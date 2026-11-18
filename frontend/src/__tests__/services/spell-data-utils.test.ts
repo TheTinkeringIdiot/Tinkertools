@@ -14,6 +14,7 @@ import {
   formatSpellParameter,
 } from '../../services/spell-data-utils';
 import type { Spell } from '../../types/api';
+import { TEST_VERSION } from '../helpers/version-fixtures';
 
 describe('spell-data-utils', () => {
   describe('getSpellFormat', () => {
@@ -36,14 +37,13 @@ describe('spell-data-utils', () => {
 
   describe('formatSpell', () => {
     const mockSpell: Spell = {
-      id: 1,
       target: 1,
       tick_count: 1,
       tick_interval: 100,
       spell_id: 53002, // Known format in SPELL_FORMATS
       spell_format: 'Old format string', // Should be ignored
       spell_params: {
-        Stat: 'Intelligence',
+        Stat: 19, // Intelligence: the backend sends stat IDs
         MinValue: 10,
         MaxValue: 20,
         TickCount: 1,
@@ -106,7 +106,7 @@ describe('spell-data-utils', () => {
         tick_count: 5,
         tick_interval: 200,
         spell_params: {
-          Stat: 'Intelligence',
+          Stat: 19, // Intelligence
           MinValue: 10,
           MaxValue: 20,
         },
@@ -212,7 +212,9 @@ describe('spell-data-utils', () => {
 
       expect(result.type).toBe('link');
       expect(result.displayValue).toBe('Item 12345');
-      expect(result.linkUrl).toBe('/items/12345');
+      // AOID links carry the game version segment: an AOID only means
+      // something inside one game database.
+      expect(result.linkUrl).toBe(`/${TEST_VERSION}/items/12345`);
     });
 
     it('should format chance parameters as percentages', () => {

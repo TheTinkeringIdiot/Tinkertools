@@ -39,6 +39,7 @@ e2e/
 ## Test Coverage
 
 Current tests:
+
 - [x] Profile CRUD (create, read, update, delete)
 - [ ] Item search and filtering
 - [ ] Equipment management
@@ -49,6 +50,7 @@ Current tests:
 ## Documentation
 
 See `/tmp/e2e-setup-guide.md` for complete documentation on:
+
 - Writing new tests
 - Creating page objects
 - Using test fixtures
@@ -73,6 +75,7 @@ test('should create profile', async ({ page }) => {
 ## Configuration
 
 See `../playwright.config.ts` for:
+
 - Browser configuration
 - Timeouts and retries
 - Screenshot/video settings

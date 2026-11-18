@@ -7,26 +7,29 @@
  * @see /frontend/src/types/nano.ts - NanoProgram interface
  */
 
-import type { NanoProgram, NanoSchool, CastingRequirement } from '@/types/nano';
+import type { Action } from '@/types/api';
+import type { NanoProgram, NanoSchoolName } from '@/types/nano';
 
 // ============================================================================
 // Nano Creation Factory
 // ============================================================================
 
 export interface NanoCreationOptions {
-  id?: number;
   aoid?: number;
   name?: string;
   ql?: number;
-  school?: NanoSchool;
-  strain?: string;
+  school?: NanoSchoolName | null;
+  /** NanoStrain ID (stat 75) */
+  strainId?: number | null;
+  strain?: string | null;
   nanoPointCost?: number;
   memoryUsage?: number;
   castingTime?: number;
   rechargeTime?: number;
-  level?: number;
-  profession?: string;
-  castingRequirements?: CastingRequirement[];
+  level?: number | null;
+  /** Professions that can cast it; empty for a nano any profession can cast */
+  professions?: string[];
+  actions?: Action[];
 }
 
 /**
@@ -41,26 +44,26 @@ export interface NanoCreationOptions {
  */
 export function createTestNano(options: NanoCreationOptions = {}): NanoProgram {
   const {
-    id = Math.floor(Math.random() * 1000000),
     aoid = Math.floor(Math.random() * 1000000),
     name = 'Test Nano',
     ql = 100,
-    school = 'Matter Creation',
+    school = 'Combat',
+    strainId = 9000,
     strain = 'TestStrain',
     nanoPointCost = 50,
     memoryUsage = 20,
     castingTime = 3,
     rechargeTime = 30,
     level = 100,
-    profession = 'All',
-    castingRequirements = [],
+    professions = [],
+    actions = [],
   } = options;
 
   return {
-    id,
     aoid,
     name,
     school,
+    strainId,
     strain,
     nanoPointCost,
     memoryUsage,
@@ -68,8 +71,8 @@ export function createTestNano(options: NanoCreationOptions = {}): NanoProgram {
     rechargeTime,
     level,
     qualityLevel: ql,
-    profession,
-    castingRequirements,
+    professions,
+    actions,
     effects: [],
   };
 }
@@ -82,10 +85,10 @@ export function createTestNano(options: NanoCreationOptions = {}): NanoProgram {
  * Iron Circle - Protection buff (QL 200)
  */
 export const mockNano1: NanoProgram = {
-  id: 1,
   aoid: 12345,
   name: 'Iron Circle',
-  school: 'Matter Metamorphosis',
+  school: 'Protection',
+  strainId: 9001,
   strain: 'IronCircle',
   nanoPointCost: 100,
   memoryUsage: 25,
@@ -93,8 +96,8 @@ export const mockNano1: NanoProgram = {
   rechargeTime: 30,
   level: 150,
   qualityLevel: 200,
-  profession: 'Adventurer',
-  castingRequirements: [],
+  professions: ['Adventurer'],
+  actions: [],
   effects: [],
 };
 
@@ -102,10 +105,10 @@ export const mockNano1: NanoProgram = {
  * Greater Fortification - Protection buff (QL 220)
  */
 export const mockNano2: NanoProgram = {
-  id: 2,
   aoid: 12346,
   name: 'Greater Fortification',
-  school: 'Matter Metamorphosis',
+  school: 'Protection',
+  strainId: 9002,
   strain: 'Fortification',
   nanoPointCost: 120,
   memoryUsage: 30,
@@ -113,8 +116,8 @@ export const mockNano2: NanoProgram = {
   rechargeTime: 30,
   level: 160,
   qualityLevel: 220,
-  profession: 'Adventurer',
-  castingRequirements: [],
+  professions: ['Adventurer'],
+  actions: [],
   effects: [],
 };
 
@@ -123,10 +126,10 @@ export const mockNano2: NanoProgram = {
  * Same strain as mockNano1, for testing strain conflicts
  */
 export const mockNanoHighPriority: NanoProgram = {
-  id: 10,
   aoid: 12350,
   name: 'Iron Circle Superior',
-  school: 'Matter Metamorphosis',
+  school: 'Protection',
+  strainId: 9001,
   strain: 'IronCircle', // Same strain as mockNano1
   nanoPointCost: 150,
   memoryUsage: 35,
@@ -134,8 +137,8 @@ export const mockNanoHighPriority: NanoProgram = {
   rechargeTime: 30,
   level: 180,
   qualityLevel: 250,
-  profession: 'Adventurer',
-  castingRequirements: [],
+  professions: ['Adventurer'],
+  actions: [],
   effects: [],
 };
 
@@ -144,10 +147,10 @@ export const mockNanoHighPriority: NanoProgram = {
  * Same strain as mockNano1, for testing strain conflicts
  */
 export const mockNanoLowPriority: NanoProgram = {
-  id: 11,
   aoid: 12340,
   name: 'Iron Circle Basic',
-  school: 'Matter Metamorphosis',
+  school: 'Protection',
+  strainId: 9001,
   strain: 'IronCircle', // Same strain as mockNano1
   nanoPointCost: 80,
   memoryUsage: 20,
@@ -155,8 +158,8 @@ export const mockNanoLowPriority: NanoProgram = {
   rechargeTime: 30,
   level: 120,
   qualityLevel: 150,
-  profession: 'Adventurer',
-  castingRequirements: [],
+  professions: ['Adventurer'],
+  actions: [],
   effects: [],
 };
 
@@ -165,10 +168,10 @@ export const mockNanoLowPriority: NanoProgram = {
  * Uses 1100 NCU, almost filling a typical character's available NCU
  */
 export const mockNanoHighNCU: NanoProgram = {
-  id: 20,
   aoid: 99999,
   name: 'Massive Buff',
-  school: 'Matter Creation',
+  school: 'Combat',
+  strainId: 9003,
   strain: 'MassiveBuff',
   nanoPointCost: 200,
   memoryUsage: 1100, // Almost fills NCU
@@ -176,8 +179,8 @@ export const mockNanoHighNCU: NanoProgram = {
   rechargeTime: 60,
   level: 200,
   qualityLevel: 300,
-  profession: 'All',
-  castingRequirements: [],
+  professions: [],
+  actions: [],
   effects: [],
 };
 
@@ -220,14 +223,14 @@ export function createMixedNanoSet(): NanoProgram[] {
     mockNano2,
     createTestNano({
       name: 'Damage Buff',
-      school: 'Matter Creation',
+      school: 'Combat',
       strain: 'DamageEnhancement',
       memoryUsage: 40,
       ql: 180,
     }),
     createTestNano({
       name: 'Heal Buff',
-      school: 'Biological Metamorphosis',
+      school: 'Medical',
       strain: 'HealingAura',
       memoryUsage: 35,
       ql: 200,
@@ -244,7 +247,7 @@ export function createMixedNanoSet(): NanoProgram[] {
  */
 export function createBuffNano(options: Partial<NanoCreationOptions> = {}): NanoProgram {
   return createTestNano({
-    school: 'Matter Creation',
+    school: 'Protection',
     strain: 'BuffStrain',
     memoryUsage: 30,
     ...options,
@@ -256,9 +259,9 @@ export function createBuffNano(options: Partial<NanoCreationOptions> = {}): Nano
  */
 export function createPriorityTestSet(): NanoProgram[] {
   return [
-    createBuffNano({ id: 101, name: 'Low Priority Buff', ql: 100, memoryUsage: 20 }),
-    createBuffNano({ id: 102, name: 'Medium Priority Buff', ql: 150, memoryUsage: 25 }),
-    createBuffNano({ id: 103, name: 'High Priority Buff', ql: 200, memoryUsage: 30 }),
+    createBuffNano({ name: 'Low Priority Buff', ql: 100, memoryUsage: 20 }),
+    createBuffNano({ name: 'Medium Priority Buff', ql: 150, memoryUsage: 25 }),
+    createBuffNano({ name: 'High Priority Buff', ql: 200, memoryUsage: 30 }),
   ];
 }
 
@@ -267,38 +270,27 @@ export function createPriorityTestSet(): NanoProgram[] {
 // ============================================================================
 
 /**
- * Create a casting requirement
+ * Create a nano's Use action (action 3), whose criteria are its casting
+ * requirements, from raw [value1, value2, operator] criteria as the /nanos
+ * endpoints return them
+ *
+ * @example
+ * // Matter Creation > 99 AND Time and Space > 99 (i.e. both >= 100)
+ * createNanoUseAction([[130, 99, 2], [131, 99, 2], [0, 0, 4]]);
  */
-export function createCastingRequirement(
-  type: 'skill' | 'stat' | 'level',
-  requirement: number | string,
-  value: number
-): CastingRequirement {
+export function createNanoUseAction(
+  criteria: Array<[value1: number, value2: number, operator: number]>,
+  itemId: number = 1
+): Action {
   return {
-    type,
-    requirement,
-    value,
-    operator: 'GreaterThan',
-    critical: true,
+    action: 3,
+    criteria: criteria.map(([value1, value2, operator], index) => ({
+      id: itemId * 100 + index,
+      value1,
+      value2,
+      operator,
+    })),
   };
-}
-
-/**
- * Create a nano with skill requirements
- * Accepts skill IDs (number) or skill names (string)
- */
-export function createNanoWithRequirements(
-  requirements: Array<[number | string, number]>,
-  options: Partial<NanoCreationOptions> = {}
-): NanoProgram {
-  const castingRequirements = requirements.map(([skill, value]) =>
-    createCastingRequirement('skill', skill, value)
-  );
-
-  return createTestNano({
-    castingRequirements,
-    ...options,
-  });
 }
 
 // ============================================================================
@@ -336,24 +328,25 @@ export function fitsInNCU(nanos: NanoProgram[], ncuLimit: number): boolean {
 /**
  * Get all unique strains from a set of nanos
  */
-export function getUniqueStrains(nanos: NanoProgram[]): string[] {
-  return [...new Set(nanos.map((n) => n.strain))];
+export function getUniqueStrains(nanos: NanoProgram[]): number[] {
+  return [...new Set(nanos.map((n) => n.strainId).filter((id): id is number => id !== null))];
 }
 
 /**
  * Find strain conflicts in a set of nanos
  */
-export function findStrainConflicts(nanos: NanoProgram[]): Map<string, NanoProgram[]> {
-  const strainMap = new Map<string, NanoProgram[]>();
+export function findStrainConflicts(nanos: NanoProgram[]): Map<number, NanoProgram[]> {
+  const strainMap = new Map<number, NanoProgram[]>();
 
   nanos.forEach((nano) => {
-    const existing = strainMap.get(nano.strain) || [];
+    if (nano.strainId === null) return;
+    const existing = strainMap.get(nano.strainId) || [];
     existing.push(nano);
-    strainMap.set(nano.strain, existing);
+    strainMap.set(nano.strainId, existing);
   });
 
   // Filter to only strains with conflicts (more than 1 nano)
-  const conflicts = new Map<string, NanoProgram[]>();
+  const conflicts = new Map<number, NanoProgram[]>();
   strainMap.forEach((nanoList, strain) => {
     if (nanoList.length > 1) {
       conflicts.set(strain, nanoList);

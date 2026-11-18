@@ -1,9 +1,27 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import type { TinkerProfile, Item } from '@/lib/tinkerprofiles/types';
+import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
+import type { Item } from '@/types/api';
 import { createDefaultProfile } from '@/lib/tinkerprofiles/constants';
 import { calculateEquipmentBonuses } from '@/services/equipment-bonus-calculator';
 import { updateProfileSkillInfo } from '@/lib/tinkerprofiles/ip-integrator';
 import { skillService } from '@/services/skill-service';
+import { createTestItem, createSpellData, createSpell } from '@/__tests__/helpers';
+
+/** Item whose Wear effect applies "Modify {Stat} by {Amount}" (spell 53045) per bonus */
+function createBonusItem(name: string, bonuses: Array<[number, number]>): Item {
+  return createTestItem({
+    name,
+    ql: 200,
+    spell_data: [
+      createSpellData({
+        event: 14, // Wear event
+        spells: bonuses.map(([stat, amount]) =>
+          createSpell({ spell_id: 53045, spell_params: { Stat: stat, Amount: amount } })
+        ),
+      }),
+    ],
+  });
+}
 
 describe('MaxNCU Equipment Bonus Application', () => {
   let profile: TinkerProfile;
@@ -14,25 +32,7 @@ describe('MaxNCU Equipment Bonus Application', () => {
 
   it('should properly apply MaxNCU bonuses from equipped items', () => {
     // Create a test item with MaxNCU bonus (stat 181)
-    const testItem: Item = {
-      aoid: 12345,
-      name: 'NCU Memory Test Item',
-      ql: 200,
-      spell_data: [
-        {
-          event: 14, // Wear event
-          spells: [
-            {
-              spell_id: 53045, // Stat modification spell
-              spell_params: {
-                Stat: 181, // MaxNCU stat ID
-                Amount: 25, // +25 NCU bonus
-              },
-            },
-          ],
-        },
-      ],
-    } as any;
+    const testItem = createBonusItem('NCU Memory Test Item', [[181, 25]]);
 
     // Equip the item
     profile.Clothing.Chest = testItem;
@@ -53,45 +53,9 @@ describe('MaxNCU Equipment Bonus Application', () => {
   });
 
   it('should stack MaxNCU bonuses from multiple items', () => {
-    const item1: Item = {
-      aoid: 12346,
-      name: 'NCU Memory 1',
-      ql: 200,
-      spell_data: [
-        {
-          event: 14,
-          spells: [
-            {
-              spell_id: 53045,
-              spell_params: {
-                Stat: 181,
-                Amount: 20,
-              },
-            },
-          ],
-        },
-      ],
-    } as any;
+    const item1 = createBonusItem('NCU Memory 1', [[181, 20]]);
 
-    const item2: Item = {
-      aoid: 12347,
-      name: 'NCU Memory 2',
-      ql: 200,
-      spell_data: [
-        {
-          event: 14,
-          spells: [
-            {
-              spell_id: 53045,
-              spell_params: {
-                Stat: 181,
-                Amount: 30,
-              },
-            },
-          ],
-        },
-      ],
-    } as any;
+    const item2 = createBonusItem('NCU Memory 2', [[181, 30]]);
 
     // Equip both items
     profile.Clothing.Chest = item1;
@@ -110,25 +74,7 @@ describe('MaxNCU Equipment Bonus Application', () => {
   });
 
   it('should handle negative MaxNCU modifiers', () => {
-    const debuffItem: Item = {
-      aoid: 12348,
-      name: 'NCU Debuff Item',
-      ql: 200,
-      spell_data: [
-        {
-          event: 14,
-          spells: [
-            {
-              spell_id: 53045,
-              spell_params: {
-                Stat: 181,
-                Amount: -15,
-              },
-            },
-          ],
-        },
-      ],
-    } as any;
+    const debuffItem = createBonusItem('NCU Debuff Item', [[181, -15]]);
 
     profile.Clothing.Chest = debuffItem;
 
@@ -143,39 +89,11 @@ describe('MaxNCU Equipment Bonus Application', () => {
   });
 
   it('should combine MaxNCU with other misc skill bonuses', () => {
-    const multiStatItem: Item = {
-      aoid: 12349,
-      name: 'Multi-Stat Item',
-      ql: 200,
-      spell_data: [
-        {
-          event: 14,
-          spells: [
-            {
-              spell_id: 53045,
-              spell_params: {
-                Stat: 181, // MaxNCU
-                Amount: 35,
-              },
-            },
-            {
-              spell_id: 53045,
-              spell_params: {
-                Stat: 276, // Add All Off
-                Amount: 10,
-              },
-            },
-            {
-              spell_id: 53045,
-              spell_params: {
-                Stat: 277, // Add All Def
-                Amount: 15,
-              },
-            },
-          ],
-        },
-      ],
-    } as any;
+    const multiStatItem = createBonusItem('Multi-Stat Item', [
+      [181, 35],
+      [276, 10],
+      [277, 15],
+    ]);
 
     profile.Clothing.Chest = multiStatItem;
 
@@ -187,8 +105,6 @@ describe('MaxNCU Equipment Bonus Application', () => {
     expect(equipmentBonuses[277]).toBe(15); // Add All Defense
 
     updateProfileSkillInfo(profile, equipmentBonuses);
-
-    console.log('Skills after update:', Object.keys(profile.skills));
 
     // Verify all skill bonuses were applied
     const maxNCUSkillId = skillService.resolveId('Max NCU');

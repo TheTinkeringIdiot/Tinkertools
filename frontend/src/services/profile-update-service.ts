@@ -3,21 +3,18 @@
  * Handles complex character metadata changes with proper recalculation of dependent values
  */
 
-import type { TinkerProfile, SkillWithIP } from '@/lib/tinkerprofiles';
-import { PROFESSION_NAMES, BREED_NAMES } from '@/services/game-data';
+import type { TinkerProfile } from '@/lib/tinkerprofiles';
+import { SKILL_COST_FACTORS } from '@/services/game-data';
 import {
   getBreedInitValue,
   calcTotalAbilityCost,
   calcTotalSkillCost,
-  calcIP,
-  calcAllTrickleDown,
   calcHP,
   calcNP,
-  getSkillCostFactor,
-  getAbilityCostFactor,
   ABILITY_INDEX_TO_STAT_ID,
 } from '@/lib/tinkerprofiles/ip-calculator';
 import { getBreedId, getProfessionId } from './game-utils';
+import { skillService } from './skill-service';
 import { updateProfileWithIPTracking } from '@/lib/tinkerprofiles/ip-integrator';
 
 export interface CharacterMetadataChanges {
@@ -85,31 +82,23 @@ export async function updateCharacterMetadata(
     }
 
     // Handle level change
-    let newLevel = originalLevel;
     if (changes.level !== undefined && changes.level !== originalLevel) {
-      newLevel = changes.level;
-      updatedProfile.Character.Level = newLevel;
+      updatedProfile.Character.Level = changes.level;
 
       // Recalculate health and nano based on new level
       recalculateHealthAndNano(updatedProfile);
     }
 
     // Handle breed change (most impactful)
-    let newBreed = originalBreed;
     if (changes.breed !== undefined) {
       // Convert incoming breed string to ID
       const breedId = getBreedId(changes.breed);
       if (breedId !== null && breedId !== undefined && breedId !== originalBreed) {
-        newBreed = breedId;
         // Store numeric ID in Character
         updatedProfile.Character.Breed = breedId;
 
         // Recalculate abilities based on new breed
-        const breedUpdateResult = await updateForBreedChange(
-          updatedProfile,
-          originalBreed,
-          newBreed
-        );
+        const breedUpdateResult = updateForBreedChange(updatedProfile, originalBreed, breedId);
 
         result.warnings.push(...breedUpdateResult.warnings);
         result.errors.push(...breedUpdateResult.errors);
@@ -121,7 +110,6 @@ export async function updateCharacterMetadata(
     }
 
     // Handle profession change
-    let newProfession = originalProfession;
     if (changes.profession !== undefined) {
       // Convert incoming profession string to ID
       const professionId = getProfessionId(changes.profession);
@@ -130,16 +118,11 @@ export async function updateCharacterMetadata(
         professionId !== undefined &&
         professionId !== originalProfession
       ) {
-        newProfession = professionId;
         // Store numeric ID in Character
         updatedProfile.Character.Profession = professionId;
 
         // Recalculate skills based on new profession
-        const professionUpdateResult = await updateForProfessionChange(
-          updatedProfile,
-          originalProfession,
-          newProfession
-        );
+        const professionUpdateResult = updateForProfessionChange(updatedProfile, professionId);
 
         result.warnings.push(...professionUpdateResult.warnings);
         result.errors.push(...professionUpdateResult.errors);
@@ -151,7 +134,7 @@ export async function updateCharacterMetadata(
     }
 
     // Recalculate IP tracking
-    const ipUpdateResult = await recalculateIPTracking(updatedProfile);
+    const ipUpdateResult = recalculateIPTracking(updatedProfile);
     if (ipUpdateResult.errors.length > 0) {
       result.errors.push(...ipUpdateResult.errors);
       return result;
@@ -198,72 +181,53 @@ export async function updateCharacterMetadata(
 }
 
 /**
- * Handle breed change - update base ability values and recalculate IP costs
+ * Handle breed change - keep the IP investment in each ability and reprice it
+ * with the new breed's cost factors. Base values, caps and totals are rebuilt
+ * from the new breed by the IP recalculation that follows.
  */
-async function updateForBreedChange(
+function updateForBreedChange(
   profile: TinkerProfile,
   oldBreedId: number,
   newBreedId: number
-): Promise<{ warnings: string[]; errors: string[] }> {
+): { warnings: string[]; errors: string[] } {
   const warnings: string[] = [];
   const errors: string[] = [];
 
-  if (!profile.Skills?.Attributes) {
+  if (!profile.skills) {
     errors.push('Profile missing ability data');
     return { warnings, errors };
   }
 
-  const abilities = profile.Skills.Attributes;
-  const abilityNames = ['Strength', 'Agility', 'Stamina', 'Intelligence', 'Sense', 'Psychic'];
-
-  // Update each ability
-  for (let i = 0; i < abilityNames.length; i++) {
-    const abilityName = abilityNames[i];
-    const ability = abilities[abilityName as keyof typeof abilities] as SkillWithIP;
-
+  for (const abilityStatId of ABILITY_INDEX_TO_STAT_ID) {
+    const ability = profile.skills[abilityStatId];
     if (!ability) continue;
 
-    // Get old and new base values
-    const abilityStatId = ABILITY_INDEX_TO_STAT_ID[i];
     const oldBaseValue = getBreedInitValue(oldBreedId, abilityStatId);
     const newBaseValue = getBreedInitValue(newBreedId, abilityStatId);
+    const improvements = ability.pointsFromIp || 0;
 
-    // Calculate improvements (how much the user invested)
-    const improvements = ability.value - oldBaseValue;
-
-    // Set new total value (new base + same improvements), ensuring it's never below the new base
-    ability.value = Math.max(newBaseValue + improvements, newBaseValue);
-
-    // Recalculate IP cost with new breed cost factors
-    if (improvements > 0) {
-      ability.ipSpent = calcTotalAbilityCost(improvements, newBreedId, abilityStatId);
-      ability.pointFromIp = improvements;
-    } else {
-      ability.ipSpent = 0;
-      ability.pointFromIp = 0;
-    }
+    ability.base = newBaseValue;
+    ability.ipSpent =
+      improvements > 0 ? calcTotalAbilityCost(improvements, newBreedId, abilityStatId) : 0;
 
     // Add warning if base value changed significantly
     if (Math.abs(newBaseValue - oldBaseValue) > 3) {
       const change = newBaseValue > oldBaseValue ? 'increased' : 'decreased';
+      const abilityName = skillService.getName(abilityStatId);
       warnings.push(`${abilityName} base value ${change} from ${oldBaseValue} to ${newBaseValue}`);
     }
   }
-
-  // Recalculate trickle-down bonuses
-  await recalculateTrickleDown(profile);
 
   return { warnings, errors };
 }
 
 /**
- * Handle profession change - recalculate skill IP costs
+ * Handle profession change - reprice the IP invested in each trainable skill
  */
-async function updateForProfessionChange(
+function updateForProfessionChange(
   profile: TinkerProfile,
-  oldProfessionId: number,
   newProfessionId: number
-): Promise<{ warnings: string[]; errors: string[] }> {
+): { warnings: string[]; errors: string[] } {
   const warnings: string[] = [];
   const errors: string[] = [];
 
@@ -272,60 +236,26 @@ async function updateForProfessionChange(
     return { warnings, errors };
   }
 
-  const skillCategories = [
-    'Body_Defense',
-    'Melee_Weapons',
-    'Melee_Specials',
-    'Ranged_Weapons',
-    'Ranged_Specials',
-    'Nanos_Casting',
-    'Exploring',
-    'Trade_Repair',
-    'Combat_Healing',
-  ];
-
-  // Map of skill names to their IDs (this would need to be expanded based on actual skill mapping)
-  const skillNameToId: Record<string, number> = {
-    Body_Dev: 0,
-    Nano_Pool: 1,
-    Martial_Arts: 2,
-    // ... (this would need to be completed with all skill mappings)
-  };
-
   let significantChanges = 0;
 
-  // Update skill costs for each category
-  for (const category of skillCategories) {
-    const skillCategory = profile.Skills[category as keyof typeof profile.Skills];
-    if (!skillCategory || typeof skillCategory !== 'object') continue;
+  for (const [skillIdStr, skillData] of Object.entries(profile.skills)) {
+    const skillId = Number(skillIdStr);
+    if (!SKILL_COST_FACTORS[skillId]) continue;
 
-    for (const [skillName, skill] of Object.entries(skillCategory)) {
-      if (!skill || typeof skill !== 'object' || !('value' in skill)) continue;
+    const improvements = skillData.pointsFromIp || 0;
+    if (improvements <= 0) continue;
 
-      const skillData = skill as SkillWithIP;
-      const skillId = skillNameToId[skillName];
+    const oldCost = skillData.ipSpent || 0;
+    const newCost = calcTotalSkillCost(improvements, newProfessionId, skillId);
+    skillData.ipSpent = newCost;
 
-      if (skillId === undefined) continue;
-
-      // Calculate improvements
-      const improvements = skillData.pointFromIp || 0;
-
-      if (improvements > 0) {
-        // Recalculate IP cost with new profession
-        const oldCost = skillData.ipSpent || 0;
-        const newCost = calcTotalSkillCost(improvements, newProfessionId, skillId);
-
-        skillData.ipSpent = newCost;
-
-        // Track significant cost changes
-        const costDifference = Math.abs(newCost - oldCost);
-        if (costDifference > improvements * 0.2) {
-          // > 20% change
-          significantChanges++;
-          const change = newCost > oldCost ? 'increased' : 'decreased';
-          warnings.push(`${skillName} IP cost ${change} from ${oldCost} to ${newCost}`);
-        }
-      }
+    // Track significant cost changes (> 20%)
+    if (Math.abs(newCost - oldCost) > oldCost * 0.2) {
+      significantChanges++;
+      const change = newCost > oldCost ? 'increased' : 'decreased';
+      warnings.push(
+        `${skillService.getName(skillId)} IP cost ${change} from ${oldCost} to ${newCost}`
+      );
     }
   }
 
@@ -336,43 +266,6 @@ async function updateForProfessionChange(
   }
 
   return { warnings, errors };
-}
-
-/**
- * Recalculate trickle-down bonuses from abilities to skills
- */
-async function recalculateTrickleDown(profile: TinkerProfile): Promise<void> {
-  if (!profile.Skills?.Attributes) return;
-
-  // Get current ability values
-  const abilities = [
-    profile.Skills.Attributes.Strength?.value || 0,
-    profile.Skills.Attributes.Agility?.value || 0,
-    profile.Skills.Attributes.Stamina?.value || 0,
-    profile.Skills.Attributes.Intelligence?.value || 0,
-    profile.Skills.Attributes.Sense?.value || 0,
-    profile.Skills.Attributes.Psychic?.value || 0,
-  ];
-
-  // Calculate all trickle-down bonuses
-  const trickleDownResult = calcAllTrickleDown(abilities);
-
-  // Apply trickle-down to skills (this would need proper skill mapping)
-  // For now, we'll just store the trickle values where available
-  const skillCategories = Object.keys(profile.Skills).filter((key) => key !== 'Attributes');
-
-  for (const category of skillCategories) {
-    const skillCategory = profile.Skills[category as keyof typeof profile.Skills];
-    if (!skillCategory || typeof skillCategory !== 'object') continue;
-
-    for (const [skillName, skill] of Object.entries(skillCategory)) {
-      if (!skill || typeof skill !== 'object' || !('trickleDown' in skill)) continue;
-
-      // This would need proper mapping from skill names to trickle-down values
-      // For now, we'll leave existing trickle values or set to 0
-      (skill as any).trickleDown = (skill as any).trickleDown || 0;
-    }
-  }
 }
 
 /**
@@ -413,9 +306,7 @@ export function recalculateHealthAndNano(profile: TinkerProfile): void {
 /**
  * Recalculate complete IP tracking information with caps and trickle-down updates
  */
-async function recalculateIPTracking(
-  profile: TinkerProfile
-): Promise<{ warnings: string[]; errors: string[] }> {
+function recalculateIPTracking(profile: TinkerProfile): { warnings: string[]; errors: string[] } {
   const warnings: string[] = [];
   const errors: string[] = [];
 
@@ -434,7 +325,7 @@ async function recalculateIPTracking(
     // Use the integrated IP tracker which handles caps, trickle-down, and comprehensive IP calculations
     let updatedProfile: TinkerProfile;
     try {
-      updatedProfile = await updateProfileWithIPTracking(profile);
+      updatedProfile = updateProfileWithIPTracking(profile);
       console.log('IP tracking recalculation completed successfully');
     } catch (ipError) {
       const errorMessage = `IP tracking calculation failed: ${ipError instanceof Error ? ipError.message : String(ipError)}`;
@@ -451,8 +342,8 @@ async function recalculateIPTracking(
         warnings.push('Updated profile missing IP tracker data');
       }
 
-      if (updatedProfile.Skills) {
-        profile.Skills = updatedProfile.Skills; // This includes updated caps and trickle-down values
+      if (updatedProfile.skills) {
+        profile.skills = updatedProfile.skills; // This includes updated caps and trickle-down values
       } else {
         warnings.push('Updated profile missing skills data');
       }
@@ -504,48 +395,13 @@ async function recalculateIPTracking(
     console.error('IP recalculation error context:', {
       error,
       profileName: profile?.Character?.Name || 'unknown',
-      hasSkills: !!profile?.Skills,
+      hasSkills: !!profile?.skills,
       hasIPTracker: !!profile?.IPTracker,
       stack: error instanceof Error ? error.stack : undefined,
     });
   }
 
   return { warnings, errors };
-}
-
-/**
- * Validate that ability values meet breed minimums
- */
-function validateAbilityMinimums(profile: TinkerProfile): { errors: string[]; warnings: string[] } {
-  const errors: string[] = [];
-  const warnings: string[] = [];
-
-  if (!profile.Character?.Breed || !profile.Skills?.Attributes) {
-    return { errors, warnings };
-  }
-
-  // Direct access - Character stores numeric IDs
-  const breedId = profile.Character.Breed || 0;
-  const abilityNames = ['Strength', 'Agility', 'Stamina', 'Intelligence', 'Sense', 'Psychic'];
-
-  for (let i = 0; i < abilityNames.length; i++) {
-    const abilityName = abilityNames[i];
-    const ability = profile.Skills.Attributes[
-      abilityName as keyof typeof profile.Skills.Attributes
-    ] as SkillWithIP;
-
-    if (ability) {
-      const minimumValue = getBreedInitValue(breedId, i);
-      if (ability.value < minimumValue) {
-        const breedName = BREED_NAMES[breedId] || 'Unknown';
-        errors.push(
-          `${abilityName} (${ability.value}) is below minimum value for ${breedName} breed (${minimumValue})`
-        );
-      }
-    }
-  }
-
-  return { errors, warnings };
 }
 
 /**
@@ -580,11 +436,6 @@ export function validateCharacterBuild(profile: TinkerProfile): {
   if (level < 1 || level > 220) {
     errors.push(`Invalid character level: ${level}`);
   }
-
-  // Check ability minimums
-  const abilityValidation = validateAbilityMinimums(profile);
-  errors.push(...abilityValidation.errors);
-  warnings.push(...abilityValidation.warnings);
 
   return {
     valid: errors.length === 0,
@@ -627,7 +478,7 @@ export async function handleEquipmentBonusRecalculation(
     // This will call the equipment bonus calculator if it's integrated into the IP system
     let ipUpdatedProfile: TinkerProfile;
     try {
-      ipUpdatedProfile = await updateProfileWithIPTracking(updatedProfile);
+      ipUpdatedProfile = updateProfileWithIPTracking(updatedProfile);
       console.log('Equipment bonus recalculation completed successfully');
     } catch (error) {
       result.errors.push(

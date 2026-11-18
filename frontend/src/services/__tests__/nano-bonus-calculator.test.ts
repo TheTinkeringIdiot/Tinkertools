@@ -17,12 +17,12 @@ import {
   parseNanoForStatBonuses,
   parseNanoForStatBonusesWithErrors,
   nanoBonusCalculator,
-  STAT_BONUS_SPELL_IDS,
-  NANO_EVENTS,
-  type NanoStatBonus,
-  type NanoBonusError,
-  type NanoCalculationResult,
 } from '../nano-bonus-calculator';
+
+/** Deliberately malformed input, typed as whatever the code under test accepts */
+function malformed<T>(value: unknown): T {
+  return value as T;
+}
 
 describe('NanoBonusCalculator', () => {
   let calculator: NanoBonusCalculator;
@@ -47,7 +47,6 @@ describe('NanoBonusCalculator', () => {
   // ==========================================================================
 
   const createValidSpell = (statId: number, amount: number, spellId: number = 53045): Spell => ({
-    id: Math.floor(Math.random() * 10000),
     spell_id: spellId,
     spell_params: {
       Stat: statId,
@@ -57,7 +56,6 @@ describe('NanoBonusCalculator', () => {
   });
 
   const createValidSpellData = (spells: Spell[], event: number = 1): SpellData => ({
-    id: Math.floor(Math.random() * 10000),
     event,
     spells,
   });
@@ -68,7 +66,6 @@ describe('NanoBonusCalculator', () => {
     ql: number = 200,
     spellData: SpellData[] = []
   ): Item => ({
-    id: Math.floor(Math.random() * 10000),
     aoid,
     name,
     ql,
@@ -76,9 +73,9 @@ describe('NanoBonusCalculator', () => {
     item_class: 1,
     is_nano: true, // This is a nano item
     stats: [
-      { id: 1, stat: 54, value: 25 }, // NCU cost
-      { id: 2, stat: 75, value: 100 + aoid }, // NanoStrain (unique per nano)
-      { id: 3, stat: 551, value: 1000 }, // StackingOrder
+      { stat: 54, value: 25 }, // NCU cost
+      { stat: 75, value: 100 + aoid }, // NanoStrain (unique per nano)
+      { stat: 551, value: 1000 }, // StackingOrder
     ],
     spell_data: spellData,
     actions: [],
@@ -378,20 +375,20 @@ describe('NanoBonusCalculator', () => {
     });
 
     it('should handle null/undefined nanos array gracefully', () => {
-      expect(calculator.calculateBonuses(null as any)).toEqual({});
-      expect(calculator.calculateBonuses(undefined as any)).toEqual({});
+      expect(calculator.calculateBonuses(malformed(null))).toEqual({});
+      expect(calculator.calculateBonuses(malformed(undefined))).toEqual({});
 
-      const result = calculateNanoBonusesWithErrors(null as any);
+      const result = calculateNanoBonusesWithErrors(malformed(null));
       expect(result.success).toBe(false);
       expect(result.errors.length).toBeGreaterThan(0);
       expect(result.bonuses).toEqual({});
     });
 
     it('should handle non-array nanos input', () => {
-      const result = calculator.calculateBonuses('not an array' as any);
+      const result = calculator.calculateBonuses(malformed('not an array'));
       expect(result).toEqual({});
 
-      const detailedResult = calculateNanoBonusesWithErrors('not an array' as any);
+      const detailedResult = calculateNanoBonusesWithErrors(malformed('not an array'));
       expect(detailedResult.success).toBe(false);
       expect(detailedResult.errors).toEqual(
         expect.arrayContaining([
@@ -411,7 +408,7 @@ describe('NanoBonusCalculator', () => {
 
       const nanosWithNull = [validNano1, null, validNano2];
 
-      const result = calculator.calculateBonuses(nanosWithNull as any);
+      const result = calculator.calculateBonuses(malformed(nanosWithNull));
       expect(result).toEqual({
         17: 20, // Assault Rifle - both valid nanos contribute
       });
@@ -420,7 +417,7 @@ describe('NanoBonusCalculator', () => {
     it('should handle nanos with missing spell_data', () => {
       const nanoWithoutSpellData = createValidNanoItem('No Spell Data', 12345, 200);
       // Explicitly remove spell_data
-      delete (nanoWithoutSpellData as any).spell_data;
+      delete (nanoWithoutSpellData as Partial<Item>).spell_data;
 
       const result = calculator.calculateBonuses([nanoWithoutSpellData]);
       expect(result).toEqual({}); // No bonuses, but no crash
@@ -444,7 +441,7 @@ describe('NanoBonusCalculator', () => {
 
     it('should handle nanos with invalid spell_data format', () => {
       const nanoWithInvalidSpellData = createValidNanoItem('Invalid Spell Data', 12345, 200);
-      nanoWithInvalidSpellData.spell_data = 'not an array' as any;
+      nanoWithInvalidSpellData.spell_data = malformed('not an array');
 
       const result = calculateNanoBonusesWithErrors([nanoWithInvalidSpellData]);
       expect(result.bonuses).toEqual({});
@@ -460,7 +457,7 @@ describe('NanoBonusCalculator', () => {
 
     it('should handle spells with missing spell_id', () => {
       const invalidSpell = { spell_params: { Stat: 17, Amount: 10 } }; // Missing spell_id
-      const spellData = createValidSpellData([invalidSpell as any], 1);
+      const spellData = createValidSpellData([malformed(invalidSpell)], 1);
       const nano = createValidNanoItem('Missing Spell ID', 12345, 200, [spellData]);
 
       const result = calculator.calculateBonuses([nano]);
@@ -478,7 +475,6 @@ describe('NanoBonusCalculator', () => {
 
     it('should handle spells with missing parameters', () => {
       const spellWithMissingParams: Spell = {
-        id: Math.floor(Math.random() * 10000),
         spell_id: 53045,
         spell_params: {}, // Empty parameters
         criteria: [],
@@ -534,7 +530,7 @@ describe('NanoBonusCalculator', () => {
       const validNano = createValidNanoItem('Valid Nano', 11111, 200, [validSpellData]);
 
       const invalidNano = createValidNanoItem('Invalid Nano', 22222, 200);
-      invalidNano.spell_data = [{ invalid: 'data' } as any];
+      invalidNano.spell_data = [malformed({ invalid: 'data' })];
 
       const anotherValidNano = createValidNanoItem('Another Valid Nano', 33333, 200, [
         validSpellData,
@@ -553,9 +549,9 @@ describe('NanoBonusCalculator', () => {
       // Create nano with extremely high NCU cost
       const highNCUNano = createValidNanoItem('High NCU Nano', 12345, 200, [spellData]);
       highNCUNano.stats = [
-        { id: 1, stat: 54, value: 10000 }, // Very high NCU cost
-        { id: 2, stat: 75, value: 100 },
-        { id: 3, stat: 551, value: 1000 },
+        { stat: 54, value: 10000 }, // Very high NCU cost
+        { stat: 75, value: 100 },
+        { stat: 551, value: 1000 },
       ];
 
       const result = calculateNanoBonusesWithErrors([highNCUNano]);
@@ -594,18 +590,18 @@ describe('NanoBonusCalculator', () => {
         createValidSpellData([createValidSpell(17, 10)], 1),
       ]);
       nano1.stats = [
-        { id: 1, stat: 54, value: 25 },
-        { id: 2, stat: 75, value: 100 }, // Different NanoStrain
-        { id: 3, stat: 551, value: 1000 },
+        { stat: 54, value: 25 },
+        { stat: 75, value: 100 }, // Different NanoStrain
+        { stat: 551, value: 1000 },
       ];
 
       const nano2 = createValidNanoItem('Nano 2', 22222, 200, [
         createValidSpellData([createValidSpell(17, 15)], 1),
       ]);
       nano2.stats = [
-        { id: 1, stat: 54, value: 30 },
-        { id: 2, stat: 75, value: 200 }, // Different NanoStrain
-        { id: 3, stat: 551, value: 1000 },
+        { stat: 54, value: 30 },
+        { stat: 75, value: 200 }, // Different NanoStrain
+        { stat: 551, value: 1000 },
       ];
 
       const result = calculator.calculateBonuses([nano1, nano2]);
@@ -621,18 +617,18 @@ describe('NanoBonusCalculator', () => {
         createValidSpellData([createValidSpell(17, 20)], 1),
       ]);
       highPriorityNano.stats = [
-        { id: 1, stat: 54, value: 25 },
-        { id: 2, stat: 75, value: 100 }, // Same NanoStrain
-        { id: 3, stat: 551, value: 2000 }, // Higher StackingOrder
+        { stat: 54, value: 25 },
+        { stat: 75, value: 100 }, // Same NanoStrain
+        { stat: 551, value: 2000 }, // Higher StackingOrder
       ];
 
       const lowPriorityNano = createValidNanoItem('Low Priority', 22222, 200, [
         createValidSpellData([createValidSpell(17, 10)], 1),
       ]);
       lowPriorityNano.stats = [
-        { id: 1, stat: 54, value: 20 },
-        { id: 2, stat: 75, value: 100 }, // Same NanoStrain
-        { id: 3, stat: 551, value: 1000 }, // Lower StackingOrder
+        { stat: 54, value: 20 },
+        { stat: 75, value: 100 }, // Same NanoStrain
+        { stat: 551, value: 1000 }, // Lower StackingOrder
       ];
 
       // Calculator should still aggregate both (conflict resolution at store level)
@@ -697,16 +693,16 @@ describe('NanoBonusCalculator', () => {
     });
 
     it('should handle errors in convenience functions gracefully', () => {
-      const result1 = calculateNanoBonuses(null as any);
+      const result1 = calculateNanoBonuses(malformed(null));
       expect(result1).toEqual({});
 
-      const result2 = parseNanoForStatBonuses(null as any);
+      const result2 = parseNanoForStatBonuses(malformed(null));
       expect(result2).toEqual([]);
 
-      const result3 = calculateNanoBonusesWithErrors(null as any);
+      const result3 = calculateNanoBonusesWithErrors(malformed(null));
       expect(result3.success).toBe(false);
 
-      const result4 = parseNanoForStatBonusesWithErrors(null as any);
+      const result4 = parseNanoForStatBonusesWithErrors(malformed(null));
       expect(result4.bonuses).toEqual([]);
       expect(result4.errors.length).toBeGreaterThan(0);
     });
@@ -762,7 +758,7 @@ describe('NanoBonusCalculator', () => {
     it('should provide comprehensive error reporting', () => {
       const invalidNanos: Item[] = [
         // null entry
-        null as any,
+        malformed(null),
         // Valid nano for comparison
         createValidNanoItem('Valid Nano', 10001, 200, [
           createValidSpellData([createValidSpell(17, 10)], 1),

@@ -15,8 +15,8 @@ Displays comprehensive nano information including effects, requirements, and com
       <!-- Header Information -->
       <div class="flex items-start gap-4 pb-4 border-b border-surface-200 dark:border-surface-700">
         <Avatar
-          :label="getSchoolShortName(nano.school)"
-          :class="schoolAvatarClass"
+          :label="schoolInitials(nano.school)"
+          :class="avatarClass"
           size="xlarge"
           shape="circle"
         />
@@ -37,11 +37,16 @@ Displays comprehensive nano information including effects, requirements, and com
           </div>
 
           <div class="flex flex-wrap gap-2 mb-3">
-            <Badge :value="nano.school" severity="info" />
+            <Badge v-if="nano.school" :value="nano.school" severity="info" />
             <Badge :value="`QL ${nano.qualityLevel}`" severity="secondary" />
             <Badge v-if="nano.level" :value="`Level ${nano.level}`" severity="secondary" />
             <Badge v-if="nano.strain" :value="`Strain ${nano.strain}`" severity="warning" />
-            <Badge v-if="nano.profession" :value="nano.profession" severity="help" />
+            <Badge
+              v-for="profession in nano.professions"
+              :key="profession"
+              :value="profession"
+              severity="help"
+            />
           </div>
 
           <p v-if="nano.description" class="text-surface-600 dark:text-surface-400">
@@ -61,7 +66,13 @@ Displays comprehensive nano information including effects, requirements, and com
           <div class="flex-1">
             <div class="flex items-center justify-between mb-2">
               <h3 class="font-semibold">
-                {{ compatibilityInfo.canCast ? 'Can Cast' : 'Cannot Cast' }}
+                {{
+                  compatibilityInfo.castState === 'castable'
+                    ? 'Can Cast'
+                    : compatibilityInfo.castState === 'unverified'
+                      ? 'Can Cast, If...'
+                      : 'Cannot Cast'
+                }}
               </h3>
               <div class="flex items-center gap-2">
                 <span class="text-sm">Compatibility Score:</span>
@@ -74,34 +85,26 @@ Displays comprehensive nano information including effects, requirements, and com
 
             <!-- Compatibility Details -->
             <div v-if="!compatibilityInfo.canCast" class="space-y-2 text-sm">
-              <div v-if="compatibilityInfo.skillDeficits.length > 0">
-                <strong>Skill Requirements Not Met:</strong>
-                <ul class="list-disc list-inside ml-2 mt-1">
-                  <li v-for="deficit in compatibilityInfo.skillDeficits" :key="deficit.skill">
-                    {{ deficit.skill }}: {{ deficit.current }}/{{ deficit.required }}
-                    <span class="text-red-600 dark:text-red-400"
-                      >(need {{ deficit.deficit }} more)</span
-                    >
-                  </li>
-                </ul>
-              </div>
-
-              <div v-if="compatibilityInfo.statDeficits.length > 0">
-                <strong>Stat Requirements Not Met:</strong>
-                <ul class="list-disc list-inside ml-2 mt-1">
-                  <li v-for="deficit in compatibilityInfo.statDeficits" :key="deficit.stat">
-                    {{ deficit.stat }}: {{ deficit.current }}/{{ deficit.required }}
-                    <span class="text-red-600 dark:text-red-400"
-                      >(need {{ deficit.deficit }} more)</span
-                    >
-                  </li>
-                </ul>
-              </div>
-
-              <div v-if="compatibilityInfo.levelDeficit > 0">
-                <strong>Level Requirement:</strong>
-                Need {{ compatibilityInfo.levelDeficit }} more levels
-              </div>
+              <strong>Requirements Not Met:</strong>
+              <ul class="list-disc list-inside ml-2 mt-1">
+                <li v-for="(req, index) in compatibilityInfo.unmetRequirements" :key="index">
+                  {{ req.description ?? `${req.statName} ${req.operator} ${req.required}` }}
+                  <span v-if="!req.description" class="text-red-600 dark:text-red-400"
+                    >(have {{ req.current }})</span
+                  >
+                </li>
+              </ul>
+            </div>
+            <div v-else-if="compatibilityInfo.castState === 'unverified'" class="space-y-2 text-sm">
+              <strong>Not Checkable From Your Profile:</strong>
+              <ul class="list-disc list-inside ml-2 mt-1">
+                <li
+                  v-for="requirement in compatibilityInfo.unverifiedRequirements"
+                  :key="requirement.description"
+                >
+                  <CriterionReference :criterion="requirement" />
+                </li>
+              </ul>
             </div>
 
             <!-- Resource Information -->
@@ -133,7 +136,7 @@ Displays comprehensive nano information including effects, requirements, and com
                 <div class="space-y-2 text-sm">
                   <div class="grid grid-cols-2 gap-2">
                     <span class="text-surface-600 dark:text-surface-400">School:</span>
-                    <span class="font-medium">{{ nano.school }}</span>
+                    <span class="font-medium">{{ nano.school || 'Unknown' }}</span>
                   </div>
                   <div class="grid grid-cols-2 gap-2">
                     <span class="text-surface-600 dark:text-surface-400">Quality Level:</span>
@@ -147,9 +150,9 @@ Displays comprehensive nano information including effects, requirements, and com
                     <span class="text-surface-600 dark:text-surface-400">Strain:</span>
                     <span class="font-medium">{{ nano.strain }}</span>
                   </div>
-                  <div v-if="nano.profession" class="grid grid-cols-2 gap-2">
+                  <div v-if="nano.professions.length" class="grid grid-cols-2 gap-2">
                     <span class="text-surface-600 dark:text-surface-400">Profession:</span>
-                    <span class="font-medium">{{ nano.profession }}</span>
+                    <span class="font-medium">{{ nano.professions.join(', ') }}</span>
                   </div>
                 </div>
               </div>
@@ -166,11 +169,11 @@ Displays comprehensive nano information including effects, requirements, and com
                   </div>
                   <div v-if="nano.castingTime" class="grid grid-cols-2 gap-2">
                     <span class="text-surface-600 dark:text-surface-400">Casting Time:</span>
-                    <span class="font-medium">{{ formatTime(nano.castingTime) }}</span>
+                    <span class="font-medium">{{ formatCentiseconds(nano.castingTime) }}</span>
                   </div>
                   <div v-if="nano.rechargeTime" class="grid grid-cols-2 gap-2">
                     <span class="text-surface-600 dark:text-surface-400">Recharge Time:</span>
-                    <span class="font-medium">{{ formatTime(nano.rechargeTime) }}</span>
+                    <span class="font-medium">{{ formatCentiseconds(nano.rechargeTime) }}</span>
                   </div>
                   <div v-if="nano.memoryUsage" class="grid grid-cols-2 gap-2">
                     <span class="text-surface-600 dark:text-surface-400">Memory Usage:</span>
@@ -221,36 +224,15 @@ Displays comprehensive nano information including effects, requirements, and com
 
         <!-- Requirements Tab -->
         <TabPanel header="Requirements">
-          <div v-if="nano.castingRequirements && nano.castingRequirements.length > 0">
+          <div v-if="useAction && useAction.criteria.length > 0">
             <h4 class="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-4">
               Casting Requirements
             </h4>
-            <div class="space-y-3">
-              <div
-                v-for="(req, index) in nano.castingRequirements"
-                :key="index"
-                class="flex items-center justify-between p-3 bg-surface-50 dark:bg-surface-800 rounded-lg"
-              >
-                <div class="flex items-center gap-3">
-                  <i
-                    :class="getRequirementIcon(req.type)"
-                    class="text-surface-500 dark:text-surface-400"
-                  ></i>
-                  <div>
-                    <div class="font-medium">{{ formatRequirement(req) }}</div>
-                    <div v-if="req.critical" class="text-xs text-red-600 dark:text-red-400">
-                      Critical Requirement
-                    </div>
-                  </div>
-                </div>
-
-                <div v-if="showCompatibility && activeProfile" class="text-right">
-                  <div :class="getRequirementStatusClass(req)">
-                    {{ getRequirementStatus(req) }}
-                  </div>
-                </div>
-              </div>
-            </div>
+            <CriteriaDisplay
+              :criteria="useAction.criteria"
+              :character-stats="characterStats"
+              :expanded="true"
+            />
           </div>
           <div v-else class="text-center py-8 text-surface-500 dark:text-surface-400">
             No casting requirements
@@ -416,14 +398,14 @@ Displays comprehensive nano information including effects, requirements, and com
             @click="toggleFavorite"
           />
         </div>
-        <Button label="Close" @click="handleClose" autofocus />
+        <Button label="Close" autofocus @click="handleClose" />
       </div>
     </template>
   </Dialog>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { computed } from 'vue';
 import Avatar from 'primevue/avatar';
 import Badge from 'primevue/badge';
 import Button from 'primevue/button';
@@ -432,20 +414,22 @@ import Dialog from 'primevue/dialog';
 import TabView from 'primevue/tabview';
 import TabPanel from 'primevue/tabpanel';
 
-import type {
-  NanoProgram,
-  TinkerProfile,
-  NanoCompatibilityInfo,
-  CastingRequirement,
-  NanoEffect,
-} from '@/types/nano';
+import CriteriaDisplay from '@/components/CriteriaDisplay.vue';
+import CriterionReference from '@/components/CriterionReference.vue';
+import { getNanoCompatibility, getNanoUseAction } from './nano-compatibility';
+import { schoolAvatarClass, schoolInitials } from './nano-schools';
+import { useNanosStore } from '@/stores/nanosStore';
+import { formatCentiseconds } from '@/utils/nuke-casting-calculations';
+import { mapProfileToStats } from '@/utils/profile-stats-mapper';
+import type { ReadonlyTinkerProfile } from '@/lib/tinkerprofiles/types';
+import type { NanoProgram, NanoEffect, EffectDuration, TargetingData } from '@/types/nano';
 
 // Props
 const props = withDefaults(
   defineProps<{
     visible: boolean;
     nano?: NanoProgram | null;
-    activeProfile?: TinkerProfile | null;
+    activeProfile?: ReadonlyTinkerProfile | null;
     showCompatibility?: boolean;
   }>(),
   {
@@ -463,105 +447,29 @@ const emit = defineEmits<{
 }>();
 
 // Reactive state
-const isFavorite = ref(false);
+const nanosStore = useNanosStore();
+const isFavorite = computed(() => !!props.nano && nanosStore.isFavorite(props.nano.aoid));
 
 // Computed
-const schoolAvatarClass = computed(() => {
-  if (!props.nano) return 'bg-surface-500 text-white';
+const avatarClass = computed(() => schoolAvatarClass(props.nano?.school));
 
-  const schoolColors: Record<string, string> = {
-    'Matter Metamorphosis': 'bg-red-500 text-white',
-    'Biological Metamorphosis': 'bg-green-500 text-white',
-    'Psychological Modifications': 'bg-purple-500 text-white',
-    'Matter Creation': 'bg-blue-500 text-white',
-    'Time and Space': 'bg-yellow-500 text-white',
-    'Sensory Improvement': 'bg-indigo-500 text-white',
-  };
-  return schoolColors[props.nano.school] || 'bg-surface-500 text-white';
-});
+const useAction = computed(() => (props.nano ? getNanoUseAction(props.nano) : undefined));
 
-const compatibilityInfo = computed((): NanoCompatibilityInfo | null => {
-  if (!props.showCompatibility || !props.activeProfile || !props.nano) {
-    return null;
-  }
+// The profile as a stat-ID map
+const characterStats = computed(() =>
+  props.showCompatibility && props.activeProfile ? mapProfileToStats(props.activeProfile) : null
+);
 
-  const profile = props.activeProfile;
-  const requirements = props.nano.castingRequirements || [];
-
-  let canCast = true;
-  let skillDeficits: { skill: string; current: number; required: number; deficit: number }[] = [];
-  let statDeficits: { stat: string; current: number; required: number; deficit: number }[] = [];
-  let levelDeficit = 0;
-
-  for (const req of requirements) {
-    switch (req.type) {
-      case 'skill':
-        const skill = req.requirement as string;
-        const currentSkill = profile.skills[skill] || 0;
-        if (currentSkill < req.value) {
-          canCast = false;
-          skillDeficits.push({
-            skill,
-            current: currentSkill,
-            required: req.value,
-            deficit: req.value - currentSkill,
-          });
-        }
-        break;
-
-      case 'stat':
-        const stat = req.requirement as string;
-        const currentStat = profile.stats[stat] || 0;
-        if (currentStat < req.value) {
-          canCast = false;
-          statDeficits.push({
-            stat,
-            current: currentStat,
-            required: req.value,
-            deficit: req.value - currentStat,
-          });
-        }
-        break;
-
-      case 'level':
-        if (profile.level < req.value) {
-          canCast = false;
-          levelDeficit = req.value - profile.level;
-        }
-        break;
-    }
-  }
-
-  const totalRequirements = requirements.length;
-  const metRequirements =
-    totalRequirements - skillDeficits.length - statDeficits.length - (levelDeficit > 0 ? 1 : 0);
-  const compatibilityScore =
-    totalRequirements > 0 ? Math.round((metRequirements / totalRequirements) * 100) : 100;
-
-  const allSkillReqs = requirements.filter((req) => req.type === 'skill');
-  let averageSkillGap = 0;
-
-  if (allSkillReqs.length > 0) {
-    const totalGap = skillDeficits.reduce((sum, deficit) => sum + deficit.deficit, 0);
-    averageSkillGap = Math.round(totalGap / allSkillReqs.length);
-  }
-
-  return {
-    canCast,
-    compatibilityScore,
-    averageSkillGap,
-    skillDeficits,
-    statDeficits,
-    levelDeficit,
-    memoryUsage: props.nano.memoryUsage || 0,
-    nanoPointCost: props.nano.nanoPointCost || 0,
-  };
-});
+const compatibilityInfo = computed(() =>
+  props.nano && characterStats.value ? getNanoCompatibility(props.nano, characterStats.value) : null
+);
 
 const compatibilityPanelClass = computed(() => {
   if (!compatibilityInfo.value) return '';
 
-  if (compatibilityInfo.value.canCast) {
+  if (compatibilityInfo.value.castState === 'unverified') {
+    return 'bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800';
+  } else if (compatibilityInfo.value.canCast) {
     return 'bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800';
   } else if (compatibilityInfo.value.compatibilityScore >= 75) {
     return 'bg-yellow-50 dark:bg-yellow-950 border-yellow-200 dark:border-yellow-800';
@@ -573,7 +481,9 @@ const compatibilityPanelClass = computed(() => {
 const compatibilityIcon = computed(() => {
   if (!compatibilityInfo.value) return '';
 
-  if (compatibilityInfo.value.canCast) {
+  if (compatibilityInfo.value.castState === 'unverified') {
+    return 'pi pi-question-circle text-blue-600 dark:text-blue-400';
+  } else if (compatibilityInfo.value.canCast) {
     return 'pi pi-check-circle text-green-600 dark:text-green-400';
   } else if (compatibilityInfo.value.compatibilityScore >= 75) {
     return 'pi pi-exclamation-triangle text-yellow-600 dark:text-yellow-400';
@@ -591,18 +501,6 @@ const compatibilityScoreSeverity = computed(() => {
 });
 
 // Methods
-const getSchoolShortName = (school: string): string => {
-  const shortNames: Record<string, string> = {
-    'Matter Metamorphosis': 'MM',
-    'Biological Metamorphosis': 'BM',
-    'Psychological Modifications': 'PM',
-    'Matter Creation': 'MC',
-    'Time and Space': 'TS',
-    'Sensory Improvement': 'SI',
-  };
-  return shortNames[school] || school.charAt(0);
-};
-
 const formatTime = (seconds: number): string => {
   if (seconds < 60) {
     return `${seconds}s`;
@@ -617,85 +515,20 @@ const formatTime = (seconds: number): string => {
   }
 };
 
-const formatDuration = (duration: any): string => {
-  if (typeof duration === 'number') {
-    return formatTime(duration);
-  }
-  return duration?.toString() || 'Unknown';
-};
-
-const formatTargeting = (targeting: any): string => {
-  return targeting?.toString() || 'Unknown';
-};
-
-const formatRequirement = (req: CastingRequirement): string => {
-  const capitalizeFirst = (str: string) => str.charAt(0).toUpperCase() + str.slice(1);
-
-  switch (req.type) {
-    case 'skill':
-      return `${capitalizeFirst(req.requirement as string)}: ${req.value}`;
-    case 'stat':
-      return `${capitalizeFirst(req.requirement as string)}: ${req.value}`;
-    case 'level':
-      return `Level: ${req.value}`;
+const formatDuration = (duration: EffectDuration): string => {
+  switch (duration.type) {
+    case 'instant':
+      return 'Instant';
+    case 'permanent':
+      return 'Permanent';
     default:
-      return `${capitalizeFirst(req.requirement as string)}: ${req.value}`;
+      return duration.value !== undefined ? formatTime(duration.value) : 'Unknown';
   }
 };
 
-const getRequirementIcon = (type: string): string => {
-  const icons: Record<string, string> = {
-    skill: 'pi pi-graduation-cap',
-    stat: 'pi pi-chart-bar',
-    level: 'pi pi-user',
-    nano: 'pi pi-flash',
-    item: 'pi pi-box',
-  };
-  return icons[type] || 'pi pi-question-circle';
-};
-
-const getRequirementStatus = (req: CastingRequirement): string => {
-  if (!props.activeProfile) return '';
-
-  const profile = props.activeProfile;
-  let currentValue = 0;
-
-  switch (req.type) {
-    case 'skill':
-      currentValue = profile.skills[req.requirement as string] || 0;
-      break;
-    case 'stat':
-      currentValue = profile.stats[req.requirement as string] || 0;
-      break;
-    case 'level':
-      currentValue = profile.level;
-      break;
-  }
-
-  return currentValue >= req.value ? '✓ Met' : `${currentValue}/${req.value}`;
-};
-
-const getRequirementStatusClass = (req: CastingRequirement): string => {
-  if (!props.activeProfile) return '';
-
-  const profile = props.activeProfile;
-  let currentValue = 0;
-
-  switch (req.type) {
-    case 'skill':
-      currentValue = profile.skills[req.requirement as string] || 0;
-      break;
-    case 'stat':
-      currentValue = profile.stats[req.requirement as string] || 0;
-      break;
-    case 'level':
-      currentValue = profile.level;
-      break;
-  }
-
-  return currentValue >= req.value
-    ? 'text-green-600 dark:text-green-400 font-medium'
-    : 'text-red-600 dark:text-red-400 font-medium';
+const formatTargeting = (targeting: TargetingData): string => {
+  const target = targeting.type.charAt(0).toUpperCase() + targeting.type.slice(1);
+  return targeting.range !== undefined ? `${target} (${targeting.range}m)` : target;
 };
 
 const formatEffectType = (type: string): string => {
@@ -737,40 +570,7 @@ const getEffectSeverity = (type: string): string => {
 };
 
 const toggleFavorite = () => {
-  if (!props.nano) return;
-
-  isFavorite.value = !isFavorite.value;
-
-  try {
-    const favorites = JSON.parse(localStorage.getItem('tinkertools_nano_favorites') || '[]');
-    const nanoId = props.nano.id;
-
-    if (isFavorite.value) {
-      if (!favorites.includes(nanoId)) {
-        favorites.push(nanoId);
-      }
-    } else {
-      const index = favorites.indexOf(nanoId);
-      if (index > -1) {
-        favorites.splice(index, 1);
-      }
-    }
-
-    localStorage.setItem('tinkertools_nano_favorites', JSON.stringify(favorites));
-  } catch (error) {
-    console.warn('Failed to save favorite status:', error);
-  }
-};
-
-const loadFavoriteStatus = () => {
-  if (!props.nano) return;
-
-  try {
-    const favorites = JSON.parse(localStorage.getItem('tinkertools_nano_favorites') || '[]');
-    isFavorite.value = favorites.includes(props.nano.id);
-  } catch (error) {
-    console.warn('Failed to load favorite status:', error);
-  }
+  if (props.nano) nanosStore.toggleFavorite(props.nano.aoid);
 };
 
 const handleVisibilityChange = (visible: boolean) => {
@@ -780,17 +580,6 @@ const handleVisibilityChange = (visible: boolean) => {
 const handleClose = () => {
   emit('close');
 };
-
-// Watch for nano changes
-watch(
-  () => props.nano,
-  () => {
-    if (props.nano) {
-      loadFavoriteStatus();
-    }
-  },
-  { immediate: true }
-);
 </script>
 
 <style scoped>

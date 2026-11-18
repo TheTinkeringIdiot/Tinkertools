@@ -10,12 +10,8 @@ import {
   calcAbilityCapImprovements,
   calcSkillCap,
   calcTrickleDown,
-  calcSkillMaxValue,
-  calcTitleLevel,
   calcIPAdjustableRange,
   calcHP,
-  roundAO,
-  ABILITY_INDEX_TO_STAT_ID,
 } from '@/lib/tinkerprofiles/ip-calculator';
 import { STAT } from '@/services/game-data';
 
@@ -70,9 +66,8 @@ describe('IP Calculator - Ability-Dependent Skill Caps', () => {
 
     it('should handle extreme ability values', () => {
       const highAbilities = [100, 100, 100, 100, 100, 100];
-      const bodyDevId = getStatId('Body Dev.');
 
-      // Weighted = 100*0.5 + 100*0.2 + 100*0.3 = 100
+      // Duck Explosions (153) trickles from Agi/Int/Sen: weighted = 100*0.5 + 100*0.2 + 100*0.3 = 100
       // Formula: round(((100 - 5) * 2) + 5) = round(195) = 195
       const result = calcAbilityCapImprovements(highAbilities, 153);
 
@@ -250,7 +245,6 @@ describe('IP Calculator - Ability-Dependent Skill Caps', () => {
     });
 
     it('should handle early TL1 levels correctly', () => {
-      const abilities = [6, 6, 6, 6, 6, 6];
       const bodyDevId = getStatId('BodyDevelopment');
 
       // Level 5 should not hit TL1 cap yet
@@ -283,48 +277,9 @@ describe('IP Calculator - Ability-Dependent Skill Caps', () => {
 
 // Helper functions
 function getStatId(skillName: string): number {
-  const statId = Object.keys(STAT).find((key) => STAT[key as keyof typeof STAT] === skillName);
-  return statId ? parseInt(statId) : 152; // Default to Body Dev if not found
+  const entry = Object.entries(STAT).find(([, name]) => name === skillName);
+  return entry ? parseInt(entry[0]) : 152; // Default to Body Dev if not found
 }
-
-// Mock roundAO function if not exported
-function mockRoundAO(n: number): number {
-  return Math.floor(n + 0.5);
-}
-
-// Additional test data
-const TEST_BREEDS = {
-  SOLITUS: 1,
-  OPIFEX: 2,
-  NANOMAGE: 3,
-  ATROX: 4,
-};
-
-const TEST_PROFESSIONS = {
-  ADVENTURER: 7,
-  AGENT: 0,
-  BUREAUCRAT: 1,
-  DOCTOR: 2,
-  ENFORCER: 3,
-  ENGINEER: 4,
-  FIXER: 5,
-  KEEPER: 6,
-  MARTIAL_ARTIST: 8,
-  META_PHYSICIST: 9,
-  NANO_TECHNICIAN: 10,
-  SHADE: 11,
-  SOLDIER: 12,
-  TRADER: 13,
-};
-
-const COMMON_SKILL_IDS = {
-  BODY_DEV: getStatId('Body Dev.'),
-  NANO_POOL: getStatId('Nano Pool'),
-  MARTIAL_ARTS: getStatId('Martial Arts'),
-  BRAWLING: getStatId('Brawling'),
-  MELEE_ENERGY: getStatId('Melee Energy'),
-  RANGED_ENERGY: getStatId('Ranged Energy'),
-};
 
 describe('HP Calculator - Accurate AO Formula', () => {
   describe('calcHP', () => {

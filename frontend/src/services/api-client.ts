@@ -5,31 +5,21 @@
  * - Axios integration with interceptors
  * - Request/response typing
  * - Error handling and retry logic
- * - Request batching and deduplication
  */
 
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
+import axios, { AxiosInstance, AxiosRequestConfig, InternalAxiosRequestConfig } from 'axios';
 import type {
   ApiResponse,
   PaginatedResponse,
   Item,
-  Spell,
   SymbiantItem,
   Mob,
-  MobWithDrops,
   ItemSearchQuery,
-  SpellSearchQuery,
   SymbiantSearchQuery,
   MobSearchQuery,
   MobDropsQuery,
-  ItemFilterRequest,
-  ItemCompatibilityRequest,
-  ItemCompatibilityResult,
-  BatchItemRequest,
   UserFriendlyError,
   ApiError,
-  InterpolatedItem,
-  InterpolationRequest,
   InterpolationResponse,
   InterpolationInfo,
   ImplantLookupResponse,
@@ -37,22 +27,59 @@ import type {
   BatchPerkLookupResponse,
 } from '../types/api';
 import { ErrorCodes } from '../types/api';
+import type { ItemRevisionsBatchResponse } from '../types/game-version';
+import type {
+  BuildTransitionsResponse,
+  ChangeListQuery,
+  ChangeListResponse,
+  ItemCompareResponse,
+  ItemTimelineResponse,
+  TransitionsQuery,
+} from '../types/changes';
+import { API_ROOT, apiBaseFor } from './api-config';
+import { dataVersion, dataSlug } from '../composables/useGameVersion';
+
+declare module 'axios' {
+  interface AxiosRequestConfig {
+    /** Route this one request to a specific game version instead of the current one. */
+    gameVersion?: string;
+  }
+}
 
 // ============================================================================
 // Configuration
 // ============================================================================
 
 const API_CONFIG = {
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1',
+  // Root only. The selected game version is applied per request in the
+  // request interceptor (see apiBaseFor), so switching versions needs no new client.
+  baseURL: API_ROOT,
   timeout: 120000, // 120 seconds - increased for large dataset loads (symbiants ~900+ items, pocket bosses)
   retryAttempts: 3,
   retryDelay: 1000,
-  batchDelay: 50, // ms to wait before executing batch requests
 };
 
 // ============================================================================
 // Error Handling
 // ============================================================================
+
+/** Request config carrying the response interceptor's retry bookkeeping */
+type RetryableRequestConfig = InternalAxiosRequestConfig & {
+  _retry?: boolean;
+  _retryCount?: number;
+};
+
+/** The parts of an axios error (or a look-alike) that error handling reads */
+interface RequestErrorLike {
+  code?: string;
+  message?: string;
+  response?: { status?: number; data?: { error?: ApiError | string; detail?: unknown } };
+  config?: RetryableRequestConfig;
+}
+
+function asRequestError(error: unknown): RequestErrorLike {
+  return typeof error === 'object' && error !== null ? (error as RequestErrorLike) : {};
+}
 
 class ApiErrorHandler {
   static handle(error: ApiError): UserFriendlyError {
@@ -106,75 +133,37 @@ class ApiErrorHandler {
   }
 }
 
-// ============================================================================
-// Batch Request Manager
-// ============================================================================
-
-interface PendingBatch<T> {
-  ids: (string | number)[];
-  promise: Promise<T[]>;
-  resolve: (data: T[]) => void;
-  reject: (error: any) => void;
+/** Options of the cross-version diff requests. */
+export interface DiffRequestOptions {
+  /** Newer side of the comparison; defaults to the version being browsed. */
+  gameVersion?: string;
+  signal?: AbortSignal;
 }
 
-class BatchRequestManager {
-  private pendingBatches = new Map<string, PendingBatch<any>>();
-
-  async batchItems(itemIds: number[]): Promise<Item[]> {
-    return this.createBatch('items', itemIds, (ids) =>
-      apiClient.post<Item[]>('/items/batch', { item_ids: ids })
-    );
+function changeListParams(query: ChangeListQuery): URLSearchParams {
+  const params = new URLSearchParams();
+  if (query.page !== undefined) params.append('page', String(query.page));
+  if (query.page_size !== undefined) params.append('page_size', String(query.page_size));
+  if (query.sort) params.append('sort', query.sort);
+  for (const kind of query.kind ?? []) params.append('kind', kind);
+  for (const part of query.part ?? []) params.append('part', part);
+  for (const relevance of query.relevance ?? []) params.append('relevance', relevance);
+  if (query.is_nano !== undefined) params.append('is_nano', String(query.is_nano));
+  if (query.item_class !== undefined) params.append('item_class', String(query.item_class));
+  if (query.min_ql !== undefined) params.append('min_ql', String(query.min_ql));
+  if (query.max_ql !== undefined) params.append('max_ql', String(query.max_ql));
+  if (query.profession !== undefined) params.append('profession', String(query.profession));
+  if (query.slot !== undefined) params.append('slot', String(query.slot));
+  if (query.search) params.append('search', query.search);
+  if (query.notes) params.append('notes', query.notes);
+  if (query.note_id !== undefined) params.append('note_id', String(query.note_id));
+  if (query.include_diff) params.append('include_diff', 'true');
+  if (query.transition) {
+    params.append('transition', query.transition);
+    if (query.transition_old !== undefined) params.append('transition_old', query.transition_old);
+    if (query.transition_new !== undefined) params.append('transition_new', query.transition_new);
   }
-
-  async batchSpells(spellIds: number[]): Promise<Spell[]> {
-    return this.createBatch('spells', spellIds, (ids) =>
-      apiClient.post<Spell[]>('/spells/batch', { spell_ids: ids })
-    );
-  }
-
-  private async createBatch<T>(
-    batchKey: string,
-    ids: (string | number)[],
-    executor: (ids: (string | number)[]) => Promise<ApiResponse<T[]>>
-  ): Promise<T[]> {
-    const existing = this.pendingBatches.get(batchKey);
-
-    if (existing) {
-      existing.ids.push(...ids);
-      return existing.promise;
-    }
-
-    let resolve: (data: T[]) => void;
-    let reject: (error: any) => void;
-
-    const promise = new Promise<T[]>((res, rej) => {
-      resolve = res;
-      reject = rej;
-    });
-
-    const batch: PendingBatch<T> = {
-      ids: [...ids],
-      promise,
-      resolve: resolve!,
-      reject: reject!,
-    };
-
-    this.pendingBatches.set(batchKey, batch);
-
-    // Execute batch after short delay to collect more requests
-    setTimeout(async () => {
-      try {
-        const response = await executor(batch.ids);
-        batch.resolve(response.data || []);
-      } catch (error) {
-        batch.reject(error);
-      } finally {
-        this.pendingBatches.delete(batchKey);
-      }
-    }, API_CONFIG.batchDelay);
-
-    return promise;
-  }
+  return params;
 }
 
 // ============================================================================
@@ -183,7 +172,6 @@ class BatchRequestManager {
 
 class TinkerToolsApiClient {
   private client: AxiosInstance;
-  private batchManager: BatchRequestManager;
 
   constructor() {
     this.client = axios.create({
@@ -196,7 +184,6 @@ class TinkerToolsApiClient {
       },
     });
 
-    this.batchManager = new BatchRequestManager();
     this.setupInterceptors();
   }
 
@@ -204,6 +191,10 @@ class TinkerToolsApiClient {
     // Request interceptor
     this.client.interceptors.request.use(
       (config) => {
+        // Scope the request to the selected game version, unless the caller
+        // asked for a specific one (e.g. peeking at an item in another snapshot).
+        config.baseURL = apiBaseFor(dataSlug(config.gameVersion) ?? dataVersion.value);
+
         // Add request ID for tracking
         config.headers['X-Request-ID'] =
           `req-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -219,15 +210,15 @@ class TinkerToolsApiClient {
     // Response interceptor
     this.client.interceptors.response.use(
       (response) => response,
-      async (error) => {
-        const originalRequest = error.config;
+      async (error: unknown) => {
+        const { response, config: originalRequest } = asRequestError(error);
 
         // Retry logic for specific errors
         if (
-          error.response?.status >= 500 &&
+          (response?.status ?? 0) >= 500 &&
           originalRequest &&
           !originalRequest._retry &&
-          originalRequest._retryCount < API_CONFIG.retryAttempts
+          (originalRequest._retryCount ?? 0) < API_CONFIG.retryAttempts
         ) {
           originalRequest._retry = true;
           originalRequest._retryCount = (originalRequest._retryCount || 0) + 1;
@@ -260,7 +251,7 @@ class TinkerToolsApiClient {
         success: true,
         data: response.data,
       } as ApiResponse<T>;
-    } catch (error: any) {
+    } catch (error) {
       throw this.handleError(error);
     }
   }
@@ -270,39 +261,39 @@ class TinkerToolsApiClient {
       const response = await this.client.get<PaginatedResponse<T>>(url, config);
       // Return the paginated response directly without wrapping
       return response.data;
-    } catch (error: any) {
+    } catch (error) {
       throw this.handleError(error);
     }
   }
 
-  async post<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
+  async post<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
     try {
       const response = await this.client.post<ApiResponse<T>>(url, data, config);
       return response.data;
-    } catch (error: any) {
+    } catch (error) {
       throw this.handleError(error);
     }
   }
 
   async postPaginated<T>(
     url: string,
-    data?: any,
+    data?: unknown,
     config?: AxiosRequestConfig
   ): Promise<PaginatedResponse<T>> {
     try {
       const response = await this.client.post<PaginatedResponse<T>>(url, data, config);
       // Return the paginated response directly without wrapping
       return response.data;
-    } catch (error: any) {
+    } catch (error) {
       throw this.handleError(error);
     }
   }
 
-  async put<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
+  async put<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
     try {
       const response = await this.client.put<ApiResponse<T>>(url, data, config);
       return response.data;
-    } catch (error: any) {
+    } catch (error) {
       throw this.handleError(error);
     }
   }
@@ -311,7 +302,7 @@ class TinkerToolsApiClient {
     try {
       const response = await this.client.delete<ApiResponse<T>>(url, config);
       return response.data;
-    } catch (error: any) {
+    } catch (error) {
       throw this.handleError(error);
     }
   }
@@ -415,34 +406,16 @@ class TinkerToolsApiClient {
 
         return this.getPaginated<Item>(`/items?${params.toString()}`);
       }
-    } catch (error: any) {
+    } catch (error) {
       throw this.handleError(error);
     }
   }
 
-  async getItem(aoid: number): Promise<ApiResponse<Item>> {
-    return this.get<Item>(`/items/${aoid}`);
-  }
-
-  async getItems(ids: number[]): Promise<ApiResponse<Item[]>> {
-    if (ids.length === 1) {
-      const response = await this.getItem(ids[0]);
-      return {
-        ...response,
-        data: response.data ? [response.data] : [],
-      };
-    }
-    return this.batchManager.batchItems(ids).then((data) => ({ success: true, data }));
-  }
-
-  async filterItems(filter: ItemFilterRequest): Promise<PaginatedResponse<Item>> {
-    return this.postPaginated<Item>('/items/filter', filter);
-  }
-
-  async checkItemCompatibility(
-    request: ItemCompatibilityRequest
-  ): Promise<ApiResponse<ItemCompatibilityResult[]>> {
-    return this.post<ItemCompatibilityResult[]>('/items/compatibility', request);
+  async getItem(aoid: number, options?: { gameVersion?: string }): Promise<ApiResponse<Item>> {
+    return this.get<Item>(
+      `/items/${aoid}`,
+      options?.gameVersion ? { gameVersion: options.gameVersion } : undefined
+    );
   }
 
   // ============================================================================
@@ -457,58 +430,16 @@ class TinkerToolsApiClient {
   ): Promise<ImplantLookupResponse> {
     try {
       const request = { slot, ql, clusters };
-      const response = await this.client.post<ImplantLookupResponse>(
-        '/implants/lookup',
-        request,
-        { signal }
-      );
+      const response = await this.client.post<ImplantLookupResponse>('/implants/lookup', request, {
+        signal,
+      });
 
       // Backend returns ImplantLookupResponse with item in 'item' field
       return response.data;
-    } catch (error: any) {
-      throw this.handleError(error);
-    }
-  }
-
-  async getAvailableImplants(slot: number, ql: number = 1): Promise<ApiResponse<Item[]>> {
-    try {
-      const response = await this.client.get<Item[]>(`/implants/slots/${slot}/available?ql=${ql}`);
-
-      // Check if response is already wrapped in ApiResponse format
-      if (response.data && typeof response.data === 'object' && 'success' in response.data) {
-        return response.data as ApiResponse<Item[]>;
-      }
-
-      // Wrap raw response in ApiResponse format
-      return {
-        success: true,
-        data: Array.isArray(response.data) ? response.data : [],
-      };
-    } catch (error: any) {
-      throw this.handleError(error);
-    }
-  }
-
-  async validateClusters(
-    clusters: Record<string, number>
-  ): Promise<ApiResponse<{ valid: boolean; message: string }>> {
-    try {
-      const response = await this.client.post<{ valid: boolean; message: string }>(
-        '/implants/validate-clusters',
-        clusters
-      );
-
-      // Check if response is already wrapped in ApiResponse format
-      if (response.data && typeof response.data === 'object' && 'success' in response.data) {
-        return response.data as ApiResponse<{ valid: boolean; message: string }>;
-      }
-
-      // Wrap raw response in ApiResponse format
-      return {
-        success: true,
-        data: response.data,
-      };
-    } catch (error: any) {
+    } catch (error) {
+      // Let a cancellation through as-is: callers abort superseded lookups
+      // and must be able to tell that apart from a failure
+      if (asRequestError(error).code === 'ERR_CANCELED') throw error;
       throw this.handleError(error);
     }
   }
@@ -517,28 +448,13 @@ class TinkerToolsApiClient {
   // Perk API
   // ============================================================================
 
-  async lookupPerkByAoid(aoid: number): Promise<any> {
-    try {
-      const response = await this.client.get(`/perks/lookup/${aoid}`);
-      return response.data;
-    } catch (error: any) {
-      // Return null if perk not found
-      if (error.response?.status === 404) {
-        console.warn(`Perk with AOID ${aoid} not found`);
-        return null;
-      }
-      throw this.handleError(error);
-    }
-  }
-
   async batchLookupPerks(aoids: number[]): Promise<BatchPerkLookupResponse> {
     try {
-      const response = await this.client.post<BatchPerkLookupResponse>(
-        '/perks/batch/lookup',
-        { aoids }
-      );
+      const response = await this.client.post<BatchPerkLookupResponse>('/perks/batch/lookup', {
+        aoids,
+      });
       return response.data;
-    } catch (error: any) {
+    } catch (error) {
       throw this.handleError(error);
     }
   }
@@ -547,31 +463,33 @@ class TinkerToolsApiClient {
   // Item Interpolation API
   // ============================================================================
 
-  async interpolateItem(aoid: number, targetQl: number): Promise<InterpolationResponse> {
+  async interpolateItem(
+    aoid: number,
+    targetQl: number,
+    options?: { gameVersion?: string }
+  ): Promise<InterpolationResponse> {
     try {
       const params = new URLSearchParams();
       params.append('target_ql', targetQl.toString());
 
       const response = await this.client.get<InterpolationResponse>(
-        `/items/${aoid}/interpolate?${params.toString()}`
+        `/items/${aoid}/interpolate?${params.toString()}`,
+        options?.gameVersion ? { gameVersion: options.gameVersion } : undefined
       );
       return response.data;
-    } catch (error: any) {
+    } catch (error) {
       throw this.handleError(error);
     }
   }
 
-  async interpolateItemByRequest(request: InterpolationRequest): Promise<InterpolationResponse> {
-    try {
-      const response = await this.client.post<InterpolationResponse>('/items/interpolate', request);
-      return response.data;
-    } catch (error: any) {
-      throw this.handleError(error);
-    }
-  }
-
-  async getInterpolationInfo(aoid: number): Promise<ApiResponse<InterpolationInfo>> {
-    return this.get<InterpolationInfo>(`/items/${aoid}/interpolation-info`);
+  async getInterpolationInfo(
+    aoid: number,
+    options?: { gameVersion?: string }
+  ): Promise<ApiResponse<InterpolationInfo>> {
+    return this.get<InterpolationInfo>(
+      `/items/${aoid}/interpolation-info`,
+      options?.gameVersion ? { gameVersion: options.gameVersion } : undefined
+    );
   }
 
   async checkItemInterpolatable(aoid: number): Promise<boolean> {
@@ -599,47 +517,30 @@ class TinkerToolsApiClient {
   }
 
   async batchInterpolateItems(
-    requests: Array<{ aoid: number; targetQl: number }>
+    requests: Array<{ aoid: number; targetQl: number }>,
+    options?: { gameVersion?: string }
   ): Promise<BatchInterpolationResponse> {
     try {
       const response = await this.client.post<BatchInterpolationResponse>(
         '/items/batch/interpolate',
         {
-          items: requests.map(r => ({ aoid: r.aoid, target_ql: r.targetQl }))
-        }
+          items: requests.map((r) => ({ aoid: r.aoid, target_ql: r.targetQl })),
+        },
+        options?.gameVersion ? { gameVersion: options.gameVersion } : undefined
       );
       return response.data;
-    } catch (error: any) {
+    } catch (error) {
       throw this.handleError(error);
     }
-  }
-
-  // ============================================================================
-  // Spells API
-  // ============================================================================
-
-  async searchSpells(query: SpellSearchQuery): Promise<PaginatedResponse<Spell>> {
-    const params = new URLSearchParams();
-
-    if (query.search) params.append('search', query.search);
-    if (query.has_criteria !== undefined)
-      params.append('has_criteria', query.has_criteria.toString());
-    if (query.spell_id) params.append('spell_id', query.spell_id.toString());
-    if (query.page) params.append('page', query.page.toString());
-    if (query.limit) params.append('limit', query.limit.toString());
-
-    return this.getPaginated<Spell>(`/spells?${params.toString()}`);
-  }
-
-  async getSpell(id: number): Promise<ApiResponse<Spell>> {
-    return this.get<Spell>(`/spells/${id}`);
   }
 
   // ============================================================================
   // Symbiants API
   // ============================================================================
 
-  async searchSymbiants(query?: SymbiantSearchQuery & { page?: number; limit?: number }): Promise<PaginatedResponse<SymbiantItem>> {
+  async searchSymbiants(
+    query?: SymbiantSearchQuery & { page?: number; limit?: number }
+  ): Promise<PaginatedResponse<SymbiantItem>> {
     const params = new URLSearchParams();
 
     if (query?.page) params.append('page', query.page.toString());
@@ -648,12 +549,12 @@ class TinkerToolsApiClient {
     return this.getPaginated<SymbiantItem>(`/symbiants?${params.toString()}`);
   }
 
-  async getSymbiant(id: number): Promise<ApiResponse<SymbiantItem>> {
-    return this.get<SymbiantItem>(`/symbiants/${id}`);
+  async getSymbiant(aoid: number): Promise<ApiResponse<SymbiantItem>> {
+    return this.get<SymbiantItem>(`/symbiants/${aoid}`);
   }
 
-  async getSymbiantDroppedBy(symbiantId: number): Promise<ApiResponse<Mob[]>> {
-    return this.get<Mob[]>(`/symbiants/${symbiantId}/dropped-by`);
+  async getSymbiantDroppedBy(aoid: number): Promise<ApiResponse<Mob[]>> {
+    return this.get<Mob[]>(`/symbiants/${aoid}/dropped-by`);
   }
 
   // ============================================================================
@@ -699,35 +600,192 @@ class TinkerToolsApiClient {
   }
 
   // ============================================================================
-  // Stat Values API
+  // Cross-version diffs
   // ============================================================================
+  //
+  // `gameVersion` is the newer side of a comparison (default: the version
+  // being browsed); `base` the older. A request aborted through `signal`
+  // rejects with the axios cancellation as is (see isRequestCancelled).
 
-  async getStatValues(params?: { stat?: number; value?: number }): Promise<PaginatedResponse<any>> {
-    const searchParams = new URLSearchParams();
-    if (params?.stat) searchParams.append('stat', params.stat.toString());
-    if (params?.value) searchParams.append('value', params.value.toString());
+  /** Every build in which an item was added, changed or removed, newest first. */
+  async getItemTimeline(aoid: number, options?: DiffRequestOptions): Promise<ItemTimelineResponse> {
+    return this.getDiff<ItemTimelineResponse>(`/items/${aoid}/timeline`, undefined, options);
+  }
 
-    return this.getPaginated<any>(`/stat-values?${searchParams.toString()}`);
+  /** One item in `base` and in the request's build. Rejects (Not Found) when neither has it. */
+  async compareItem(
+    aoid: number,
+    base: string,
+    options?: DiffRequestOptions
+  ): Promise<ItemCompareResponse> {
+    return this.getDiff<ItemCompareResponse>(
+      `/items/${aoid}/compare/${encodeURIComponent(dataSlug(base) ?? base)}`,
+      undefined,
+      options
+    );
+  }
+
+  /** What changed in a build against the one before it. */
+  async getBuildChanges(
+    query: ChangeListQuery = {},
+    options?: DiffRequestOptions
+  ): Promise<ChangeListResponse> {
+    return this.getDiff<ChangeListResponse>('/changes', changeListParams(query), options);
+  }
+
+  /** Net difference between build `base` and the request's build. */
+  async compareBuilds(
+    base: string,
+    query: ChangeListQuery = {},
+    options?: DiffRequestOptions
+  ): Promise<ChangeListResponse> {
+    return this.getDiff<ChangeListResponse>(
+      `/compare/${encodeURIComponent(dataSlug(base) ?? base)}`,
+      changeListParams(query),
+      options
+    );
+  }
+
+  /** The field transitions most changed items of a build share. */
+  async getBuildTransitions(
+    query: TransitionsQuery = {},
+    options?: DiffRequestOptions
+  ): Promise<BuildTransitionsResponse> {
+    const params = new URLSearchParams();
+    for (const part of query.part ?? []) params.append('part', part);
+    for (const relevance of query.relevance ?? []) params.append('relevance', relevance);
+    if (query.notes) params.append('notes', query.notes);
+    if (query.min_items !== undefined) params.append('min_items', String(query.min_items));
+    if (query.limit !== undefined) params.append('limit', String(query.limit));
+    if (query.offset) params.append('offset', String(query.offset));
+    return this.getDiff<BuildTransitionsResponse>('/changes/transitions', params, options);
+  }
+
+  private async getDiff<T>(
+    url: string,
+    params: URLSearchParams | undefined,
+    options: DiffRequestOptions | undefined
+  ): Promise<T> {
+    try {
+      const response = await this.client.get<T>(url, {
+        params,
+        signal: options?.signal,
+        ...(options?.gameVersion ? { gameVersion: options.gameVersion } : {}),
+      });
+      return response.data;
+    } catch (error) {
+      const { code, response } = asRequestError(error);
+      if (code === 'ERR_CANCELED') throw error;
+      // These routes answer {"error": "<sentence>", "code": "HTTP_404"}.
+      const detail = response?.data?.error;
+      if (response?.status === 404 && typeof detail === 'string') {
+        const notFound: UserFriendlyError = {
+          type: 'info',
+          title: 'Not Found',
+          message: detail,
+          action: 'Pick another version',
+          recoverable: true,
+          status: 404,
+        };
+        throw notFound;
+      }
+      throw this.handleError(error);
+    }
   }
 
   // ============================================================================
-  // Health Check
+  // Item revision counts and legacy ids (cross-version endpoints)
   // ============================================================================
 
-  async healthCheck(): Promise<ApiResponse<{ status: string; timestamp: string }>> {
-    return this.get<{ status: string; timestamp: string }>('/health');
+  async batchItemRevisions(aoids: number[]): Promise<ItemRevisionsBatchResponse> {
+    if (aoids.length === 0) return { items: {} };
+    try {
+      // The route answers the batch itself, not an ApiResponse envelope.
+      const response = await this.client.post<ItemRevisionsBatchResponse>(
+        '/items/revisions/batch',
+        { aoids: aoids.slice(0, 500) }
+      );
+      return { items: response.data?.items ?? {} };
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * AOIDs of internal item ids that were persisted before user data moved to
+   * AOIDs, as `gameVersion` knows them. Ids it does not have are left out.
+   * Rejects when the backend holds no ids for that version's family at all
+   * (`available: false`): that is no verdict on the ids asked for, and a
+   * caller that took it for one would discard what the user stored.
+   * Only the user data migration (legacy-id-migration.ts) has a use for this.
+   */
+  async resolveLegacyItemIds(
+    internalIds: number[],
+    gameVersion: string
+  ): Promise<Map<number, number>> {
+    const chunkSize = 1000;
+    const resolved = new Map<number, number>();
+    try {
+      for (let start = 0; start < internalIds.length; start += chunkSize) {
+        const response = await this.client.post<{
+          aoids: Record<string, number>;
+          available: boolean;
+        }>(
+          '/legacy-item-ids/resolve',
+          { item_ids: internalIds.slice(start, start + chunkSize) },
+          { gameVersion }
+        );
+        if (!response.data.available) {
+          throw new Error(`The server holds no legacy item ids for ${gameVersion}`);
+        }
+        for (const [internalId, aoid] of Object.entries(response.data.aoids)) {
+          resolved.set(Number(internalId), aoid);
+        }
+      }
+    } catch (error) {
+      throw this.handleError(error);
+    }
+    return resolved;
   }
 
   // ============================================================================
   // Error Handling
   // ============================================================================
 
-  private handleError(error: any): UserFriendlyError {
-    if (error.response?.data?.error) {
-      return ApiErrorHandler.handle(error.response.data.error);
+  private handleError(error: unknown): UserFriendlyError {
+    const { code, message, response } = asRequestError(error);
+
+    const detail = response?.data?.error;
+    if (detail && typeof detail === 'object') {
+      return ApiErrorHandler.handle(detail);
     }
 
-    if (error.code === 'NETWORK_ERROR') {
+    // A plain 404 answers {"error": "<sentence>", "code": "HTTP_404"}; an
+    // unknown version segment answers {"detail": "<sentence>"}.
+    if (response?.status === 404) {
+      const sentence = typeof detail === 'string' ? detail : response.data?.detail;
+      return {
+        type: 'info',
+        title: 'Not Found',
+        message: typeof sentence === 'string' && sentence ? sentence : 'Not found',
+        action: 'Check the link or pick another version',
+        recoverable: true,
+        status: 404,
+      };
+    }
+
+    if (detail) {
+      return {
+        type: 'error',
+        title: 'Unexpected Error',
+        message: 'Something went wrong. Please try again.',
+        action: 'Contact support if the problem persists',
+        recoverable: false,
+      };
+    }
+
+    // axios reports ERR_NETWORK; NETWORK_ERROR is the older spelling
+    if (code === 'ERR_NETWORK' || code === 'NETWORK_ERROR') {
       return {
         type: 'error',
         title: 'Network Error',
@@ -737,7 +795,7 @@ class TinkerToolsApiClient {
       };
     }
 
-    if (error.code === 'ECONNABORTED') {
+    if (code === 'ECONNABORTED') {
       return {
         type: 'warning',
         title: 'Request Timeout',
@@ -750,7 +808,7 @@ class TinkerToolsApiClient {
     return {
       type: 'error',
       title: 'Unexpected Error',
-      message: error.message || 'An unexpected error occurred',
+      message: message || 'An unexpected error occurred',
       action: 'Please try again or contact support',
       recoverable: false,
     };
@@ -762,5 +820,5 @@ class TinkerToolsApiClient {
 // ============================================================================
 
 export const apiClient = new TinkerToolsApiClient();
-export { ApiErrorHandler, BatchRequestManager };
+export { ApiErrorHandler };
 export default apiClient;

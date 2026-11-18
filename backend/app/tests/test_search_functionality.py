@@ -3,11 +3,23 @@ Tests for advanced search and filtering functionality using real database data.
 """
 
 import pytest
-from unittest.mock import Mock
 from fastapi.testclient import TestClient
 
+from sqlalchemy import BigInteger, cast, func, select
+
 from app.main import app
-from app.core.database import get_db
+from app.store import tables as t
+from app.store.presence import has_stat, present, revisions
+
+
+def _symbiants(build, *columns):
+    """SELECT over the rows of ``symbiant_items`` the build carries."""
+    return select(*columns).select_from(
+        t.symbiant_items.join(
+            t.item_presence,
+            (t.item_presence.c.rev_id == t.symbiant_items.c.rev_id) & present(build),
+        )
+    )
 
 
 @pytest.fixture
@@ -48,144 +60,28 @@ class TestItemSearch:
             # At least one item should contain "weapon" in its name
             assert any("weapon" in name for name in item_names)
 
-    def test_item_advanced_filtering(self, client):
-        """Test advanced filtering endpoint."""
-        response = client.get("/api/v1/items/filter?min_ql=100&max_ql=200")
+    def test_filter_by_slot(self, client, store_db, build):
+        """Test the slot filter matches the EquippedIn (stat 298) bitmask."""
+        # Slot bit 15 at QL 200 is a small set that fits on one page
+        slot, ql = 15, 200
+        equipped_in = cast(t.stat_entry.c.value, BigInteger).op("&")(1 << slot) > 0
+        expected_aoids = set(
+            store_db.execute(
+                revisions(build, t.item_revision.c.aoid).where(
+                    t.item_revision.c.ql == ql,
+                    has_stat(t.stat_entry.c.stat == 298, equipped_in),
+                )
+            ).scalars()
+        )
+        assert 0 < len(expected_aoids) <= 1000
+
+        response = client.get(
+            f"/api/v1/items?slot={slot}&min_ql={ql}&max_ql={ql}&page_size=1000"
+        )
         assert response.status_code == 200
         data = response.json()
-
-        assert "items" in data
-        assert data["total"] >= 0
-        # Verify all items are within the QL range
-        for item in data["items"]:
-            assert 100 <= item["ql"] <= 200
-
-    def test_item_class_filtering(self, client):
-        """Test filtering by item class."""
-        response = client.get("/api/v1/items/filter?item_class=1")
-        assert response.status_code == 200
-        data = response.json()
-
-        assert data["total"] >= 0
-        # All results should have the same item_class
-        for item in data["items"]:
-            assert item["item_class"] == 1
-
-    def test_nano_filtering(self, client):
-        """Test filtering by nano flag."""
-        response = client.get("/api/v1/items/filter?is_nano=true")
-        assert response.status_code == 200
-        data = response.json()
-
-        assert data["total"] > 0
-        # All results should be nano items
-        for item in data["items"]:
-            assert item["is_nano"] is True
-
-    def test_sorting_functionality(self, client):
-        """Test sorting options."""
-        # Sort by QL ascending
-        response = client.get("/api/v1/items/filter?sort_by=ql&sort_order=asc&page_size=10")
-        assert response.status_code == 200
-        data = response.json()
-
-        if data["total"] > 1:
-            qls = [item["ql"] for item in data["items"]]
-            # Check if sorted ascending
-            assert qls == sorted(qls)
-
-        # Sort by name descending
-        response = client.get("/api/v1/items/filter?sort_by=name&sort_order=desc&page_size=10")
-        assert response.status_code == 200
-        data = response.json()
-
-        if data["total"] > 1:
-            names = [item["name"] for item in data["items"]]
-            # Check if sorted descending
-            assert names == sorted(names, reverse=True)
-
-
-class TestStatBasedQueries:
-    """Test stat-based item queries."""
-
-    def test_items_with_stats_endpoint(self, client):
-        """Test items with stats endpoint basic functionality."""
-        response = client.get("/api/v1/items/with-stats?stat_requirements=16:>=100")
-        assert response.status_code in [200, 422]  # 422 if validation fails
-
-        if response.status_code == 200:
-            data = response.json()
-            assert "items" in data
-            assert "total" in data
-
-    def test_multiple_stat_requirements(self, client):
-        """Test multiple stat requirements with AND logic."""
-        response = client.get("/api/v1/items/with-stats?stat_requirements=16:>=50,17:>=50&logic=and")
-        assert response.status_code in [200, 422]
-
-        if response.status_code == 200:
-            data = response.json()
-            assert "items" in data
-
-    def test_multiple_stat_requirements_or(self, client):
-        """Test multiple stat requirements with OR logic."""
-        response = client.get("/api/v1/items/with-stats?stat_requirements=16:>=50,17:>=50&logic=or")
-        assert response.status_code in [200, 422]
-
-        if response.status_code == 200:
-            data = response.json()
-            assert "items" in data
-
-
-class TestSpellSearch:
-    """Test spell search functionality with real database data."""
-
-    def test_spells_endpoint_basic(self, client):
-        """Test basic spells endpoint."""
-        response = client.get("/api/v1/spells")
-        assert response.status_code == 200
-        data = response.json()
-
-        assert "items" in data
-        assert "total" in data
-        assert isinstance(data["items"], list)
-        assert data["total"] > 0
-
-    def test_spell_search(self, client):
-        """Test spell search functionality."""
-        # Search for common spell-related terms that likely exist in database
-        response = client.get("/api/v1/spells/search?q=Modif")
-        assert response.status_code == 200
-        data = response.json()
-
-        assert "items" in data
-        assert data["total"] >= 0
-        # If there are results, verify they contain search term
-        if len(data["items"]) > 0:
-            spell_formats = [spell["spell_format"].lower() for spell in data["items"]]
-            # At least one spell should contain the search term
-            assert any("modif" in fmt for fmt in spell_formats)
-
-    def test_spell_target_filtering(self, client):
-        """Test filtering spells by target."""
-        response = client.get("/api/v1/spells?target=1")
-        assert response.status_code == 200
-        data = response.json()
-
-        assert data["total"] >= 0
-        # All results should have target = 1
-        for spell in data["items"]:
-            assert spell["target"] == 1
-
-    def test_spell_with_criteria(self, client):
-        """Test spell criteria filtering endpoint."""
-        response = client.get("/api/v1/spells/with-criteria")
-        assert response.status_code in [200, 422]
-
-        if response.status_code == 200:
-            data = response.json()
-            assert "items" in data
-            assert "total" in data
+        assert data["total"] == len(expected_aoids)
+        assert {item["aoid"] for item in data["items"]} == expected_aoids
 
 
 class TestPocketBossSearch:
@@ -217,7 +113,9 @@ class TestPocketBossSearch:
 
     def test_boss_level_filtering(self, client):
         """Test filtering bosses by level."""
-        response = client.get("/api/v1/mobs?is_pocket_boss=true&min_level=100&max_level=200")
+        response = client.get(
+            "/api/v1/mobs?is_pocket_boss=true&min_level=100&max_level=200"
+        )
         assert response.status_code == 200
         data = response.json()
 
@@ -250,12 +148,18 @@ class TestPocketBossSearch:
         if len(data["items"]) > 0:
             assert "symbiant_count" in data["items"][0]
 
-    def test_boss_by_symbiant_family(self, client):
+    def test_boss_by_symbiant_family(self, client, store_db):
         """Test finding symbiant drops by family for a specific boss."""
-        from app.tests.db_test_constants import MOB_ID_ADOBE_SUZERAIN
+        from app.tests.db_test_constants import MOB_ADOBE_SUZERAIN
+
+        mob_id = store_db.execute(
+            select(t.mob.c.mob_id).where(
+                t.mob.c.name == MOB_ADOBE_SUZERAIN, ~t.mob.c.retired
+            )
+        ).scalar_one()
 
         # Get symbiant drops for a specific boss, filtered by family
-        response = client.get(f"/api/v1/mobs/{MOB_ID_ADOBE_SUZERAIN}/drops?family=Artillery")
+        response = client.get(f"/api/v1/mobs/{mob_id}/drops?family=Artillery")
         assert response.status_code == 200
         data = response.json()
 
@@ -270,65 +174,71 @@ class TestPocketBossSearch:
 class TestSymbiantSearch:
     """Test symbiant search functionality."""
 
-    def test_symbiants_basic(self, client):
+    def test_symbiants_basic(self, client, store_db, build):
         """Test basic symbiants endpoint."""
+        expected_total = store_db.execute(_symbiants(build, func.count())).scalar_one()
+        assert expected_total > 0
+
         response = client.get("/api/v1/symbiants")
         assert response.status_code == 200
         data = response.json()
 
-        # Symbiants endpoint returns List[SymbiantResponse], not paginated
-        assert isinstance(data, list)
-        assert len(data) > 0
+        # Symbiants endpoint is paginated (default page_size 50)
+        assert data["total"] == expected_total
+        assert data["page"] == 1
+        assert len(data["items"]) == min(data["page_size"], expected_total)
 
-        # Verify first symbiant has expected fields
-        if len(data) > 0:
-            symbiant = data[0]
-            assert "id" in symbiant
-            assert "family" in symbiant
-            assert "name" in symbiant
+        symbiant = data["items"][0]
+        assert "aoid" in symbiant
+        assert "family" in symbiant
+        assert "name" in symbiant
 
-    def test_symbiant_family_filtering(self, client):
-        """Test filtering symbiants by family (client-side filtering expected)."""
-        response = client.get("/api/v1/symbiants")
-        assert response.status_code == 200
-        data = response.json()
+    def test_symbiant_family_filtering(self, client, store_db, build):
+        """Test every symbiant and family arrives intact across pages."""
+        from collections import Counter
 
-        assert isinstance(data, list)
-        # Find Artillery family symbiants (if any)
-        artillery_symbiants = [s for s in data if "Artillery" in s.get("family", "")]
-        assert len(artillery_symbiants) > 0
+        family = t.symbiant_items.c.family
+        expected = dict(
+            store_db.execute(
+                _symbiants(build, family, func.count()).group_by(family)
+            ).all()
+        )
+        assert "Artillery" in expected
+
+        families = Counter()
+        ids = []
+        page = 1
+        while True:
+            response = client.get(f"/api/v1/symbiants?page={page}&page_size=200")
+            assert response.status_code == 200
+            data = response.json()
+            families.update(s["family"] for s in data["items"])
+            ids.extend(s["aoid"] for s in data["items"])
+            if not data["has_next"]:
+                break
+            page += 1
+
+        assert dict(families) == expected
+        # Pages partition the set: no symbiant repeated or skipped
+        assert len(ids) == len(set(ids))
+        assert set(ids) == set(
+            store_db.execute(_symbiants(build, t.symbiant_items.c.aoid)).scalars()
+        )
 
     def test_symbiant_ql_filtering(self, client):
         """Test symbiant QL filtering (client-side filtering expected)."""
-        # Note: The endpoint returns all symbiants for client-side filtering
         response = client.get("/api/v1/symbiants")
         assert response.status_code == 200
         data = response.json()
 
-        # Response should be a list
-        assert isinstance(data, list)
-        # Verify symbiants have QL field for client-side filtering
-        if len(data) > 0:
-            symbiant = data[0]
-            assert "ql" in symbiant
+        # Every symbiant needs a QL for client-side filtering
+        assert len(data["items"]) > 0
+        for symbiant in data["items"]:
+            assert isinstance(symbiant["ql"], int)
 
 
 class TestCacheAndPerformance:
     """Test caching and performance monitoring functionality."""
-
-    def test_cache_stats(self, mock_client):
-        """Test cache statistics endpoint."""
-        # Cache stats endpoint doesn't use database
-        response = mock_client.get("/api/v1/cache/stats")
-        assert response.status_code == 200
-        data = response.json()
-
-        assert "hits" in data
-        assert "misses" in data
-        assert "cache_size" in data
-        assert "hit_rate_percent" in data
-        assert isinstance(data["hits"], int)
-        assert isinstance(data["misses"], int)
 
     def test_cache_clear(self, mock_client):
         """Test cache clearing."""
@@ -339,51 +249,6 @@ class TestCacheAndPerformance:
 
         assert "message" in data
         assert "cleared" in data["message"].lower()
-
-    def test_cache_cleanup(self, mock_client):
-        """Test cache cleanup endpoint."""
-        # Cache cleanup endpoint doesn't use database
-        response = mock_client.post("/api/v1/cache/cleanup")
-        assert response.status_code == 200
-        data = response.json()
-
-        assert "message" in data
-        assert "removed" in data["message"].lower()
-
-    def test_performance_health(self, mock_client):
-        """Test performance health check."""
-        # Performance health endpoint doesn't use database
-        response = mock_client.get("/api/v1/performance/health")
-        assert response.status_code == 200
-        data = response.json()
-
-        assert data["status"] == "healthy"
-        assert "performance_monitoring" in data
-        assert "monitoring_endpoints" in data
-
-    def test_performance_overview(self, mock_client):
-        """Test performance overview endpoint."""
-        # Performance overview endpoint may use database for stats
-        # Mock it to avoid database dependencies
-        mock_query = Mock()
-        mock_query.options.return_value = mock_query
-        mock_query.all.return_value = []
-
-        mock_db = Mock()
-        mock_db.execute.return_value = mock_query
-
-        app.dependency_overrides[get_db] = lambda: mock_db
-
-        try:
-            response = mock_client.get("/api/v1/performance/overview")
-            assert response.status_code == 200
-            data = response.json()
-
-            assert "cache_stats" in data
-            # index_usage might fail if pg_stat_statements isn't available
-            # so we don't assert on it
-        finally:
-            app.dependency_overrides.clear()
 
 
 class TestPaginationAndEdgeCases:
@@ -433,28 +298,35 @@ class TestPaginationAndEdgeCases:
         assert data["items"] == []
         assert data["pages"] >= 1
 
-    def test_invalid_stat_requirements_format(self, client):
-        """Test invalid stat requirement formats are handled."""
-        response = client.get("/api/v1/items/with-stats?stat_requirements=invalid_format")
-        assert response.status_code in [200, 422, 400]
         # Should either handle gracefully (200) or return proper error code
 
     def test_endpoint_response_structure(self, client):
         """Test that all paginated endpoints have consistent response structure."""
-        # Note: symbiants endpoint returns List[], not paginated, so excluded from this test
         endpoints = [
             "/api/v1/items",
-            "/api/v1/spells",
-            "/api/v1/mobs?is_pocket_boss=true"
+            "/api/v1/mobs?is_pocket_boss=true",
+            "/api/v1/symbiants",
         ]
 
         for endpoint in endpoints:
-            response = client.get(f"{endpoint}?page=1&page_size=5" if "?" not in endpoint else f"{endpoint}&page=1&page_size=5")
+            response = client.get(
+                f"{endpoint}?page=1&page_size=5"
+                if "?" not in endpoint
+                else f"{endpoint}&page=1&page_size=5"
+            )
             assert response.status_code == 200, f"Endpoint {endpoint} failed"
             data = response.json()
 
             # Check required pagination fields
-            required_fields = ["items", "total", "page", "page_size", "pages", "has_next", "has_prev"]
+            required_fields = [
+                "items",
+                "total",
+                "page",
+                "page_size",
+                "pages",
+                "has_next",
+                "has_prev",
+            ]
             for field in required_fields:
                 assert field in data, f"Missing {field} in {endpoint} response"
 
@@ -481,20 +353,20 @@ class TestRealDataValidation:
             assert "ql" in item_data
 
     def test_get_specific_symbiant(self, client):
-        """Test getting a specific symbiant by ID using real database data."""
-        # Get list to find a real ID (symbiants returns a list, not paginated)
-        response = client.get("/api/v1/symbiants")
+        """Test getting a specific symbiant by AOID using real database data."""
+        # Get list to find a real AOID
+        response = client.get("/api/v1/symbiants?page_size=1")
         assert response.status_code == 200
         data = response.json()
 
-        if len(data) > 0:
-            symbiant_id = data[0]["id"]
+        if data["total"] > 0:
+            aoid = data["items"][0]["aoid"]
 
             # Get specific symbiant
-            response = client.get(f"/api/v1/symbiants/{symbiant_id}")
+            response = client.get(f"/api/v1/symbiants/{aoid}")
             assert response.status_code == 200
             symbiant_data = response.json()
-            assert symbiant_data["id"] == symbiant_id
+            assert symbiant_data["aoid"] == aoid
             assert "family" in symbiant_data
 
     def test_get_specific_pocket_boss(self, client):
@@ -526,4 +398,3 @@ class TestRealDataValidation:
 
         response = client.get("/api/v1/mobs/99999999")
         assert response.status_code == 404
-

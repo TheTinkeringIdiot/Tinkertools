@@ -1,18 +1,15 @@
 """
-Real database record identifiers for testing.
+Identifiers of real game records for testing.
 
-This module contains constants for specific AOIDs and IDs from the production
-TinkerTools database. These records have known characteristics and are used
-in tests to replace mock data with real database queries.
-
-All values are taken from database research and represent stable, well-known
-game data that can be reliably used in tests.
+Constants for specific AOIDs and names in the game data the development store
+holds. These records have known characteristics; a test on the real game data
+names them here and reads the values it expects from the store.
 
 Usage:
+    from app.store.items import load_records
     from app.tests.db_test_constants import ITEM_PISTOL_MASTERY
-    from app.tests.db_helpers import get_item_by_aoid
 
-    item = await get_item_by_aoid(session, ITEM_PISTOL_MASTERY)
+    (item,) = load_records(store_db, build, aoids=[ITEM_PISTOL_MASTERY])
 """
 
 # =============================================================================
@@ -50,15 +47,15 @@ ITEM_FERVOR_MINION = 210325  # 11 sources
 # Symbiant Items - For mob drop testing
 # =============================================================================
 
-# Adobe Suzerain (Mob 1171) drops - 7 symbiants
+# Adobe Suzerain drops - 7 symbiants
 ITEM_SYMBIANT_ADOBE_ARTILLERY_OCULAR = 219135  # ID: 86188, QL: 170, Artillery Unit Aban
 ITEM_SYMBIANT_ADOBE_INFANTRY_THIGH = 235792  # ID: 94098, QL: 170, Infantry Unit Aban
 ITEM_SYMBIANT_ADOBE_INFANTRY_FEET = 235825  # ID: 94131, QL: 150, Infantry Unit Aban
 
-# Aesma Daeva (Mob 1172) drops - 1 symbiant
+# Aesma Daeva drops - 1 symbiant
 ITEM_SYMBIANT_AESMA_INFANTRY_LEFT_ARM = 235711  # ID: 94018, QL: 260, Infantry Unit Aban
 
-# Ahpta (Mob 1173) drops - 5 symbiants
+# Ahpta drops - 5 symbiants
 ITEM_SYMBIANT_AHPTA_ARTILLERY_FEET = 235612  # ID: 93919, QL: 250, Artillery Unit Aban
 ITEM_SYMBIANT_AHPTA_CONTROL_OCULAR = 236297  # ID: 94602, QL: 270, Control Unit Aban
 ITEM_SYMBIANT_AHPTA_CONTROL_BRAIN = 236312  # ID: 94616, QL: 250, Control Unit Aban
@@ -161,11 +158,13 @@ SPELL_ID_SIMPLE_5 = 5  # Spell AOID: 53045, 0 criteria
 # Mobs (Pocket Bosses)
 # =============================================================================
 
-MOB_ID_ADOBE_SUZERAIN = 1171  # Level: 125, Playfield: "Scheol Upper", 7 items
-MOB_ID_AESMA_DAEVA = 1172  # Level: 220, Playfield: "Inferno Frontier", 1 item
-MOB_ID_AHPTA = 1173  # Level: 220, Playfield: "Inferno Frontier", 5 items
-MOB_ID_ALATYR = 1174  # Level: 188, Playfield: "Penumbra Forest"
-MOB_ID_ANYA = 1175  # Level: 185, Playfield: "Penumbra Valley"
+# Mob ids are serials assigned at import time and change between imports, so
+# tests look mobs up by name (unique in the mobs table) instead.
+MOB_ADOBE_SUZERAIN = "Adobe Suzerain"  # Level: 125, "Scheol Upper", 7 items
+MOB_AESMA_DAEVA = "Aesma Daeva"  # Level: 220, "Inferno Frontier", 1 item
+MOB_AHPTA = "Ahpta"  # Level: 220, "Inferno Frontier", 5 items
+MOB_ALATYR = "Alatyr"  # Level: 188, "Penumbra Forest"
+MOB_ANYA = "Anya"  # Level: 185, "Penumbra Valley"
 
 # All mobs in the database are pocket bosses (is_pocket_boss = True)
 
@@ -184,11 +183,17 @@ SOURCE_TYPE_ID_VENDOR = 5  # "Vendors and shops that sell items"
 # =============================================================================
 
 # Item sources (nano crystals)
-SOURCE_ID_1H_BLUNT_NC = 160  # Source ID: 26464, "Nano Crystal (1H Blunt Weapon Expertise)"
-SOURCE_ID_1H_BLUNT_CORRODED = 161  # Source ID: 221375, "Badly Corroded Crystal (1H Blunt...)"
-SOURCE_ID_1H_BLUNT_INCOMP = 162  # Source ID: 26462, "Nano Crystal (1H Blunt Weapon Incompeten...)"
+SOURCE_ID_1H_BLUNT_NC = (
+    160  # Source ID: 26464, "Nano Crystal (1H Blunt Weapon Expertise)"
+)
+SOURCE_ID_1H_BLUNT_CORRODED = (
+    161  # Source ID: 221375, "Badly Corroded Crystal (1H Blunt...)"
+)
+SOURCE_ID_1H_BLUNT_INCOMP = (
+    162  # Source ID: 26462, "Nano Crystal (1H Blunt Weapon Incompeten...)"
+)
 
 # Mob sources (with item drops)
-SOURCE_ID_MOB_ADOBE_SUZERAIN = 1  # Source ID: 1171, 7 items dropped
-SOURCE_ID_MOB_AESMA_DAEVA = 2  # Source ID: 1172, 1 item dropped
-SOURCE_ID_MOB_AHPTA = 3  # Source ID: 1173, 5 items dropped
+SOURCE_ID_MOB_ADOBE_SUZERAIN = 1  # 7 items dropped
+SOURCE_ID_MOB_AESMA_DAEVA = 2  # 1 item dropped
+SOURCE_ID_MOB_AHPTA = 3  # 5 items dropped

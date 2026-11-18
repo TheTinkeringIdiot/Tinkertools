@@ -11,9 +11,11 @@ import type {
   SymbiantItem,
   MobSearchQuery,
   PaginatedResponse,
+  PaginationInfo,
   UserFriendlyError,
 } from '../types/api';
 import { apiClient } from '../services/api-client';
+import { toUserFriendlyError } from '../services/error-message';
 
 export const usePocketBossesStore = defineStore('pocketBosses', () => {
   // ============================================================================
@@ -25,7 +27,7 @@ export const usePocketBossesStore = defineStore('pocketBosses', () => {
   const searchResults = ref<{
     query: MobSearchQuery | null;
     results: Mob[];
-    pagination: any;
+    pagination: Omit<PaginationInfo, 'offset'>;
     timestamp: number;
   } | null>(null);
   const loading = ref(false);
@@ -158,8 +160,8 @@ export const usePocketBossesStore = defineStore('pocketBosses', () => {
       } else {
         throw new Error('Search failed');
       }
-    } catch (err: any) {
-      error.value = err;
+    } catch (err) {
+      error.value = toUserFriendlyError(err);
       throw err;
     } finally {
       loading.value = false;
@@ -188,8 +190,8 @@ export const usePocketBossesStore = defineStore('pocketBosses', () => {
       } else {
         throw new Error(response.error?.message || 'Pocket boss not found');
       }
-    } catch (err: any) {
-      error.value = err;
+    } catch (err) {
+      error.value = toUserFriendlyError(err);
       return null;
     } finally {
       loading.value = false;
@@ -218,8 +220,8 @@ export const usePocketBossesStore = defineStore('pocketBosses', () => {
       } else {
         throw new Error(response.error?.message || 'Failed to load drops');
       }
-    } catch (err: any) {
-      error.value = err;
+    } catch (err) {
+      error.value = toUserFriendlyError(err);
       return [];
     } finally {
       loading.value = false;
@@ -264,22 +266,12 @@ export const usePocketBossesStore = defineStore('pocketBosses', () => {
 
       lastFetch.value = Date.now();
       return allResults;
-    } catch (err: any) {
-      error.value = err;
+    } catch (err) {
+      error.value = toUserFriendlyError(err);
       throw err;
     } finally {
       loading.value = false;
     }
-  }
-
-  /**
-   * Find pocket bosses that drop a specific symbiant
-   */
-  function getBossesDropping(symbiantId: number): Mob[] {
-    // Note: This functionality should use the new API endpoint
-    // /symbiants/{symbiantId}/dropped-by instead
-    console.warn('getBossesDropping is deprecated - use apiClient.getSymbiantDroppedBy instead');
-    return [];
   }
 
   /**
@@ -409,7 +401,6 @@ export const usePocketBossesStore = defineStore('pocketBosses', () => {
     getPocketBoss,
     getPocketBossDrops,
     loadAllPocketBosses,
-    getBossesDropping,
     getBossesByDifficulty,
     getBossWithDrops,
     clearSearch,

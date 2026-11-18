@@ -1,0 +1,67 @@
+# Build notes: build-wide events that explain many item changes at once.
+#
+# Read by backend/app/core/change_rules.py, whose docstring gives the format
+# and the rule: a change is tagged with a note when one of its field
+# transitions matches `explains` and all of them match `explains` or
+# `alongside`. A note with `partial = false` accounts for nothing in a change
+# it does not explain entirely, so the patch notes keep the line of its
+# transition for those. `python tools/change_candidates.py SLUG` lists what the
+# changed items of a build have in common and what each note here catches.
+# The importer applies this file on its next run (`import_cli.py import-cas`).
+#
+# Stats: 23 StaticInstance, 75 NanoStrain, 76 ItemClass, 79 Icon,
+# 88 DefaultSlot, 287 AttackRange.
+
+[[note]]
+build = "ao-14-4-2"
+title = "ItemClass and DefaultSlot written out on every item"
+body = "The client data gained stats 76 (ItemClass) and 88 (DefaultSlot) with value 0 on items that had neither. Nothing about the items changed."
+explains = [
+    { path = "stat:76", old = "absent", new = 0 },
+    { path = "stat:88", old = "absent", new = 0 },
+]
+alongside = [{ path = "static_instance" }]
+
+[[note]]
+build = "ao-14-5-0"
+title = "Nano clusters: Wear effects moved from event 14 to event 0"
+body = "Every nano cluster had its Wear effects renumbered from event 14 to event 0, with a new description and icon. The effects themselves are the same."
+explains = [{ path = "event", old = 14, new = 0 }]
+alongside = [
+    { path = "name" },
+    { path = "description" },
+    { path = "stat:75", old = "absent" },
+    { path = "stat:79" },
+    { path = "stat:88", old = "absent", new = 0 },
+    { path = "static_instance" },
+]
+
+[[note]]
+build = "ao-14-5-0"
+title = "Implant descriptions: Nano-Cluster respelled NanoCluster"
+body = "The cluster list in every implant's description was respelled, and many implants took a new icon. Their modifiers were re-sorted, which is not a change."
+explains = [
+    { path = "description", old = ".*Nano-Cluster.*", new = ".*NanoCluster.*" },
+]
+alongside = [{ path = "stat:79" }]
+
+[[note]]
+build = "ao-14-6-0"
+title = "Weapons given an explicit attack range"
+body = "Stat 287 (AttackRange) was written out on weapons that had none."
+explains = [{ path = "stat:287", old = "absent" }]
+alongside = [{ path = "static_instance" }]
+
+[[note]]
+build = "ao-14-8-0"
+title = "Implants and nano clusters renamed"
+body = "Implants went from 'A Shining Warfare Right-Arm Implant' to 'Right-Arm Implant: Assault Rif, Shiny' and clusters from 'A Faded NanoCluster of Slashing Protection' to 'Melee/Ma AC Cluster - Faded (Leg)'. Descriptions follow the names."
+explains = [{ path = "name", new = ".*( Implant: | Cluster - ).*" }]
+alongside = [{ path = "description" }]
+
+[[note]]
+build = "ao-18-8-62-ep1"
+title = "Modify effects (53045) retargeted from target 2 to target 3, nothing else changed"
+body = "The only change to these nanos and items is that their effects of type 53045 (Modify {Stat}) name target 3 instead of target 2. Their parameters are the same. Any other retargeting (hits, nanos that went from target to self) is listed as the change it is. The archive has no build between 17.10.5 and this one, so the patch that did it is unknown."
+explains = [{ path = "effect:53045:target", old = 2, new = 3 }]
+partial = false

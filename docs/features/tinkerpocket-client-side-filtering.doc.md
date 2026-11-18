@@ -4,6 +4,7 @@
 **Date:** 2025-01-11
 **Component:** TinkerPocket Symbiants
 **Type:** Architecture Change
+**Since changed:** the endpoint is paginated again and the frontend loads it in chunks (`symbiant-pagination-chunked-loading.doc.md`); filtering is still done in the browser. The backend snippets below show the code of the time, written against the relational schema that the content-addressed store replaced.
 
 ---
 
@@ -73,7 +74,7 @@ def list_symbiants(
     min_ql: Optional[int] = Query(None),
     max_ql: Optional[int] = Query(None),
     # ... many more filters
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_store)
 ) -> PaginatedResponse[SymbiantResponse]:
     # Complex filter logic
     # Count query
@@ -85,7 +86,7 @@ def list_symbiants(
 ```python
 @router.get("", response_model=List[SymbiantResponse])
 def list_symbiants(
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_store)
 ) -> List[SymbiantResponse]:
     # Simple query - get ALL symbiants with ordering
     symbiants = (

@@ -14,6 +14,7 @@ class InterpolatedSpell(BaseModel):
     """
     Represents a spell with interpolated parameters.
     """
+
     target: Optional[int] = None
     tick_count: Optional[int] = None
     tick_interval: Optional[int] = None
@@ -30,6 +31,7 @@ class InterpolatedSpellData(BaseModel):
     """
     Represents spell data with interpolated spells.
     """
+
     event: Optional[int] = None
     spells: List[InterpolatedSpell] = Field(default_factory=list)
 
@@ -41,6 +43,7 @@ class InterpolatedAction(BaseModel):
     """
     Represents an action with interpolated criteria.
     """
+
     action: Optional[int] = None
     criteria: List[Dict[str, Any]] = Field(default_factory=list)
 
@@ -51,11 +54,14 @@ class InterpolatedAction(BaseModel):
 class InterpolatedItem(BaseModel):
     """
     Represents an item interpolated to a specific quality level.
-    
+
     This is the main class that contains all interpolated data for an item,
     including stats, spells, actions, and metadata about the interpolation process.
     """
+
     # Original item data
+    # Deprecated: holds the AOID. Use ``aoid``; this field is removed once
+    # every route reads the content-addressed store.
     id: int
     aoid: Optional[int] = None
     name: str
@@ -63,7 +69,7 @@ class InterpolatedItem(BaseModel):
     description: Optional[str] = None
     item_class: Optional[int] = None
     is_nano: bool = False
-    
+
     # Interpolation metadata
     interpolating: bool = False
     low_ql: Optional[int] = None
@@ -71,15 +77,11 @@ class InterpolatedItem(BaseModel):
     target_ql: Optional[int] = None
     ql_delta: Optional[int] = None
     ql_delta_full: Optional[int] = None
-    
+
     # Interpolated data
     stats: List[Dict[str, Any]] = Field(default_factory=list)
     spell_data: List[InterpolatedSpellData] = Field(default_factory=list)
     actions: List[InterpolatedAction] = Field(default_factory=list)
-    
-    # Optional related data (copied from original item)
-    attack_defense_id: Optional[int] = None
-    animation_mesh_id: Optional[int] = None
 
     class Config:
         from_attributes = True
@@ -91,7 +93,7 @@ class InterpolatedItem(BaseModel):
         Used for non-interpolated items or as a base for interpolation.
         """
         return cls(
-            id=item.id,
+            id=item.aoid,
             aoid=item.aoid,
             name=item.name,
             ql=item.ql,
@@ -107,8 +109,6 @@ class InterpolatedItem(BaseModel):
             stats=[],  # Will be populated separately
             spell_data=[],  # Will be populated separately
             actions=[],  # Will be populated separately
-            attack_defense_id=item.atkdef_id,
-            animation_mesh_id=item.animation_mesh_id
         )
 
     def interpolate_value(self, lo_val: int, hi_val: int) -> int:
@@ -118,12 +118,14 @@ class InterpolatedItem(BaseModel):
         """
         if not self.interpolating or self.ql_delta_full == 0:
             return lo_val
-        
+
         val_per_ql = (hi_val - lo_val) / self.ql_delta_full
         newval = round(lo_val + (val_per_ql * self.ql_delta))
         return newval
 
-    def set_interpolation_metadata(self, lo_item: Any, hi_item: Optional[Any], target_ql: int):
+    def set_interpolation_metadata(
+        self, lo_item: Any, hi_item: Optional[Any], target_ql: int
+    ):
         """
         Set the interpolation metadata based on low/high items and target QL.
         """
@@ -143,23 +145,16 @@ class InterpolatedItem(BaseModel):
             self.target_ql = target_ql
             self.ql_delta_full = hi_item.ql - lo_item.ql
             self.ql_delta = target_ql - lo_item.ql
-            
+
         # Always update the main QL field to the target QL
         self.ql = target_ql
-
-
-class InterpolationRequest(BaseModel):
-    """
-    Request model for item interpolation.
-    """
-    aoid: int = Field(..., description="Anarchy Online ID of the item")
-    target_ql: int = Field(..., ge=1, le=500, description="Target quality level")
 
 
 class InterpolationResponse(BaseModel):
     """
     Response model for item interpolation.
     """
+
     success: bool
     item: Optional[InterpolatedItem] = None
     error: Optional[str] = None
@@ -173,6 +168,7 @@ class ItemInterpolationRequest(BaseModel):
     """
     Single item interpolation request for batch operations.
     """
+
     aoid: int = Field(..., description="Anarchy Online ID of the item")
     target_ql: int = Field(default=1, ge=1, le=500, description="Target quality level")
 
@@ -181,13 +177,17 @@ class BatchInterpolationRequest(BaseModel):
     """
     Request model for batch item interpolation.
     """
-    items: List[ItemInterpolationRequest] = Field(..., max_length=100, description="List of items to interpolate (max 100)")
+
+    items: List[ItemInterpolationRequest] = Field(
+        ..., max_length=100, description="List of items to interpolate (max 100)"
+    )
 
 
 class BatchItemResult(BaseModel):
     """
     Result for a single item in a batch interpolation request.
     """
+
     aoid: int
     target_ql: int
     success: bool
@@ -199,6 +199,7 @@ class BatchInterpolationResponse(BaseModel):
     """
     Response model for batch item interpolation.
     """
+
     success: bool
     results: List[BatchItemResult] = Field(default_factory=list)
     errors: List[str] = Field(default_factory=list)

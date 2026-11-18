@@ -69,7 +69,7 @@ useSymbiantsStore
   ↓ (API call)
 /api/v1/symbiants (Backend)
   ↓ (queries with spell_data)
-symbiant_items materialized view + items + spells tables
+symbiant_items and the item parts of the content-addressed store
   ↓ (returns symbiants with full spell data)
 SymbiantCompare.vue
   ↓ (extracts stats from spell_data)
@@ -151,9 +151,8 @@ The component uses spell_data to determine stat bonuses:
 
 ### Database Dependencies
 
-- **`symbiant_items` materialized view**: Provides symbiant metadata (name, family, slot, QL)
-- **`items` table**: Base item data
-- **`spells` table**: Spell data for stat modifications
+- **`symbiant_items`** (a derived table of the store, schema `cas`): symbiant metadata (name, family, slot, QL)
+- **`item_revision` and its parts** (`part_effects`, `part_actions`): the effects and requirements of each symbiant
 
 ### Performance Considerations
 

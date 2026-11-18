@@ -31,19 +31,22 @@ onMounted(() => {
 });
 
 // Sync URL query param when tab changes
-watch(activeTab, (newIndex) => {
+watch(activeTab, async (newIndex) => {
   const tabName = tabNames[newIndex];
   if (tabName) {
-    router.replace({ query: { ...route.query, tab: tabName } });
+    await router.replace({ query: { ...route.query, tab: tabName } });
   }
 });
 
 // Sync tab when URL changes (browser back/forward)
-watch(() => route.query.tab, (newTab) => {
-  if (newTab && typeof newTab === 'string' && tabIndexMap[newTab] !== undefined) {
-    activeTab.value = tabIndexMap[newTab];
+watch(
+  () => route.query.tab,
+  (newTab) => {
+    if (newTab && typeof newTab === 'string' && tabIndexMap[newTab] !== undefined) {
+      activeTab.value = tabIndexMap[newTab];
+    }
   }
-});
+);
 
 // Expose for tests
 defineExpose({

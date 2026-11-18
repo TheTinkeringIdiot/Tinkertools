@@ -1,0 +1,61 @@
+# One deployment serves every hostname: `web` is the only service the outside
+# reaches (DEPLOYMENT.md). The database holds game data only and is loaded by
+# restoring a dump (scripts/deploy/stack.sh restore), never by this file.
+services:
+  db:
+    # Debian, not alpine: the store was built under glibc's en_US.UTF-8, and
+    # the API's name ordering follows the database's collation.
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-tinkertools}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tinkertools}
+      POSTGRES_DB: ${POSTGRES_DB:-tinkertools}
+    command: postgres -c shared_buffers=${DB_SHARED_BUFFERS:-1GB} -c effective_cache_size=${DB_EFFECTIVE_CACHE_SIZE:-3GB}
+    # Parallel queries allocate here; Docker's default of 64 MB is too little.
+    shm_size: 512mb
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tinkertools}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-tinkertools}:${POSTGRES_PASSWORD:-tinkertools}@db:5432/${POSTGRES_DB:-tinkertools}
+      APP_ENV: production
+      # The browser calls the API on the page's own origin, which needs no
+      # CORS; this only names who else may.
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://ao.tinkeringidiot.com,https://prk.tinkeringidiot.com}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      # Each worker can reach about 500 MB (backend/README.md).
+      WEB_CONCURRENCY: ${API_WORKERS:-2}
+      RESPONSE_CACHE_MAX_BYTES: ${RESPONSE_CACHE_MAX_BYTES:-268435456}
+      MALLOC_ARENA_MAX: "2"
+
+  web:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        # Unset, the Dockerfile's production values apply.
+        - VITE_VERSION_HOSTNAME_MAP
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      # Loopback only: the public way in is the proxy in front (Coolify
+      # routes the domains to port 80 of this service over its own network).
+      - "127.0.0.1:${WEB_PORT:-8088}:80"
+
+volumes:
+  db_data:

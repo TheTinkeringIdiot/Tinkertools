@@ -258,12 +258,12 @@ import { ref, watch } from 'vue';
 import Dropdown from 'primevue/dropdown';
 import InputNumber from 'primevue/inputnumber';
 import type { CharacterStats } from '@/types/offensive-nano';
-import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
+import type { ReadonlyTinkerProfile } from '@/lib/tinkerprofiles/types';
 
 // Props
 interface Props {
   characterStats: CharacterStats;
-  profile?: TinkerProfile | null;
+  profile?: ReadonlyTinkerProfile | null;
 }
 
 const props = defineProps<Props>();

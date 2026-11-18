@@ -11,15 +11,20 @@
           <h4 class="font-semibold text-primary">{{ primaryAction.actionName }}</h4>
           <Tag
             v-if="characterStats"
-            :severity="getRequirementSeverity(primaryActionEvaluation?.canPerform || null)"
-            :value="primaryActionEvaluation?.canPerform ? 'Can Use' : 'Cannot Use'"
+            v-tooltip.top="
+              actionStatus(primaryAction) === 'unknown'
+                ? 'Depends on conditions your profile does not record'
+                : undefined
+            "
+            :severity="statusSeverity(actionStatus(primaryAction))"
+            :value="statusLabel(actionStatus(primaryAction))"
           />
         </div>
 
         <!-- Requirements -->
         <div v-if="primaryAction.hasRequirements" class="requirements-list">
           <CriteriaDisplay
-            :criteria="actions.find((a) => a.id === primaryAction.id)?.criteria || []"
+            :criteria="primaryAction.rawCriteria"
             :character-stats="characterStats"
             :expanded="true"
             :show-oe-breakpoints="showOeBreakpoints"
@@ -33,12 +38,12 @@
         <Accordion v-model:activeIndex="expandedActions" multiple>
           <AccordionTab
             v-for="(action, index) in otherActions"
-            :key="action.id"
+            :key="index"
             :header="getActionHeader(action)"
           >
             <div v-if="action.hasRequirements" class="requirements-list">
               <CriteriaDisplay
-                :criteria="actions.find((a) => a.id === action.id)?.criteria || []"
+                :criteria="action.rawCriteria"
                 :character-stats="characterStats"
                 :expanded="false"
                 :show-oe-breakpoints="showOeBreakpoints"
@@ -95,6 +100,7 @@ import Tag from 'primevue/tag';
 import CriteriaDisplay from './CriteriaDisplay.vue';
 import { useItemActions } from '../composables/useActionCriteria';
 import type { Action } from '../types/api';
+import { isRequirementCriterion, type ParsedAction } from '../services/action-criteria';
 import type { CharacterStats } from '../composables/useActionCriteria';
 
 // ============================================================================
@@ -124,7 +130,7 @@ const characterStatsRef = computed(() => props.characterStats);
 const {
   parsedActions,
   primaryAction,
-  primaryActionEvaluation,
+  actionEvaluations,
   canUseItem,
   minimumRequirements,
   getRequirementSeverity,
@@ -142,26 +148,43 @@ const expandedActions = ref<number[]>([]);
 
 const otherActions = computed(() => {
   if (!primaryAction.value) return parsedActions.value;
-  return parsedActions.value.filter((action) => action.id !== primaryAction.value!.id);
+  return parsedActions.value.filter((action) => action !== primaryAction.value);
 });
 
 // ============================================================================
 // Methods
 // ============================================================================
 
-function getActionHeader(action: any): string {
+/** met / unmet / unknown (can't be checked from the profile); null without a character */
+function actionStatus(action: ParsedAction): 'met' | 'unmet' | 'unknown' | null {
+  // Evaluations are listed in the order of the parsed actions
+  return actionEvaluations.value[parsedActions.value.indexOf(action)]?.status ?? null;
+}
+
+function statusLabel(status: 'met' | 'unmet' | 'unknown' | null): string {
+  if (status === 'met') return 'Can Use';
+  if (status === 'unknown') return 'Can Use If…';
+  return 'Cannot Use';
+}
+
+function statusSeverity(status: 'met' | 'unmet' | 'unknown' | null): string {
+  if (status === 'unknown') return 'info';
+  return getRequirementSeverity(status === null ? null : status === 'met');
+}
+
+function getActionHeader(action: ParsedAction): string {
   let header = action.actionName;
 
   if (props.characterStats && action.hasRequirements) {
     // Add evaluation result to header
-    const evaluation = action.canPerform;
-    if (evaluation !== null) {
-      header += evaluation ? ' ✓' : ' ✗';
+    const status = actionStatus(action);
+    if (status !== null) {
+      header += status === 'met' ? ' ✓' : status === 'unknown' ? ' ?' : ' ✗';
     }
   }
 
   if (action.hasRequirements) {
-    const reqCount = action.criteria.filter((c: any) => c.isStatRequirement).length;
+    const reqCount = action.criteria.filter(isRequirementCriterion).length;
     header += ` (${reqCount} requirement${reqCount !== 1 ? 's' : ''})`;
   }
 

@@ -6,15 +6,27 @@
  * item interpolation with local caching and state management.
  */
 
-import { reactive, ref } from 'vue';
-import type {
-  Item,
-  InterpolatedItem,
-  InterpolationInfo,
-  InterpolationResponse,
-} from '../types/api';
+import { reactive } from 'vue';
+import type { Item, InterpolatedItem, InterpolationInfo } from '../types/api';
 import { apiClient } from './api-client';
+import { errorMessage } from './error-message';
 import { INTERP_STATS } from './game-data';
+import { dataVersion, dataSlug } from '../composables/useGameVersion';
+
+/** Options accepted by every call that reaches the backend. */
+export interface InterpolationRequestOptions {
+  /** Game version to interpolate against; defaults to the browsing version. */
+  gameVersion?: string | null;
+}
+
+/**
+ * Interpolated stats differ per game version, so every cache entry is keyed by
+ * the version it came from. A peek at another snapshot must never read or
+ * overwrite the browsing version's entries.
+ */
+function versionKey(options?: InterpolationRequestOptions): string {
+  return dataSlug(options?.gameVersion) || dataVersion.value || '';
+}
 
 // ============================================================================
 // Types and Interfaces
@@ -41,12 +53,12 @@ class InterpolationCache {
   private cache = new Map<string, CacheEntry>();
   private readonly defaultTTL = 5 * 60 * 1000; // 5 minutes
 
-  private getCacheKey(aoid: number, targetQl: number): string {
-    return `${aoid}:${targetQl}`;
+  private getCacheKey(aoid: number, targetQl: number, version: string): string {
+    return `${version}:${aoid}:${targetQl}`;
   }
 
-  get(aoid: number, targetQl: number): InterpolatedItem | null {
-    const key = this.getCacheKey(aoid, targetQl);
+  get(aoid: number, targetQl: number, version: string): InterpolatedItem | null {
+    const key = this.getCacheKey(aoid, targetQl, version);
     const entry = this.cache.get(key);
 
     if (!entry) return null;
@@ -60,8 +72,14 @@ class InterpolationCache {
     return entry.item;
   }
 
-  set(aoid: number, targetQl: number, item: InterpolatedItem, ttl = this.defaultTTL): void {
-    const key = this.getCacheKey(aoid, targetQl);
+  set(
+    aoid: number,
+    targetQl: number,
+    version: string,
+    item: InterpolatedItem,
+    ttl = this.defaultTTL
+  ): void {
+    const key = this.getCacheKey(aoid, targetQl, version);
     this.cache.set(key, {
       item,
       timestamp: Date.now(),
@@ -73,9 +91,10 @@ class InterpolationCache {
     this.cache.clear();
   }
 
+  /** Drops the item from every version's cache. */
   clearItem(aoid: number): void {
     for (const key of this.cache.keys()) {
-      if (key.startsWith(`${aoid}:`)) {
+      if (key.split(':')[1] === String(aoid)) {
         this.cache.delete(key);
       }
     }
@@ -102,7 +121,8 @@ class InterpolationCache {
 
 class InterpolationService {
   private cache = new InterpolationCache();
-  private infoCache = new Map<number, InterpolationInfo>();
+  /** Keyed by "<version>:<aoid>". */
+  private infoCache = new Map<string, InterpolationInfo>();
 
   // Reactive state for UI components
   public readonly state = reactive<InterpolationState>({
@@ -115,9 +135,15 @@ class InterpolationService {
   /**
    * Interpolate an item to a specific quality level
    */
-  async interpolateItem(aoid: number, targetQl: number): Promise<InterpolatedItem | null> {
+  async interpolateItem(
+    aoid: number,
+    targetQl: number,
+    options?: InterpolationRequestOptions
+  ): Promise<InterpolatedItem | null> {
+    const version = versionKey(options);
+
     // Check cache first
-    const cached = this.cache.get(aoid, targetQl);
+    const cached = this.cache.get(aoid, targetQl, version);
     if (cached) {
       this.state.currentItem = cached;
       return cached;
@@ -127,7 +153,9 @@ class InterpolationService {
     this.state.error = null;
 
     try {
-      const response = await apiClient.interpolateItem(aoid, targetQl);
+      const response = options?.gameVersion
+        ? await apiClient.interpolateItem(aoid, targetQl, { gameVersion: options.gameVersion })
+        : await apiClient.interpolateItem(aoid, targetQl);
 
       if (!response.success || !response.item) {
         this.state.error = response.error || 'Failed to interpolate item';
@@ -135,14 +163,14 @@ class InterpolationService {
       }
 
       // Cache the result
-      this.cache.set(aoid, targetQl, response.item);
+      this.cache.set(aoid, targetQl, version, response.item);
 
       // Update state
       this.state.currentItem = response.item;
 
       return response.item;
-    } catch (error: any) {
-      this.state.error = error.message || 'Failed to interpolate item';
+    } catch (error) {
+      this.state.error = errorMessage(error) || 'Failed to interpolate item';
       return null;
     } finally {
       this.state.loading = false;
@@ -152,23 +180,30 @@ class InterpolationService {
   /**
    * Get interpolation information for an item
    */
-  async getInterpolationInfo(aoid: number): Promise<InterpolationInfo | null> {
+  async getInterpolationInfo(
+    aoid: number,
+    options?: InterpolationRequestOptions
+  ): Promise<InterpolationInfo | null> {
+    const key = `${versionKey(options)}:${aoid}`;
+
     // Check cache first
-    const cached = this.infoCache.get(aoid);
+    const cached = this.infoCache.get(key);
     if (cached) {
       this.state.interpolationInfo = cached;
       return cached;
     }
 
     try {
-      const response = await apiClient.getInterpolationInfo(aoid);
+      const response = options?.gameVersion
+        ? await apiClient.getInterpolationInfo(aoid, { gameVersion: options.gameVersion })
+        : await apiClient.getInterpolationInfo(aoid);
 
       if (!response.success || !response.data) {
         return null;
       }
 
       // Cache the result
-      this.infoCache.set(aoid, response.data);
+      this.infoCache.set(key, response.data);
       this.state.interpolationInfo = response.data;
 
       return response.data;
@@ -181,8 +216,15 @@ class InterpolationService {
   /**
    * Check if an item can be interpolated
    */
-  async isItemInterpolatable(aoid: number): Promise<boolean> {
+  async isItemInterpolatable(
+    aoid: number,
+    options?: InterpolationRequestOptions
+  ): Promise<boolean> {
     try {
+      if (options?.gameVersion) {
+        const info = await this.getInterpolationInfo(aoid, options);
+        return info?.interpolatable ?? false;
+      }
       return await apiClient.checkItemInterpolatable(aoid);
     } catch {
       return false;
@@ -192,8 +234,11 @@ class InterpolationService {
   /**
    * Get the quality level range for interpolation
    */
-  async getInterpolationRange(aoid: number): Promise<{ min: number; max: number } | null> {
-    const info = await this.getInterpolationInfo(aoid);
+  async getInterpolationRange(
+    aoid: number,
+    options?: InterpolationRequestOptions
+  ): Promise<{ min: number; max: number } | null> {
+    const info = await this.getInterpolationInfo(aoid, options);
     if (info) {
       return {
         min: info.min_ql,
@@ -211,8 +256,8 @@ class InterpolationService {
     if (item.is_nano) return false;
     if (item.name?.includes('Control Point')) return false;
 
-    // If we have cached info, use it
-    const cached = this.infoCache.get(item.aoid || 0);
+    // If we have cached info for the browsing version, use it
+    const cached = this.infoCache.get(`${versionKey()}:${item.aoid || 0}`);
     if (cached) {
       return cached.interpolatable;
     }
@@ -226,7 +271,6 @@ class InterpolationService {
    */
   itemToInterpolatedItem(item: Item): InterpolatedItem {
     return {
-      id: item.id,
       aoid: item.aoid,
       name: item.name,
       ql: item.ql,
@@ -259,8 +303,6 @@ class InterpolationService {
           action: action.action,
           criteria: action.criteria || [],
         })) || [],
-      attack_defense_id: item.attack_defense?.id,
-      animation_mesh_id: item.animation_mesh?.id,
     };
   }
 
@@ -276,7 +318,9 @@ class InterpolationService {
    */
   clearItemCache(aoid: number): void {
     this.cache.clearItem(aoid);
-    this.infoCache.delete(aoid);
+    for (const key of this.infoCache.keys()) {
+      if (key.endsWith(`:${aoid}`)) this.infoCache.delete(key);
+    }
   }
 
   /**

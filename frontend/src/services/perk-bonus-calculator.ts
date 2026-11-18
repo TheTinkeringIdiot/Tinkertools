@@ -20,7 +20,7 @@
  * - LRU caching with error recovery for performance optimization
  */
 
-import type { Item, SpellData, Spell } from '@/types/api';
+import type { Item, Spell } from '@/types/api';
 
 // ============================================================================
 // Type Definitions
@@ -71,19 +71,19 @@ export interface PerkCalculationResult {
  * Spell IDs that provide stat modifications for perk bonuses
  * Same as equipment but perks may use different event types
  */
-export const STAT_BONUS_SPELL_IDS = [
+export const STAT_BONUS_SPELL_IDS: readonly number[] = [
   53045, // "Modify {Stat} by {Amount}" - primary stat bonus spell
   53012, // "Modify {Stat} by {Amount}" - alternative format
   53014, // "Modify {Stat} for {Duration}s by {Amount}" - timed bonus (some perks use this)
   53175, // "Modify {Stat} by {Amount}" - additional stat modifier format
-] as const;
+];
 
 /**
  * Perk events that provide stat bonuses
  * - 1: Cast (perks may trigger on cast)
  * - 14: Wear (standard wear effect like equipment)
  */
-export const PERK_EVENTS = [1, 14] as const;
+export const PERK_EVENTS: readonly number[] = [1, 14];
 
 // ============================================================================
 // Performance Caching
@@ -406,7 +406,7 @@ export class PerkBonusCalculator {
 
     for (const spellData of perk.spell_data) {
       // Only process perk-related events (Cast=1, Wear=14)
-      if (!spellData.event || !PERK_EVENTS.includes(spellData.event as any)) {
+      if (!spellData.event || !PERK_EVENTS.includes(spellData.event)) {
         continue;
       }
 
@@ -497,8 +497,6 @@ export class PerkBonusCalculator {
           type: 'error',
           message: 'Perk data has invalid format',
           details: `Perk is not an object: ${typeof perk}`,
-          perkName: (perk as any)?.name,
-          perkAoid: (perk as any)?.aoid,
           recoverable: true,
         });
         return result;
@@ -566,10 +564,7 @@ export class PerkBonusCalculator {
           }
 
           // Enhanced event validation with type checking
-          if (
-            typeof spellData.event !== 'number' ||
-            !PERK_EVENTS.includes(spellData.event as any)
-          ) {
+          if (typeof spellData.event !== 'number' || !PERK_EVENTS.includes(spellData.event)) {
             // Log suspicious event IDs for debugging but continue processing
             if (typeof spellData.event === 'number' && spellData.event !== 2) {
               // Only warn about unexpected numeric events (event 2 is equipment wield, expected to be ignored)
@@ -709,7 +704,7 @@ export class PerkBonusCalculator {
     perkAoid?: number
   ): PerkStatBonus | null {
     // Fast path: check spell_id first (most common rejection case)
-    if (!spell.spell_id || !STAT_BONUS_SPELL_IDS.includes(spell.spell_id as any)) {
+    if (!spell.spell_id || !STAT_BONUS_SPELL_IDS.includes(spell.spell_id)) {
       return null;
     }
 
@@ -792,7 +787,7 @@ export class PerkBonusCalculator {
         return result;
       }
 
-      if (!STAT_BONUS_SPELL_IDS.includes(spell.spell_id as any)) {
+      if (!STAT_BONUS_SPELL_IDS.includes(spell.spell_id)) {
         // Not an error - this spell doesn't modify stats
         return result;
       }

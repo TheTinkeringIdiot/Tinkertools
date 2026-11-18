@@ -34,25 +34,35 @@ Shows items in grid or list view with pagination and compatibility indicators
         v-if="viewMode === 'grid'"
         class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6"
       >
-        <ItemCard
-          v-for="item in items"
-          :key="item.id"
-          :item="item"
-          :profile="compatibilityProfile"
-          :show-compatibility="showCompatibility"
-          :is-comparing="isComparing(item.id)"
-          @click="$emit('item-click', item)"
-          @compare="$emit('item-compare', item)"
-          @cast-buff="$emit('cast-buff', item)"
-          @quick-view="showQuickView(item)"
-        />
+        <div v-for="item in items" :key="item.aoid" class="relative">
+          <ItemCard
+            :item="item"
+            :profile="compatibilityProfile"
+            :show-compatibility="showCompatibility"
+            :is-comparing="isComparing(item.aoid)"
+            @click="$emit('item-click', item)"
+            @compare="$emit('item-compare', item)"
+            @cast-buff="$emit('cast-buff', item)"
+            @quick-view="showQuickView(item)"
+          />
+          <span
+            v-if="changeCount(item) > 0"
+            class="absolute right-1 top-1 inline-flex flex-none items-center gap-1 whitespace-nowrap rounded bg-surface-100 dark:bg-surface-800 px-1.5 py-0.5 text-xs text-surface-600 dark:text-surface-300"
+            data-testid="item-revision-badge"
+            :data-aoid="item.aoid"
+            :title="changedTitle(item)"
+          >
+            <i class="pi pi-history text-xs" aria-hidden="true"></i>
+            {{ changedText(item) }}
+          </span>
+        </div>
       </div>
 
       <!-- List View -->
       <div v-else class="space-y-2 mb-6">
         <div
           v-for="item in items"
-          :key="item.id"
+          :key="item.aoid"
           class="bg-surface-0 dark:bg-surface-950 border border-surface-200 dark:border-surface-700 rounded-lg hover:shadow-md transition-shadow cursor-pointer"
           @click="$emit('item-click', item)"
         >
@@ -64,10 +74,10 @@ Shows items in grid or list view with pagination and compatibility indicators
               >
                 <img
                   v-if="getItemIconUrl(item)"
-                  :src="getItemIconUrl(item)"
+                  :src="getItemIconUrl(item) ?? undefined"
                   :alt="`${item.name} icon`"
                   class="w-10 h-10 object-contain"
-                  @error="(e) => handleIconError(e, item.id)"
+                  @error="handleIconError(item.aoid)"
                 />
                 <i v-else class="pi pi-box text-surface-400"></i>
               </div>
@@ -81,8 +91,18 @@ Shows items in grid or list view with pagination and compatibility indicators
                       <h3 class="font-semibold text-surface-900 dark:text-surface-50 truncate">
                         {{ item.name }}
                       </h3>
-                      <Badge :value="`QL ${item.ql}`" severity="info" size="small" />
-                      <Badge v-if="item.is_nano" value="Nano" severity="success" size="small" />
+                      <Badge :value="`QL ${item.ql}`" severity="info" />
+                      <Badge v-if="item.is_nano" value="Nano" severity="success" />
+                      <span
+                        v-if="changeCount(item) > 0"
+                        class="inline-flex flex-none items-center gap-1 whitespace-nowrap rounded bg-surface-100 dark:bg-surface-800 px-1.5 py-0.5 text-xs text-surface-600 dark:text-surface-300"
+                        data-testid="item-revision-badge"
+                        :data-aoid="item.aoid"
+                        :title="changedTitle(item)"
+                      >
+                        <i class="pi pi-history text-xs" aria-hidden="true"></i>
+                        {{ changedText(item) }}
+                      </span>
                     </div>
 
                     <!-- Description -->
@@ -102,40 +122,40 @@ Shows items in grid or list view with pagination and compatibility indicators
                     <div v-if="showCompatibility" class="mr-2">
                       <i
                         v-if="getCompatibilityStatus(item) === 'compatible'"
-                        class="pi pi-check-circle text-green-500"
                         v-tooltip.bottom="'You can use this item'"
+                        class="pi pi-check-circle text-green-500"
                       ></i>
                       <i
                         v-else-if="getCompatibilityStatus(item) === 'incompatible'"
-                        class="pi pi-times-circle text-red-500"
                         v-tooltip.bottom="'You cannot use this item'"
+                        class="pi pi-times-circle text-red-500"
                       ></i>
                       <i
                         v-else
-                        class="pi pi-question-circle text-yellow-500"
                         v-tooltip.bottom="'Compatibility unknown'"
+                        class="pi pi-question-circle text-yellow-500"
                       ></i>
                     </div>
 
                     <!-- Compare Button -->
                     <Button
+                      v-tooltip.bottom="'Add to comparison'"
                       icon="pi pi-clone"
                       size="small"
                       text
-                      :severity="isComparing(item.id) ? 'primary' : 'secondary'"
+                      :severity="isComparing(item.aoid) ? 'primary' : 'secondary'"
                       @click.stop="$emit('item-compare', item)"
-                      v-tooltip.bottom="'Add to comparison'"
                     />
 
                     <!-- Cast Buff Button (for nanos only) -->
                     <Button
                       v-if="item.is_nano && profilesStore.hasActiveProfile"
+                      v-tooltip.bottom="'Cast nano buff to active profile'"
                       icon="pi pi-sparkles"
                       size="small"
                       text
                       severity="primary"
                       @click.stop="$emit('cast-buff', item)"
-                      v-tooltip.bottom="'Cast nano buff to active profile'"
                     />
 
                     <!-- Quick Actions Menu -->
@@ -211,9 +231,14 @@ Shows items in grid or list view with pagination and compatibility indicators
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
-import type { Item, TinkerProfile, PaginationInfo } from '@/types/api';
+import type { PageState } from 'primevue/paginator';
+import type { Item, PaginationInfo } from '@/types/api';
+import type { ReadonlyTinkerProfile } from '@/lib/tinkerprofiles/types';
 import { getItemIconUrl as getItemIconUrlUtil } from '@/services/game-utils';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
+import { versionedPath } from '@/composables/useGameVersion';
+import { mapProfileToStats } from '@/utils/profile-stats-mapper';
+import { getItemRequirements } from './item-requirements';
 
 // Components (to be created)
 import ItemCard from './ItemCard.vue';
@@ -222,13 +247,30 @@ import ItemQuickView from './ItemQuickView.vue';
 const props = defineProps<{
   items: Item[];
   viewMode: 'grid' | 'list';
-  compatibilityProfile?: TinkerProfile | null;
+  compatibilityProfile?: ReadonlyTinkerProfile | null;
   showCompatibility?: boolean;
   loading?: boolean;
   pagination?: PaginationInfo;
-  favoriteItems?: number[];
   comparisonItems?: number[];
+  /** AOID -> number of builds that changed the item after it first appeared. */
+  changeCounts?: Record<number, number>;
 }>();
+
+/** Items no build changed since they first appeared get no badge. */
+function changeCount(item: Item): number {
+  const aoid = item.aoid;
+  if (!aoid || !props.changeCounts) return 0;
+  return props.changeCounts[aoid] || 0;
+}
+
+function changedText(item: Item): string {
+  const count = changeCount(item);
+  return `Changed in ${count} ${count === 1 ? 'build' : 'builds'}`;
+}
+
+function changedTitle(item: Item): string {
+  return `${changedText(item)} since it first appeared; its page lists them under History`;
+}
 
 const emit = defineEmits<{
   'item-click': [item: Item];
@@ -309,32 +351,27 @@ const itemMenuItems = ref([
 ]);
 
 // Computed
-const statNameMap = computed(() => ({
-  16: 'Strength',
-  17: 'Agility',
-  18: 'Stamina',
-  19: 'Intelligence',
-  20: 'Sense',
-  21: 'Psychic',
-  102: '1H Blunt',
-  103: '1H Edged',
-  105: '2H Edged',
-  109: '2H Blunt',
-  133: 'Ranged Energy',
-  161: 'Computer Literacy',
-}));
+// Profile stats keyed by stat ID, computed once for all list rows
+const profileStats = computed(() =>
+  props.compatibilityProfile ? mapProfileToStats(props.compatibilityProfile) : null
+);
 
 // Methods
-function isFavorite(itemId: number): boolean {
-  return props.favoriteItems?.includes(itemId) || false;
+function isComparing(aoid: number): boolean {
+  return props.comparisonItems?.includes(aoid) || false;
 }
 
-function isComparing(itemId: number): boolean {
-  return props.comparisonItems?.includes(itemId) || false;
+function getCompatibilityStatus(item: Item): 'compatible' | 'incompatible' | 'unknown' {
+  const stats = profileStats.value;
+  const requirements = getItemRequirements(item);
+  if (!stats || requirements.length === 0) return 'unknown';
+  return requirements.every((req) => (stats[req.stat] || 0) >= req.value)
+    ? 'compatible'
+    : 'incompatible';
 }
 
-function getStatName(statId: number): string {
-  return statNameMap.value[statId] || `Stat ${statId}`;
+function getItemUrl(item: Item): string {
+  return `${window.location.origin}${versionedPath(`/items/${item.aoid}`)}`;
 }
 
 function showQuickView(item: Item) {
@@ -355,38 +392,48 @@ function showItemMenu(event: MouseEvent, item: Item) {
 }
 
 function copyItemLink(item: Item) {
-  const url = `${window.location.origin}/items/${item.id}`;
-  navigator.clipboard.writeText(url).then(() => {
-    // Show success toast
-    console.log('Item link copied to clipboard');
-  });
+  navigator.clipboard
+    .writeText(getItemUrl(item))
+    .then(() => {
+      // Show success toast
+      console.log('Item link copied to clipboard');
+    })
+    .catch((error: unknown) => {
+      console.warn('Failed to copy item link:', error);
+    });
 }
 
 function shareItem(item: Item) {
   if (navigator.share) {
-    navigator.share({
-      title: item.name,
-      text: item.description,
-      url: `${window.location.origin}/items/${item.id}`,
-    });
+    navigator
+      .share({
+        title: item.name,
+        text: item.description,
+        url: getItemUrl(item),
+      })
+      .catch((error: unknown) => {
+        // AbortError just means the user dismissed the share sheet
+        if (error instanceof DOMException && error.name === 'AbortError') return;
+        console.warn('Failed to share item:', error);
+      });
   } else {
     copyItemLink(item);
   }
 }
 
-function onPageChange(event: any) {
+function onPageChange(event: PageState) {
   currentOffset.value = event.first;
   const page = Math.floor(event.first / event.rows) + 1;
   emit('page-change', page, event.rows);
 }
 
 function getItemIconUrl(item: Item): string | null {
-  if (iconLoadErrors.value.has(item.id)) return null;
+  if (iconLoadErrors.value.has(item.aoid)) return null;
   return getItemIconUrlUtil(item.stats || []);
 }
 
-function handleIconError(event: Event, itemId: number) {
-  iconLoadErrors.value.add(itemId);
+function handleIconError(aoid: number) {
+  iconLoadErrors.value.add(aoid);
 }
 </script>
 

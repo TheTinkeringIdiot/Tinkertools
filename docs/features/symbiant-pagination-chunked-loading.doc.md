@@ -99,6 +99,8 @@ Users loading the TinkerPocket symbiant view now see progress indicators as data
 ### Technical Details
 
 #### Backend Pagination Pattern
+The route (`backend/app/api/routes/symbiants.py`) pages the symbiants of the request's build, ordered by family, QL, name and AOID; the query is `list_symbiants` in `backend/app/store/curated.py`.
+
 ```python
 @router.get("", response_model=PaginatedResponse[SymbiantResponse])
 @cached_response("symbiants")
@@ -106,7 +108,8 @@ Users loading the TinkerPocket symbiant view now see progress indicators as data
 def list_symbiants(
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(50, ge=1, le=200, description="Items per page"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_store),
+    build: Build = Depends(get_build),
 ) -> PaginatedResponse[SymbiantResponse]:
     """
     List symbiants with pagination.
@@ -115,36 +118,10 @@ def list_symbiants(
     - page: Page number (1-indexed)
     - page_size: Number of items per page (default: 50, max: 200)
     """
-    # Base query with ordering
-    base_query = (
-        db.query(SymbiantItem)
-        .order_by(
-            SymbiantItem.family.asc(),
-            SymbiantItem.ql.asc(),
-            SymbiantItem.name.asc()
-        )
-    )
-
-    # Get total count
-    total = base_query.count()
-
-    # Calculate pagination
-    pages = math.ceil(total / page_size) if total > 0 else 1
-    offset = (page - 1) * page_size
-
-    # Get paginated results
-    symbiants = base_query.limit(page_size).offset(offset).all()
-
-    # ... build response objects ...
+    symbiants, total = curated.list_symbiants(db, build, page, page_size)
 
     return PaginatedResponse[SymbiantResponse](
-        items=symbiant_responses,
-        total=total,
-        page=page,
-        page_size=page_size,
-        pages=pages,
-        has_next=page < pages,
-        has_prev=page > 1
+        items=symbiants, **page_fields(total, page, page_size)
     )
 ```
 

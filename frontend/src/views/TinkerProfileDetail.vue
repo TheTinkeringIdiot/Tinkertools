@@ -40,6 +40,14 @@ Complete character management with skills, equipment, and IP tracking
                   {{ profileData.Character.Name }}
                 </h1>
                 <Badge v-if="isActiveProfile" value="Active" severity="success" />
+                <!-- Built against a different game database than the one being browsed -->
+                <span
+                  v-if="otherVersionLabel"
+                  class="text-xs italic text-surface-500 dark:text-surface-400"
+                  :title="`This profile's items came from ${otherVersionLabel}. Copy it from the profile dropdown to use it here.`"
+                >
+                  <i class="pi pi-database text-xs mr-1"></i>{{ otherVersionLabel }}
+                </span>
               </div>
               <div class="flex items-center gap-4 text-surface-600 dark:text-surface-400">
                 <span>{{ displayProfession }} Level {{ profileData.Character.Level }}</span>
@@ -185,8 +193,8 @@ Complete character management with skills, equipment, and IP tracking
                   <div class="mt-6">
                     <BuffTable
                       :buffs="profileData.buffs || []"
-                      :currentNCU="profilesStore.currentNCU"
-                      :maxNCU="profilesStore.maxNCU"
+                      :current-n-c-u="profilesStore.currentNCU"
+                      :max-n-c-u="profilesStore.maxNCU"
                       @remove-buff="handleRemoveBuff"
                       @remove-all-buffs="handleRemoveAllBuffs"
                     />
@@ -287,8 +295,8 @@ Complete character management with skills, equipment, and IP tracking
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, nextTick } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { ref, computed, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import Button from 'primevue/button';
 import Badge from 'primevue/badge';
 import ProgressSpinner from 'primevue/progressspinner';
@@ -297,7 +305,6 @@ import TabPanel from 'primevue/tabpanel';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
 import CharacterInfoPanel from '@/components/profiles/CharacterInfoPanel.vue';
 import IPTrackerPanel from '@/components/profiles/IPTrackerPanel.vue';
-import ItemSlotsDisplay from '@/components/items/ItemSlotsDisplay.vue';
 import EquipmentSlotsDisplay from '@/components/items/EquipmentSlotsDisplay.vue';
 import SkillsManager from '@/components/profiles/skills/SkillsManager.vue';
 import EditCharacterDialog from '@/components/profiles/EditCharacterDialog.vue';
@@ -306,12 +313,11 @@ import BuffTable from '@/components/profiles/buffs/BuffTable.vue';
 import type { TinkerProfile } from '@/lib/tinkerprofiles';
 import type { Item } from '@/types/api';
 import { skillService } from '@/services/skill-service';
-import type { SkillId } from '@/types/skills';
 import { getProfessionName, getBreedName } from '@/services/game-utils';
+import { gameVersionDisplayName } from '@/lib/tinkerprofiles/game-version';
 import { useToast } from 'primevue/usetoast';
 
 // Router
-const route = useRoute();
 const router = useRouter();
 const profilesStore = useTinkerProfilesStore();
 const toast = useToast();
@@ -334,6 +340,13 @@ const skillsScrollContainer = ref<HTMLElement | null>(null); // Reference to ski
 
 // Computed
 const isActiveProfile = computed(() => profilesStore.activeProfileId === props.profileId);
+
+/** Version tag, shown only when this profile belongs to another game version. */
+const otherVersionLabel = computed(() => {
+  const slug = profileData.value?.gameVersion;
+  if (!slug || slug === profilesStore.gameVersion) return '';
+  return gameVersionDisplayName(slug);
+});
 
 const displayProfession = computed(() =>
   getProfessionName(profileData.value?.Character?.Profession || 0)
@@ -393,9 +406,10 @@ async function loadProfile() {
 async function setActiveProfile() {
   try {
     await profilesStore.setActiveProfile(props.profileId);
-    // Update profileData to reflect the newly active profile
-    const updatedProfile = profilesStore.activeProfile;
-    if (updatedProfile && updatedProfile.id === props.profileId) {
+    // Reload our own copy rather than taking the store's activeProfile: that one
+    // is readonly, and the skill handlers below update profileData in place.
+    const updatedProfile = await profilesStore.loadProfile(props.profileId);
+    if (updatedProfile) {
       profileData.value = updatedProfile;
     }
   } catch (err) {
@@ -419,7 +433,7 @@ async function duplicateProfile() {
     });
 
     // Navigate to the new profile
-    router.push({
+    await router.push({
       name: 'TinkerProfileDetail',
       params: { profileId: newProfileId },
     });
@@ -513,7 +527,9 @@ async function handleAbilityChange(abilityId: string | number, newValue: number)
   }
 }
 
-async function handleCharacterUpdate(changes: any) {
+async function handleCharacterUpdate(
+  changes: Parameters<typeof profilesStore.updateCharacterMetadata>[1]
+) {
   if (!profileData.value) return;
 
   try {
@@ -552,7 +568,7 @@ async function handleEquipmentChange() {
 // Handle buff removal events
 async function handleRemoveBuff(buff: Item) {
   try {
-    await profilesStore.removeBuff(buff.id);
+    await profilesStore.removeBuff(buff.aoid);
   } catch (err) {
     console.error('Failed to remove buff:', err);
     error.value = err instanceof Error ? err.message : 'Failed to remove buff';
@@ -566,20 +582,6 @@ async function handleRemoveAllBuffs() {
     console.error('Failed to remove all buffs:', err);
     error.value = err instanceof Error ? err.message : 'Failed to remove all buffs';
   }
-}
-
-// Feedback functions
-function showTrickleDownFeedback(affectedSkillsCount: number) {
-  // Simple console feedback for now - could be enhanced with toast notifications
-  console.info(`✨ Ability change updated trickle-down bonuses for ${affectedSkillsCount} skills`);
-
-  // Could add a toast notification here if PrimeVue Toast is set up:
-  // toast.add({
-  //   severity: 'success',
-  //   summary: 'Trickle-down Updated',
-  //   detail: `${affectedSkillsCount} skills received updated bonuses from ability changes`,
-  //   life: 3000
-  // });
 }
 
 // Equipment helper functions - now return complete equipment records
@@ -600,9 +602,9 @@ function getEquippedImplants(implants: Record<string, Item | null>) {
 // Watchers
 watch(
   () => props.profileId,
-  () => {
+  async () => {
     if (props.profileId) {
-      loadProfile();
+      await loadProfile();
     }
   },
   { immediate: true }

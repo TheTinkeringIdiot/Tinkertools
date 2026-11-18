@@ -26,18 +26,18 @@ PrimeVue DataTable with columns:
       :rows-per-page-options="[25, 50, 100]"
       striped-rows
       sortable
-      sortField="avgDPS"
-      :sortOrder="-1"
+      sort-field="avgDPS"
+      :sort-order="-1"
       responsive-layout="scroll"
-      @row-click="onRowClick"
       :empty-message="emptyMessage"
       class="p-datatable-sm"
+      @row-click="onRowClick"
     >
       <!-- Name Column -->
       <Column field="name" header="Name" :sortable="true" style="min-width: 200px">
         <template #body="{ data }">
           <a
-            :href="`/items/${data.aoid}`"
+            :href="versionedPath(`/items/${data.aoid}`)"
             class="text-primary-500 hover:text-primary-600 font-semibold"
             @click.prevent="onWeaponClick(data.aoid)"
           >
@@ -152,13 +152,22 @@ PrimeVue DataTable with columns:
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useRouter } from 'vue-router';
+import { versionedPath } from '@/composables/useGameVersion';
 import DataTable from 'primevue/datatable';
+import type { DataTableRowClickEvent } from 'primevue/datatable';
 import Column from 'primevue/column';
 import Badge from 'primevue/badge';
 import type { WeaponCandidate, FiteInputState } from '@/types/weapon-analysis';
 import { WEAPON_STAT_IDS, DAMAGE_TYPES } from '@/types/weapon-analysis';
-import { calculateBaseDamage60s, convertToDPS, calculateARBonus } from '@/utils/weapon-damage-calculations';
-import { calculateAllSpecialAttacks, getWeaponSpecialAttacks } from '@/utils/weapon-special-attacks';
+import {
+  calculateBaseDamage60s,
+  convertToDPS,
+  calculateARBonus,
+} from '@/utils/weapon-damage-calculations';
+import {
+  calculateAllSpecialAttacks,
+  getWeaponSpecialAttacks,
+} from '@/utils/weapon-special-attacks';
 
 // Props
 interface Props {
@@ -287,10 +296,9 @@ function getDamageTypeSeverity(damageType: number | undefined): string {
   if (!damageType) return 'secondary';
 
   switch (damageType) {
-    // Enum values
+    // Enum values first, then AC stat IDs
     case DAMAGE_TYPES.MELEE:
     case DAMAGE_TYPES.FIRE:
-    // AC stat IDs
     case 91: // MeleeAC
     case 97: // FireAC
       return 'danger';
@@ -323,10 +331,10 @@ function getDamageTypeSeverity(damageType: number | undefined): string {
 /**
  * Handle row click - navigate to item detail
  */
-function onRowClick(event: any) {
+function onRowClick(event: DataTableRowClickEvent) {
   const aoid = event.data.aoid;
   if (aoid) {
-    router.push(`/items/${aoid}`);
+    void router.push({ name: 'ItemDetail', params: { aoid: aoid.toString() } });
   }
 }
 
@@ -334,7 +342,7 @@ function onRowClick(event: any) {
  * Handle weapon name click - navigate to item detail
  */
 function onWeaponClick(aoid: number) {
-  router.push(`/items/${aoid}`);
+  void router.push({ name: 'ItemDetail', params: { aoid: aoid.toString() } });
 }
 </script>
 

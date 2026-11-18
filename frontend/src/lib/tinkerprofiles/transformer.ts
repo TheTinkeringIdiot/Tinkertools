@@ -9,17 +9,14 @@
 
 import type {
   TinkerProfile,
-  NanoCompatibleProfile,
   ProfileExportFormat,
   ProfileImportResult,
   ImplantWithClusters,
-  ImplantCluster,
 } from './types';
-import type { Item } from '@/types/api';
-import { createDefaultProfile, createDefaultNanoProfile } from './constants';
-import type { PerkSystem } from './perk-types';
-import { SKILL_CATEGORIES, getSkillId } from './skill-mappings';
-import { getClusterMapping, getSlotPosition, AOSETUPS_SLOT_TO_BITFLAG } from './cluster-mappings';
+import type { Item, InterpolatedItem } from '@/types/api';
+import { createDefaultProfile } from './constants';
+import type { PerkSystem, PerkEntry, ResearchEntry } from './perk-types';
+import { getClusterMapping, getSlotPosition } from './cluster-mappings';
 import { apiClient } from '@/services/api-client';
 import { skillService } from '@/services/skill-service';
 import type { SkillId } from '@/types/skills';
@@ -27,6 +24,88 @@ import { SKILL_COST_FACTORS } from '@/services/game-data';
 import { normalizeProfessionToId, normalizeBreedToId } from '@/services/game-utils';
 import { isPRKFormat, decodePRK } from './prk-decoder';
 import type { PRKPayload } from './prk-decoder';
+import { currentGameVersion, versionForImport } from './game-version';
+
+/** A perk entry in the legacy (array-shaped) PerksAndResearch format */
+interface LegacyPerkEntry {
+  aoid: number;
+  name: string;
+  level: number;
+  type?: string;
+  item?: Item;
+}
+
+/** Profile-like JSON from an import, before it has been validated */
+interface ImportedProfileData {
+  id?: string;
+  version?: string;
+  gameVersion?: string;
+  Character?: Partial<Omit<TinkerProfile['Character'], 'Profession' | 'Breed'>> & {
+    Profession?: string | number;
+    Breed?: string | number;
+  };
+  skills?: TinkerProfile['skills'];
+  Weapons?: TinkerProfile['Weapons'];
+  Clothing?: TinkerProfile['Clothing'];
+  Implants?: TinkerProfile['Implants'];
+  Symbiants?: TinkerProfile['Symbiants'];
+  // Fields of other, flatter profile formats
+  name?: string;
+  level?: number;
+  profession?: string | number;
+  breed?: string | number;
+  // Perks in any of the formats importPerksFromData understands
+  PerksAndResearch?: unknown;
+  perksAndResearch?: unknown;
+  Perks?: unknown;
+}
+
+/** The parts of an AOSetups export that the importer reads */
+interface AOSetupsExport {
+  name?: string;
+  character?: {
+    name?: string;
+    level?: number;
+    profession?: string;
+    breed?: string;
+    skills?: Array<{ name: string; ipExpenditure?: number; pointsFromIp?: number }>;
+  };
+  implants?: Array<{
+    slot?: string;
+    type?: string;
+    ql?: number;
+    clusters?: Record<string, { ClusterID: number }>;
+    symbiant?: { highid?: number; selectedQl?: number };
+  } | null>;
+  weapons?: Array<{ highid?: number; selectedQl?: number } | null>;
+  clothes?: Array<{ slot?: string; highid?: number; selectedQl?: number } | null>;
+  perks?: Array<{ aoid?: number } | null>;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+/**
+ * Convert an interpolated item from the batch endpoint into the Item shape
+ * stored in profiles.
+ */
+export function interpolatedToItem(item: InterpolatedItem): Item {
+  return {
+    aoid: item.aoid,
+    name: item.name,
+    ql: item.ql,
+    description: item.description,
+    item_class: item.item_class,
+    is_nano: item.is_nano,
+    stats: item.stats || [],
+    spell_data: item.spell_data || [],
+    actions: item.actions || [],
+    attack_stats: [],
+    defense_stats: [],
+    sources: [],
+  };
+}
 
 export class ProfileTransformer {
   // ============================================================================
@@ -127,6 +206,8 @@ export class ProfileTransformer {
       id: profile.id,
       created: profile.created,
       updated: profile.updated,
+      // Which game database the embedded item snapshots came from.
+      gameVersion: profile.gameVersion,
       Character: profile.Character,
       IPTracker: profile.IPTracker,
       skills: profile.skills, // Use numeric skill IDs as keys
@@ -142,7 +223,7 @@ export class ProfileTransformer {
   }
 
   private async importFromJSON(data: string, result: ProfileImportResult): Promise<TinkerProfile> {
-    const parsed = JSON.parse(data);
+    const parsed: ImportedProfileData = JSON.parse(data);
 
     // Check if it's already a valid TinkerProfile
     if (this.isValidTinkerProfile(parsed)) {
@@ -151,6 +232,11 @@ export class ProfileTransformer {
       importedProfile.id = `profile_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       importedProfile.created = new Date().toISOString();
       importedProfile.updated = new Date().toISOString();
+
+      // Our own export carries the game version it was built against; keep it so
+      // the profile does not silently claim to match the version being browsed.
+      importedProfile.gameVersion = parsed.gameVersion ?? currentGameVersion();
+      result.metadata.gameVersion = importedProfile.gameVersion;
 
       // Normalize Character IDs (handles both legacy strings and numeric IDs)
       importedProfile.Character.Profession = normalizeProfessionToId(
@@ -185,8 +271,17 @@ export class ProfileTransformer {
     data: string,
     result: ProfileImportResult
   ): Promise<TinkerProfile> {
-    const aosetups = JSON.parse(data);
+    const aosetups: AOSetupsExport = JSON.parse(data);
     result.metadata.migrated = true;
+
+    // AOSetups describes live Anarchy Online, so the profile belongs to an
+    // `ao`-family version even if another family is being browsed.
+    const target = versionForImport('aosetups');
+    result.metadata.gameVersion = target.slug;
+    if (target.warning) {
+      result.metadata.gameVersionWarning = target.warning;
+      result.warnings.push(target.warning);
+    }
 
     const profile = createDefaultProfile();
     console.log(
@@ -195,6 +290,7 @@ export class ProfileTransformer {
 
     // Ensure profile is v4.0.0 format with ID-based skills
     profile.version = '4.0.0';
+    profile.gameVersion = target.slug;
     // Keep all default skills - AOSetups will update the values for skills it includes
 
     // Map character data
@@ -257,7 +353,7 @@ export class ProfileTransformer {
 
         // STEP 2: Build profile with numeric skill IDs only
         for (const normalizedSkill of normalizedSkills) {
-          this.mapNormalizedSkillToProfile(normalizedSkill, profile, result);
+          this.mapNormalizedSkillToProfile(normalizedSkill, profile);
         }
         console.log(
           `[ProfileTransformer] After mapping AOSetups skills, profile has ${Object.keys(profile.skills).length} skills`
@@ -266,17 +362,15 @@ export class ProfileTransformer {
     }
 
     // Map equipment (implants, weapons, clothing)
-    await this.mapAOSetupsEquipment(aosetups, profile, result);
+    await this.mapAOSetupsEquipment(aosetups, profile, result, undefined, target.slug);
 
     // Map perks to PerksAndResearch (fetch details from backend via batch)
     if (aosetups.perks && Array.isArray(aosetups.perks)) {
-      const perkAoids = aosetups.perks
-        .filter((p: any) => p && p.aoid)
-        .map((p: any) => p.aoid);
+      const perkAoids = aosetups.perks.flatMap((p) => (p && p.aoid ? [p.aoid] : []));
 
       console.log(`[ProfileTransformer] Fetching ${perkAoids.length} perks via batch endpoint...`);
 
-      const legacyPerks = [];
+      const legacyPerks: LegacyPerkEntry[] = [];
 
       if (perkAoids.length > 0) {
         // Chunk perk AOIDs into batches of 100 (backend limit)
@@ -357,8 +451,7 @@ export class ProfileTransformer {
         }
       }
 
-      // Set as legacy array format, will be migrated by migrateProfilePerks
-      (profile as any).PerksAndResearch = legacyPerks;
+      profile.PerksAndResearch = this.perkSystemFromLegacy(legacyPerks, profile);
       result.warnings.push(`Imported ${legacyPerks.length} perks from AOSetups format`);
     }
 
@@ -389,8 +482,7 @@ export class ProfileTransformer {
    */
   private mapNormalizedSkillToProfile(
     normalizedSkill: { skillId: SkillId; ipExpenditure: number; pointsFromIp: number },
-    profile: TinkerProfile,
-    result: ProfileImportResult
+    profile: TinkerProfile
   ): void {
     const { skillId, ipExpenditure, pointsFromIp } = normalizedSkill;
     const numericId = Number(skillId);
@@ -460,10 +552,11 @@ export class ProfileTransformer {
   }
 
   private async mapAOSetupsEquipment(
-    aosetups: any,
+    aosetups: AOSetupsExport,
     profile: TinkerProfile,
     result: ProfileImportResult,
-    onProgress?: (current: number, total: number) => void
+    onProgress?: (current: number, total: number) => void,
+    gameVersion?: string
   ): Promise<void> {
     // First pass: collect all item requests
     const itemRequests: Array<{ aoid: number; targetQl?: number }> = [];
@@ -547,7 +640,7 @@ export class ProfileTransformer {
     }
 
     // Fetch all items
-    const itemMap = await this.fetchItems(itemRequests, onProgress);
+    const itemMap = await this.fetchItems(itemRequests, onProgress, gameVersion);
 
     // Second pass: populate equipment with fetched items
     for (const placement of itemPlacement) {
@@ -590,7 +683,6 @@ export class ProfileTransformer {
           } else {
             // Fallback to basic data if item fetch failed
             profile.Weapons[slot] = {
-              id: placement.aoid,
               aoid: placement.aoid,
               name: `Item ${placement.aoid} (fetch failed)`,
               ql: placement.targetQl || 1,
@@ -603,7 +695,7 @@ export class ProfileTransformer {
               attack_stats: [],
               defense_stats: [],
               sources: [],
-            } as Item;
+            };
             result.warnings.push(`Failed to fetch weapon item AOID ${placement.aoid}`);
           }
         }
@@ -634,7 +726,6 @@ export class ProfileTransformer {
           } else {
             // Fallback to basic data if item fetch failed
             profile.Clothing[slot] = {
-              id: placement.aoid,
               aoid: placement.aoid,
               name: `Item ${placement.aoid} (fetch failed)`,
               ql: placement.targetQl || 1,
@@ -647,7 +738,7 @@ export class ProfileTransformer {
               attack_stats: [],
               defense_stats: [],
               sources: [],
-            } as Item;
+            };
             result.warnings.push(`Failed to fetch clothing item AOID ${placement.aoid}`);
           }
         }
@@ -696,6 +787,7 @@ export class ProfileTransformer {
       try {
         // Convert ClusterIDs to STAT numbers
         const clusters: Record<string, number> = {};
+        const clusterSkillNames: Record<string, string> = {};
         let hasValidClusters = false;
 
         for (const [position, clusterData] of Object.entries(placement.clusters)) {
@@ -703,8 +795,10 @@ export class ProfileTransformer {
             const mapping = getClusterMapping(clusterData.ClusterID);
             if (mapping) {
               // Capitalize position key to match backend requirements (Shiny, Bright, Faded)
-              const capitalizedPosition = position.charAt(0).toUpperCase() + position.slice(1).toLowerCase();
+              const capitalizedPosition =
+                position.charAt(0).toUpperCase() + position.slice(1).toLowerCase();
               clusters[capitalizedPosition] = mapping.stat;
+              clusterSkillNames[capitalizedPosition] = mapping.skillName;
               hasValidClusters = true;
             } else {
               result.warnings.push(`Unknown ClusterID: ${clusterData.ClusterID}`);
@@ -743,11 +837,9 @@ export class ProfileTransformer {
 
         // Add cluster metadata for UI display
         for (const [position, statId] of Object.entries(clusters)) {
-          const mapping = Object.values(getClusterMapping.bind(this)).find(
-            (m: any) => m && m.stat === statId
-          );
+          const skillName = clusterSkillNames[position];
 
-          if (mapping) {
+          if (skillName) {
             const positionMap: Record<string, keyof NonNullable<ImplantWithClusters['clusters']>> =
               {
                 Shiny: 'Shiny',
@@ -759,7 +851,7 @@ export class ProfileTransformer {
             if (mappedPosition && enhancedImplant.clusters) {
               enhancedImplant.clusters[mappedPosition] = {
                 stat: statId,
-                skillName: (mapping as any).skillName,
+                skillName,
               };
             }
           }
@@ -801,7 +893,6 @@ export class ProfileTransformer {
     slotPosition: number
   ): ImplantWithClusters {
     const placeholderItem: Item = {
-      id: 0,
       aoid: placement.aoid || 0,
       name:
         placement.implantType === 'implant'
@@ -862,15 +953,23 @@ export class ProfileTransformer {
   // PRK Server Export Import
   // ============================================================================
 
-  private async importFromPRK(
-    data: string,
-    result: ProfileImportResult
-  ): Promise<TinkerProfile> {
+  private async importFromPRK(data: string, result: ProfileImportResult): Promise<TinkerProfile> {
     const payload = decodePRK(data);
     result.metadata.migrated = true;
 
+    // A PRK export describes a Project Rubi-Ka character: tag it with a PRK
+    // version and resolve its items there, falling back (with a warning) when
+    // no PRK database is loaded.
+    const target = versionForImport('prk');
+    result.metadata.gameVersion = target.slug;
+    if (target.warning) {
+      result.metadata.gameVersionWarning = target.warning;
+      result.warnings.push(target.warning);
+    }
+
     const profile = createDefaultProfile(payload.n);
     profile.version = '4.0.0';
+    profile.gameVersion = target.slug;
 
     // Character basics
     profile.Character.Level = payload.l;
@@ -913,7 +1012,7 @@ export class ProfileTransformer {
     }
 
     // Equipment — batch fetch all items, then map to slots
-    await this.mapPRKEquipment(payload, profile, result);
+    await this.mapPRKEquipment(payload, profile, result, target.slug);
 
     // Perks — batch lookup, set as legacy array, then migrate
     if (payload.pk.length > 0) {
@@ -931,46 +1030,92 @@ export class ProfileTransformer {
 
   // Slot mappings for PRK export format
   private static readonly PRK_WEAPON_SLOTS: Record<number, keyof TinkerProfile['Weapons']> = {
-    1: 'HUD1', 15: 'HUD2', 2: 'HUD3',
-    3: 'UTILS1', 4: 'UTILS2', 5: 'UTILS3',
-    6: 'RHand', 8: 'LHand',
-    9: 'NCU1', 10: 'NCU2', 11: 'NCU3', 12: 'NCU4', 13: 'NCU5', 14: 'NCU6',
+    1: 'HUD1',
+    15: 'HUD2',
+    2: 'HUD3',
+    3: 'UTILS1',
+    4: 'UTILS2',
+    5: 'UTILS3',
+    6: 'RHand',
+    8: 'LHand',
+    9: 'NCU1',
+    10: 'NCU2',
+    11: 'NCU3',
+    12: 'NCU4',
+    13: 'NCU5',
+    14: 'NCU6',
   };
 
   private static readonly PRK_ARMOR_SLOTS: Record<number, keyof TinkerProfile['Clothing']> = {
-    1: 'Neck', 2: 'Head', 3: 'Back',
-    4: 'RightShoulder', 5: 'Body', 6: 'LeftShoulder',
-    7: 'RightArm', 8: 'Hands', 9: 'LeftArm',
-    10: 'RightWrist', 11: 'Legs', 12: 'LeftWrist',
-    13: 'RightFinger', 14: 'Feet', 15: 'LeftFinger',
+    1: 'Neck',
+    2: 'Head',
+    3: 'Back',
+    4: 'RightShoulder',
+    5: 'Body',
+    6: 'LeftShoulder',
+    7: 'RightArm',
+    8: 'Hands',
+    9: 'LeftArm',
+    10: 'RightWrist',
+    11: 'Legs',
+    12: 'LeftWrist',
+    13: 'RightFinger',
+    14: 'Feet',
+    15: 'LeftFinger',
   };
 
   private static readonly PRK_IMPLANT_SLOTS: Record<number, string> = {
-    1: '2', 2: '4', 3: '8', 4: '16', 5: '32', 6: '64',
-    7: '128', 8: '256', 9: '512', 10: '1024', 11: '2048', 12: '4096', 13: '8192',
+    1: '2',
+    2: '4',
+    3: '8',
+    4: '16',
+    5: '32',
+    6: '64',
+    7: '128',
+    8: '256',
+    9: '512',
+    10: '1024',
+    11: '2048',
+    12: '4096',
+    13: '8192',
   };
 
   private async mapPRKEquipment(
     payload: PRKPayload,
     profile: TinkerProfile,
-    result: ProfileImportResult
+    result: ProfileImportResult,
+    gameVersion?: string
   ): Promise<void> {
     // Collect all item requests from equipment, armor, and implants
     const allItems = [
-      ...payload.e.map(i => ({ aoid: i.id, targetQl: i.ql, source: 'weapon' as const, slot: i.sl })),
-      ...payload.a.map(i => ({ aoid: i.id, targetQl: i.ql, source: 'armor' as const, slot: i.sl })),
-      ...payload.i.map(i => ({ aoid: i.id, targetQl: i.ql, source: 'implant' as const, slot: i.sl })),
+      ...payload.e.map((i) => ({
+        aoid: i.id,
+        targetQl: i.ql,
+        source: 'weapon' as const,
+        slot: i.sl,
+      })),
+      ...payload.a.map((i) => ({
+        aoid: i.id,
+        targetQl: i.ql,
+        source: 'armor' as const,
+        slot: i.sl,
+      })),
+      ...payload.i.map((i) => ({
+        aoid: i.id,
+        targetQl: i.ql,
+        source: 'implant' as const,
+        slot: i.sl,
+      })),
     ];
 
     if (allItems.length === 0) return;
 
     // Batch fetch all items
-    const fetchRequests = allItems.map(i => ({ aoid: i.aoid, targetQl: i.targetQl }));
-    const itemMap = await this.fetchItems(fetchRequests);
+    const fetchRequests = allItems.map((i) => ({ aoid: i.aoid, targetQl: i.targetQl }));
+    const itemMap = await this.fetchItems(fetchRequests, undefined, gameVersion);
 
     // Helper to create a fallback item when fetch fails
     const createFallback = (aoid: number, ql: number): Item => ({
-      id: aoid,
       aoid: aoid,
       name: `Item ${aoid} (fetch failed)`,
       ql: ql,
@@ -983,7 +1128,7 @@ export class ProfileTransformer {
       attack_stats: [],
       defense_stats: [],
       sources: [],
-    } as Item);
+    });
 
     // Map items to their profile slots
     for (const entry of allItems) {
@@ -1048,7 +1193,7 @@ export class ProfileTransformer {
     profile: TinkerProfile,
     result: ProfileImportResult
   ): Promise<void> {
-    const legacyPerks: any[] = [];
+    const legacyPerks: LegacyPerkEntry[] = [];
     const BATCH_SIZE = 100;
     const chunks: number[][] = [];
     for (let i = 0; i < perkAoids.length; i += BATCH_SIZE) {
@@ -1112,13 +1257,8 @@ export class ProfileTransformer {
       result.warnings.push('Batch perk lookup failed - perks added as placeholders');
     }
 
-    // Set as legacy array format, will be migrated by migrateProfilePerks
-    (profile as any).PerksAndResearch = legacyPerks;
+    profile.PerksAndResearch = this.perkSystemFromLegacy(legacyPerks, profile);
     result.warnings.push(`Imported ${legacyPerks.length} perks from PRK export`);
-
-    // Migrate to structured PerkSystem
-    const migrated = this.migrateProfilePerks(profile);
-    profile.PerksAndResearch = migrated.PerksAndResearch;
   }
 
   private async mapPRKNanos(
@@ -1131,7 +1271,7 @@ export class ProfileTransformer {
     // Nanos are not interpolated - fetch each at its actual QL via the
     // single-item endpoint (in parallel). Avoids the batch/interpolate path,
     // which forces ql=1 on nanos and uses a key shape that doesn't match here.
-    const fetchPromises = nanoAoids.map(async aoid => {
+    const fetchPromises = nanoAoids.map(async (aoid) => {
       try {
         const response = await apiClient.getItem(aoid);
         return { aoid, item: response.data ?? null };
@@ -1150,7 +1290,6 @@ export class ProfileTransformer {
       } else {
         // Minimal fallback for unfetchable nanos
         buffs.push({
-          id: aoid,
           aoid: aoid,
           name: `Nano ${aoid} (fetch failed)`,
           ql: 1,
@@ -1163,7 +1302,7 @@ export class ProfileTransformer {
           attack_stats: [],
           defense_stats: [],
           sources: [],
-        } as Item);
+        });
         result.warnings.push(`Failed to fetch nano AOID ${aoid}`);
       }
     }
@@ -1184,9 +1323,55 @@ export class ProfileTransformer {
    * @param onProgress Optional callback for progress updates
    * @returns Promise<Map<string, Item | null>> - Map of "aoid:ql" to Item
    */
+  /**
+   * Resolve {aoid, targetQl} pairs into Item snapshots against a game version.
+   *
+   * Public wrapper over the batch fetch used by imports, so the cross-version
+   * copy flow re-resolves embedded items through exactly the same path.
+   *
+   * @param gameVersion Version slug to resolve against; the current one by default.
+   * @returns Map of "aoid:ql" to Item, with null for AOIDs the version does not have.
+   */
+  async resolveItems(
+    itemRequests: Array<{ aoid: number; targetQl?: number }>,
+    gameVersion?: string,
+    onProgress?: (current: number, total: number) => void
+  ): Promise<Map<string, Item | null>> {
+    // A copy must not read a failed request as "every item is missing".
+    return this.fetchItems(itemRequests, onProgress, gameVersion, true);
+  }
+
+  /**
+   * Attack/defense stats for weapons, which the batch interpolate endpoint does
+   * not return. Keyed by AOID. Throws when a request fails.
+   */
+  async fetchCombatStats(
+    aoids: number[],
+    gameVersion?: string
+  ): Promise<Map<number, Pick<Item, 'attack_stats' | 'defense_stats'>>> {
+    const stats = new Map<number, Pick<Item, 'attack_stats' | 'defense_stats'>>();
+    await Promise.all(
+      Array.from(new Set(aoids)).map(async (aoid) => {
+        const response = await apiClient.getItem(aoid, gameVersion ? { gameVersion } : undefined);
+        if (!response.success || !response.data) {
+          throw new Error(
+            `Could not load item ${aoid} from ${gameVersion ?? 'the current version'}`
+          );
+        }
+        stats.set(aoid, {
+          attack_stats: response.data.attack_stats ?? [],
+          defense_stats: response.data.defense_stats ?? [],
+        });
+      })
+    );
+    return stats;
+  }
+
   private async fetchItems(
     itemRequests: Array<{ aoid: number; targetQl?: number }>,
-    onProgress?: (current: number, total: number) => void
+    onProgress?: (current: number, total: number) => void,
+    gameVersion?: string,
+    throwOnRequestError = false
   ): Promise<Map<string, Item | null>> {
     const itemMap = new Map<string, Item | null>();
 
@@ -1199,34 +1384,25 @@ export class ProfileTransformer {
 
     try {
       // Use batch endpoint for all items at once
-      const batchRequest = itemRequests.map(req => ({
+      const batchRequest = itemRequests.map((req) => ({
         aoid: req.aoid,
-        targetQl: req.targetQl || 1
+        targetQl: req.targetQl || 1,
       }));
 
-      const response = await apiClient.batchInterpolateItems(batchRequest);
+      // The api client scopes requests to the version being browsed. When the
+      // caller wants another version (PRK import, cross-version copy), route
+      // this one request there instead.
+      const response = await apiClient.batchInterpolateItems(
+        batchRequest,
+        gameVersion ? { gameVersion } : undefined
+      );
 
       // Process results
       for (const result of response.results) {
         const key = `${result.aoid}:${result.target_ql || 'base'}`;
 
         if (result.success && result.item) {
-          // Convert InterpolatedItem to Item format
-          const item: Item = {
-            id: result.item.id,
-            aoid: result.item.aoid,
-            name: result.item.name,
-            ql: result.item.ql,
-            description: result.item.description,
-            item_class: result.item.item_class,
-            is_nano: result.item.is_nano,
-            stats: result.item.stats || [],
-            spell_data: result.item.spell_data || [],
-            actions: result.item.actions || [],
-            attack_stats: [],
-            defense_stats: [],
-            sources: [],
-          } as Item;
+          const item = interpolatedToItem(result.item);
 
           itemMap.set(key, item);
           console.log(`[ProfileTransformer] Fetched ${result.item.name} (AOID: ${result.aoid})`);
@@ -1238,8 +1414,8 @@ export class ProfileTransformer {
 
       onProgress?.(itemRequests.length, itemRequests.length);
       console.log(`[ProfileTransformer] Batch fetch complete: ${itemMap.size} items processed`);
-
     } catch (error) {
+      if (throwOnRequestError) throw error;
       console.error('[ProfileTransformer] Batch fetch failed, items will be null:', error);
       // Mark all items as failed
       for (const req of itemRequests) {
@@ -1286,7 +1462,7 @@ export class ProfileTransformer {
     }
   }
 
-  private isValidTinkerProfile(data: any): data is TinkerProfile {
+  private isValidTinkerProfile(data: ImportedProfileData): data is TinkerProfile {
     return !!(
       data &&
       data.id &&
@@ -1297,7 +1473,10 @@ export class ProfileTransformer {
     );
   }
 
-  private convertToTinkerProfile(data: any, result: ProfileImportResult): TinkerProfile {
+  private convertToTinkerProfile(
+    data: ImportedProfileData,
+    result: ProfileImportResult
+  ): TinkerProfile {
     const profile = createDefaultProfile();
 
     // Check if this looks like an incomplete v4.0.0 TinkerProfile
@@ -1363,8 +1542,8 @@ export class ProfileTransformer {
 
     // Migrate Profession if it's a string
     if (typeof migrated.Character.Profession !== 'number') {
-      const oldValue = migrated.Character.Profession;
-      migrated.Character.Profession = normalizeProfessionToId(oldValue as any);
+      const oldValue: unknown = migrated.Character.Profession;
+      migrated.Character.Profession = normalizeProfessionToId(String(oldValue));
       console.log(
         `[Migration] Converted profession "${oldValue}" to ID ${migrated.Character.Profession}`
       );
@@ -1373,8 +1552,8 @@ export class ProfileTransformer {
 
     // Migrate Breed if it's a string
     if (typeof migrated.Character.Breed !== 'number') {
-      const oldValue = migrated.Character.Breed;
-      migrated.Character.Breed = normalizeBreedToId(oldValue as any);
+      const oldValue: unknown = migrated.Character.Breed;
+      migrated.Character.Breed = normalizeBreedToId(String(oldValue));
       console.log(`[Migration] Converted breed "${oldValue}" to ID ${migrated.Character.Breed}`);
       needsMigration = true;
     }
@@ -1406,6 +1585,26 @@ export class ProfileTransformer {
       `[ProfileTransformer] Migrating profile ${profile.Character.Name} to structured PerkSystem`
     );
 
+    // Array-shaped PerksAndResearch is the legacy format; anything else starts empty
+    const legacyPerksAndResearch: unknown = profile.PerksAndResearch;
+    const newPerkSystem = this.perkSystemFromLegacy(
+      Array.isArray(legacyPerksAndResearch) ? legacyPerksAndResearch : [],
+      profile
+    );
+
+    // Update the profile
+    const migratedProfile = structuredClone(profile);
+    migratedProfile.PerksAndResearch = newPerkSystem;
+    migratedProfile.updated = new Date().toISOString();
+
+    return migratedProfile;
+  }
+
+  /**
+   * Build a structured PerkSystem from legacy (array-shaped) perk entries,
+   * with point totals for the profile's level and alien level
+   */
+  private perkSystemFromLegacy(legacyPerks: unknown[], profile: TinkerProfile): PerkSystem {
     // Calculate available perk points based on current levels
     const characterLevel = profile.Character.Level || 1;
     const alienLevel = profile.Character.AlienLevel || 0;
@@ -1431,26 +1630,25 @@ export class ProfileTransformer {
     };
 
     // Preserve any existing PerksAndResearch data if possible
-    const legacyPerksAndResearch = profile.PerksAndResearch as any;
-    if (legacyPerksAndResearch && Array.isArray(legacyPerksAndResearch)) {
+    if (legacyPerks.length > 0) {
       // Legacy array format - try to convert if possible
       console.log(
-        `[ProfileTransformer] Found legacy perk array with ${legacyPerksAndResearch.length} entries`
+        `[ProfileTransformer] Found legacy perk array with ${legacyPerks.length} entries`
       );
 
-      for (const perkEntry of legacyPerksAndResearch) {
-        if (perkEntry && typeof perkEntry === 'object') {
+      for (const perkEntry of legacyPerks) {
+        if (isRecord(perkEntry)) {
           try {
             // Try to map legacy perk entries to new format
             if ('aoid' in perkEntry && 'name' in perkEntry && 'level' in perkEntry) {
-              const legacyPerk = perkEntry as any;
+              const legacyPerk = perkEntry as unknown as LegacyPerkEntry;
 
               // Determine perk type (default to SL if not specified)
               const perkType = legacyPerk.type || 'SL';
 
               if (perkType === 'LE') {
                 // LE research perk (free)
-                const researchEntry: any = {
+                const researchEntry: ResearchEntry = {
                   aoid: legacyPerk.aoid,
                   name: legacyPerk.name,
                   level: legacyPerk.level,
@@ -1464,7 +1662,7 @@ export class ProfileTransformer {
               } else {
                 // SL or AI perk (costs points)
                 const cost = 1; // Each perk costs exactly 1 point regardless of level
-                const perkEntry: any = {
+                const perkEntry: PerkEntry = {
                   aoid: legacyPerk.aoid,
                   name: legacyPerk.name,
                   level: legacyPerk.level,
@@ -1504,12 +1702,7 @@ export class ProfileTransformer {
     );
     newPerkSystem.aiPerkPoints.available = Math.max(0, newPerkSystem.aiPerkPoints.available);
 
-    // Update the profile
-    const migratedProfile = structuredClone(profile);
-    migratedProfile.PerksAndResearch = newPerkSystem;
-    migratedProfile.updated = new Date().toISOString();
-
-    return migratedProfile;
+    return newPerkSystem;
   }
 
   /**
@@ -1543,16 +1736,15 @@ export class ProfileTransformer {
   /**
    * Serialize PerkSystem for export, ensuring proper structure
    */
-  private serializePerkSystem(perkSystem: any): PerkSystem | any {
+  private serializePerkSystem(perkSystem: unknown): PerkSystem {
     // If already a structured PerkSystem, return as-is
     if (
-      perkSystem &&
-      typeof perkSystem === 'object' &&
+      isRecord(perkSystem) &&
       'perks' in perkSystem &&
       'standardPerkPoints' in perkSystem &&
       'aiPerkPoints' in perkSystem
     ) {
-      return perkSystem;
+      return perkSystem as unknown as PerkSystem;
     }
 
     // If legacy format or undefined, create empty structured system
@@ -1576,15 +1768,11 @@ export class ProfileTransformer {
   /**
    * Import perks from various formats and normalize to PerkSystem
    */
-  private importPerksFromData(data: any, result: ProfileImportResult): PerkSystem {
+  private importPerksFromData(data: ImportedProfileData, result: ProfileImportResult): PerkSystem {
     // Handle structured PerkSystem
-    if (
-      data.PerksAndResearch &&
-      typeof data.PerksAndResearch === 'object' &&
-      'perks' in data.PerksAndResearch
-    ) {
+    if (isRecord(data.PerksAndResearch) && 'perks' in data.PerksAndResearch) {
       result.warnings.push('Imported structured perk system');
-      return data.PerksAndResearch as PerkSystem;
+      return data.PerksAndResearch as unknown as PerkSystem;
     }
 
     // Handle legacy array format
@@ -1620,7 +1808,7 @@ export class ProfileTransformer {
   /**
    * Convert legacy perk array to structured PerkSystem
    */
-  private convertLegacyPerksToSystem(legacyPerks: any[]): PerkSystem {
+  private convertLegacyPerksToSystem(legacyPerks: unknown[]): PerkSystem {
     const system: PerkSystem = {
       perks: [],
       standardPerkPoints: { total: 0, spent: 0, available: 0 },
@@ -1629,8 +1817,9 @@ export class ProfileTransformer {
       lastCalculated: new Date().toISOString(),
     };
 
-    for (const perk of legacyPerks) {
-      if (!perk || typeof perk !== 'object') continue;
+    for (const entry of legacyPerks) {
+      if (!isRecord(entry)) continue;
+      const perk: Partial<LegacyPerkEntry> = entry;
 
       const perkType = perk.type || 'SL';
       const perkLevel = perk.level || 1;
@@ -1663,25 +1852,5 @@ export class ProfileTransformer {
     }
 
     return system;
-  }
-
-  // ============================================================================
-  // Utility Methods
-  // ============================================================================
-
-  private estimateMemoryCapacity(level: number, profession: string): number {
-    const baseCap = 500;
-    const levelBonus = Math.floor(level / 10) * 50;
-    const professionBonus = ['Meta-Physicist', 'Nanotechnician'].includes(profession) ? 100 : 0;
-
-    return baseCap + levelBonus + professionBonus;
-  }
-
-  private estimateNanoPoints(level: number, intelligence: number): number {
-    const base = 1000;
-    const levelBonus = level * 10;
-    const intelBonus = Math.floor(intelligence / 10) * 50;
-
-    return base + levelBonus + intelBonus;
   }
 }

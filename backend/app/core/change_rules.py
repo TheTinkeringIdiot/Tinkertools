@@ -1,0 +1,599 @@
+"""
+The maintained rules that describe changes between builds.
+
+Two hand-edited files in ``backend/database`` say what a change means to a
+player. Both are read here, validated, and used by the importer
+(app/core/change_analysis.py) and by the routes that compare builds.
+
+``change_relevance.toml``: relevance classes
+============================================
+
+Every change has a relevance, a set of the classes ``gameplay``, ``economy``,
+``cosmetic`` and ``text`` (bits 1, 2, 4 and 8 of ``item_change.relevance``).
+The file assigns a class to each stat and each effect type (``spell_id``) and
+to the changes that are classified as a whole. A stat or effect type the file
+does not list takes ``default``; one listed under ``unclassified`` takes it
+knowingly, until a maintainer decides.
+
+The relevance of a change from one revision to another is then:
+
+* ``text`` when the name or description differs;
+* the class of every stat whose values differ; a housekeeping value of
+  the stat (``[housekeeping]``, below) is ``cosmetic`` instead, so a stat
+  that comes or goes with that value is a cosmetic change, and one that goes
+  from that value to another is a change of the stat's class and a cosmetic
+  one;
+* the class of every effect type of which the events of the two revisions
+  do not hold the same effects: an effect added, removed or changed, and an
+  effect moved from one event to another (a modifier that applied on Use and
+  now applies on Wear). Events are compared by what they hold, not by their
+  number (:func:`effect_groups`);
+* the class of ``event`` when the events hold what they held and the effects
+  part differs all the same (an event renumbered, an empty event added);
+* the class of ``actions`` when any action or requirement differs, and of
+  ``attack_defense`` when the attack or defense skills differ;
+* the class of each field of the misc part that differs
+  (``static_instance``, ``animation_mesh``, ``shop``);
+* for an item that was added or removed, the class of ``added`` or
+  ``removed``.
+
+``[housekeeping]`` lists, as ``stat = value``, the constant with which the
+client data writes a stat out or drops it without anything changing for a
+player: ``76 = 0`` says that ItemClass 0 is as good as no ItemClass. Only that
+value is housekeeping; ItemClass 2 -> 4 keeps the class of the stat.
+
+Patch-note lines (``build_transition``) take the class of their field
+(:meth:`RelevanceRules.transition_class`), by the same rules; the line of a
+renumbering and that of an empty event added or removed take the class of
+``event``.
+
+``build_notes.toml``: build notes
+=================================
+
+A note names a build-wide event that explains many item changes of one build
+at once ("implants renamed"), so that lists can collapse them. It is defined
+by a rule, not by a list of items: patterns over the field transitions of a
+change (``app.core.item_diff.transitions``). A change is explained by a note,
+and tagged with it, when
+
+* at least one of its transitions matches a pattern of ``explains``, and
+* every one of its transitions matches a pattern of ``explains`` or of
+  ``alongside`` (what the event regularly comes with, but which alone is not
+  the event).
+
+A change that also differs in anything else is not tagged. The notes of a
+build are tried in file order and the first that explains a change tags it.
+
+A note still accounts for part of such a change: the transitions that match
+``explains`` or ``alongside``, in an item where one matches ``explains``. The
+patch notes of a build (``build_transition``) leave out a transition that the
+build's notes account for wherever it occurs: an implant that was renamed and
+rebalanced is listed with its rebalancing, not with the rename.
+
+A note with ``partial = false`` speaks only of the changes it explains
+entirely ("retargeted, nothing else changed") and accounts for nothing in any
+other change: the patch notes keep the line of its transition for the changes
+it does not tag.
+
+A pattern is a table with ``path`` and optionally ``part``, ``old`` and
+``new``:
+
+* ``path`` is a shell-style pattern (``*`` matches anything) on the
+  transition's path, e.g. ``"stat:79"`` or ``"effect:*:target"``;
+* ``old`` and ``new`` left out match anything. A number matches that value, a
+  list of three numbers that criterion, and the word ``"absent"`` a side that
+  does not exist (a stat that was added has an absent old value);
+* for the ``name`` and ``description`` of the text part, ``old`` and ``new``
+  are regular expressions that must match the whole old and the whole new
+  text.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import re
+import tomllib
+from dataclasses import dataclass
+from fnmatch import fnmatchcase
+from functools import lru_cache
+from pathlib import Path
+from typing import Any, Dict, FrozenSet, List, Mapping, Optional, Sequence, Tuple
+
+from app.core.item_diff import MISC_FIELDS, Transition
+
+DATA_DIR = Path(__file__).resolve().parents[2] / "database"
+RELEVANCE_FILE = DATA_DIR / "change_relevance.toml"
+NOTES_FILE = DATA_DIR / "build_notes.toml"
+
+GAMEPLAY, ECONOMY, COSMETIC, TEXT = 1, 2, 4, 8
+RELEVANCE_BITS = {
+    "gameplay": GAMEPLAY,
+    "economy": ECONOMY,
+    "cosmetic": COSMETIC,
+    "text": TEXT,
+}
+# Classes a stat, an effect type or a whole-part change can be given.
+CLASSES = ("gameplay", "economy", "cosmetic")
+UNCLASSIFIED = "unclassified"
+# Changes classified as a whole, the keys of ``[changes]``.
+WHOLE_CHANGES = (
+    "added",
+    "removed",
+    "actions",
+    "attack_defense",
+    "event",
+) + MISC_FIELDS
+# The class of a housekeeping value.
+HOUSEKEEPING = "cosmetic"
+
+ABSENT = "absent"
+
+
+class RulesError(ValueError):
+    """A rules file that cannot be used as it is written."""
+
+
+def relevance_names(mask: Optional[int]) -> List[str]:
+    """The classes in a relevance bitmask, in bit order."""
+    return [name for name, bit in RELEVANCE_BITS.items() if (mask or 0) & bit]
+
+
+def relevance_mask(names: Sequence[str]) -> int:
+    mask = 0
+    for name in names:
+        mask |= RELEVANCE_BITS[name]
+    return mask
+
+
+# ---------------------------------------------------------------------------
+# Relevance
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class RelevanceRules:
+    """``change_relevance.toml``, read."""
+
+    default: str
+    stats: Mapping[int, str]
+    effects: Mapping[int, str]
+    unclassified_stats: FrozenSet[int]
+    unclassified_effects: FrozenSet[int]
+    changes: Mapping[str, str]
+    housekeeping: Mapping[int, int]
+    digest: str
+
+    def stat_class(self, stat: int) -> str:
+        return self.stats.get(stat, self.default)
+
+    def is_housekeeping(self, stat: int, value: Optional[int]) -> bool:
+        """Whether ``value`` is the housekeeping value of ``stat``."""
+        return value is not None and self.housekeeping.get(stat) == value
+
+    def value_class(self, stat: int, value: int) -> str:
+        """The class of a stat holding ``value``."""
+        if self.is_housekeeping(stat, value):
+            return HOUSEKEEPING
+        return self.stat_class(stat)
+
+    def stat_change_class(
+        self, stat: int, old: Optional[int], new: Optional[int]
+    ) -> str:
+        """The class of a stat going from ``old`` to ``new`` (None: absent):
+        that of the stat, unless all that happened is that its housekeeping
+        value came or went."""
+        values = [value for value in (old, new) if value is not None]
+        if values and all(self.is_housekeeping(stat, value) for value in values):
+            return HOUSEKEEPING
+        return self.stat_class(stat)
+
+    def effect_class(self, spell_id: int) -> str:
+        return self.effects.get(spell_id, self.default)
+
+    def bit(self, change: str) -> int:
+        """The relevance bit of a change classified as a whole."""
+        return RELEVANCE_BITS[self.changes[change]]
+
+    def transition_class(self, part: str, path: str, old: Any, new: Any) -> str:
+        """The class of one field transition
+        (``app.core.item_diff.transitions``): what the line "this field went
+        from ``old`` to ``new`` on N items" matters for, whatever else those
+        items changed."""
+        if part == "text":
+            return "text"
+        if part == "stats":
+            _, stat, *bit = path.split(":")
+            if bit:
+                return self.stat_class(int(stat))
+            return self.stat_change_class(int(stat), old, new)
+        if part == "atkdef":
+            return self.changes["attack_defense"]
+        if part == "actions":
+            return self.changes["actions"]
+        if part == "effects":
+            head, _, rest = path.partition(":")
+            if head == "event":
+                return self.changes["event"]
+            return self.effect_class(int(rest.partition(":")[0]))
+        return self.changes[path]
+
+    def knows_stat(self, stat: int) -> bool:
+        return stat in self.stats or stat in self.unclassified_stats
+
+    def knows_effect(self, spell_id: int) -> bool:
+        return spell_id in self.effects or spell_id in self.unclassified_effects
+
+
+def _class_of(value: Any, where: str) -> str:
+    if value not in CLASSES:
+        raise RulesError(f"{where}: {value!r} is not one of {', '.join(CLASSES)}")
+    return value
+
+
+def _ids_by_class(section: Any, where: str) -> Tuple[Dict[int, str], FrozenSet[int]]:
+    if not isinstance(section, dict):
+        raise RulesError(f"[{where}] is missing")
+    classified: Dict[int, str] = {}
+    unclassified = set()
+    for group, entries in section.items():
+        if group != UNCLASSIFIED:
+            _class_of(group, f"[{where}.{group}]")
+        for key in entries:
+            if not key.lstrip("-").isdigit():
+                raise RulesError(f"[{where}.{group}]: {key!r} is not a numeric id")
+            number = int(key)
+            if number in classified or number in unclassified:
+                raise RulesError(f"[{where}]: {number} is listed twice")
+            if group == UNCLASSIFIED:
+                unclassified.add(number)
+            else:
+                classified[number] = group
+    return classified, frozenset(unclassified)
+
+
+def _housekeeping(section: Any) -> Dict[int, int]:
+    if section is None:
+        return {}
+    if not isinstance(section, dict):
+        raise RulesError("[housekeeping] is not a table")
+    values: Dict[int, int] = {}
+    for key, value in section.items():
+        if not key.isdigit():
+            raise RulesError(f"[housekeeping]: {key!r} is not a numeric id")
+        if type(value) is not int:
+            raise RulesError(
+                f"[housekeeping] {key}: {value!r} is not the one value of the "
+                "stat that is housekeeping"
+            )
+        values[int(key)] = value
+    return values
+
+
+def parse_relevance(text: str) -> RelevanceRules:
+    try:
+        data = tomllib.loads(text)
+    except tomllib.TOMLDecodeError as error:
+        raise RulesError(f"change relevance file: {error}") from error
+    default = _class_of(data.get("default"), "default")
+    stats, unclassified_stats = _ids_by_class(data.get("stats"), "stats")
+    effects, unclassified_effects = _ids_by_class(data.get("effects"), "effects")
+    changes = data.get("changes") or {}
+    missing = [name for name in WHOLE_CHANGES if name not in changes]
+    unknown = [name for name in changes if name not in WHOLE_CHANGES]
+    if missing or unknown:
+        raise RulesError(
+            f"[changes] must list exactly {', '.join(WHOLE_CHANGES)}"
+            f" (missing: {missing}, unknown: {unknown})"
+        )
+    return RelevanceRules(
+        default=default,
+        stats=stats,
+        effects=effects,
+        unclassified_stats=unclassified_stats,
+        unclassified_effects=unclassified_effects,
+        changes={
+            name: _class_of(value, f"[changes] {name}")
+            for name, value in changes.items()
+        },
+        housekeeping=_housekeeping(data.get("housekeeping")),
+        digest=hashlib.sha1(text.encode("utf-8")).hexdigest(),
+    )
+
+
+def effect_groups(
+    rules: RelevanceRules, doc: Optional[Sequence[Dict[str, Any]]]
+) -> Dict[str, List[List[str]]]:
+    """Per class, the effects of an effects part whose type has that class as
+    its events group them: one list of effects per event that holds any,
+    without the number of the event and without the rendered descriptions.
+
+    Two revisions differ in a class when these differ. An effect that moves
+    from one event to another changes them; an event that takes another
+    number does not."""
+    groups: Dict[str, List[List[str]]] = {}
+    for event in doc or ():
+        members: Dict[str, List[str]] = {}
+        for effect in event["effects"]:
+            content = {k: v for k, v in effect.items() if k != "description"}
+            members.setdefault(rules.effect_class(effect["spell_id"]), []).append(
+                json.dumps(content, sort_keys=True, separators=(",", ":"))
+            )
+        for name, effects in members.items():
+            groups.setdefault(name, []).append(sorted(effects))
+    return {name: sorted(events) for name, events in groups.items()}
+
+
+def with_relevance(
+    diff: Dict[str, Any],
+    rules: RelevanceRules,
+    old_effects: Optional[Sequence[Dict[str, Any]]],
+    new_effects: Optional[Sequence[Dict[str, Any]]],
+) -> Dict[str, Any]:
+    """A diff of ``app.core.item_diff.diff_parts`` with the relevance class
+    of every entry, as ``relevance``: what the entry adds to the relevance of
+    the whole change, which is the union of its entries' classes.
+    ``old_effects`` and ``new_effects`` are the effects parts the diff is of.
+
+    A stat entry in which the stat's housekeeping value comes or goes says
+    so (``housekeeping``): that much of it is cosmetic. When that is all the
+    entry is (the stat added or removed with that value), ``relevance`` is
+    cosmetic; when the stat went from the housekeeping value to another, or
+    back, ``relevance`` is the class of the stat and the entry adds both.
+
+    Effects follow the rule of the module docstring. An effect entry has the
+    class of its type when the events of the two revisions do not hold the
+    same effects of that class (:func:`effect_groups`), which is so for an
+    effect added, removed, changed or moved to another event. Where they do,
+    all that differs is how events are numbered: the entry, like the entry
+    of a renumbered event, has the class of ``event`` when that is true of
+    every class, and ``None`` when another class differs and the change is
+    classified by that.
+    """
+    before = effect_groups(rules, old_effects)
+    after = effect_groups(rules, new_effects)
+    differing = {name for name in CLASSES if before.get(name) != after.get(name)}
+    renumbered = None if differing else rules.changes["event"]
+
+    def of_effect(effect: Dict[str, Any]) -> Optional[str]:
+        name = rules.effect_class(effect["spell_id"])
+        return name if name in differing else renumbered
+
+    def tagged(entries: List[Dict[str, Any]], relevance: Any) -> List[Dict[str, Any]]:
+        return [
+            {
+                **entry,
+                "relevance": relevance(entry) if callable(relevance) else relevance,
+            }
+            for entry in entries
+        ]
+
+    def of_stat(change: Dict[str, Any]) -> Dict[str, Any]:
+        stat, old, new = change["stat"], change["old"], change["new"]
+        return {
+            **change,
+            "relevance": rules.stat_change_class(stat, old, new),
+            "housekeeping": rules.is_housekeeping(stat, old)
+            or rules.is_housekeeping(stat, new),
+        }
+
+    whole = rules.changes
+    return {
+        "text": tagged(diff["text"], "text"),
+        "stats": [of_stat(change) for change in diff["stats"]],
+        "actions": tagged(diff["actions"], whole["actions"]),
+        "attack": tagged(diff["attack"], whole["attack_defense"]),
+        "defense": tagged(diff["defense"], whole["attack_defense"]),
+        "misc": tagged(diff["misc"], lambda c: whole[c["field"]]),
+        "effects": [
+            {
+                **event,
+                "relevance": renumbered,
+                "added": tagged(event["added"], of_effect),
+                "removed": tagged(event["removed"], of_effect),
+                "changed": tagged(
+                    event["changed"], lambda pair: of_effect(pair["new"])
+                ),
+            }
+            for event in diff["effects"]
+        ],
+    }
+
+
+def diff_relevance(diff: Dict[str, Any]) -> int:
+    """The relevance bitmask of a diff tagged by :func:`with_relevance`: the
+    union of its entries' classes."""
+    names = set()
+    for part, entries in diff.items():
+        for entry in entries:
+            names.add(entry["relevance"])
+            if entry.get("housekeeping"):
+                names.add(HOUSEKEEPING)
+            if part == "effects":
+                for effects in (entry["added"], entry["removed"], entry["changed"]):
+                    names.update(effect["relevance"] for effect in effects)
+    return relevance_mask(sorted(name for name in names if name is not None))
+
+
+# ---------------------------------------------------------------------------
+# Build notes
+# ---------------------------------------------------------------------------
+
+_ANY = object()
+
+
+@dataclass(frozen=True)
+class Pattern:
+    """One pattern over field transitions; see the module docstring."""
+
+    path: str
+    part: Optional[str] = None
+    old: Any = _ANY
+    new: Any = _ANY
+
+    def matches(self, transition: Transition) -> bool:
+        if self.part is not None and self.part != transition.part:
+            return False
+        if not fnmatchcase(transition.path, self.path):
+            return False
+        return _value_matches(self.old, transition.old) and _value_matches(
+            self.new, transition.new
+        )
+
+
+def _value_matches(wanted: Any, value: Any) -> bool:
+    if wanted is _ANY:
+        return True
+    if isinstance(wanted, re.Pattern):
+        return isinstance(value, str) and wanted.fullmatch(value) is not None
+    if wanted == ABSENT:
+        return value is None
+    return wanted == value
+
+
+@dataclass(frozen=True)
+class Note:
+    """A build note and the rule that selects the changes it explains."""
+
+    build: str
+    title: str
+    body: Optional[str]
+    explains: Tuple[Pattern, ...]
+    alongside: Tuple[Pattern, ...] = ()
+    # False: the note accounts for nothing in a change it does not explain
+    partial: bool = True
+
+    def accounts_for(self, transitions: Sequence[Transition]) -> List[bool]:
+        """Per transition of a change (``transitions(diff, full_text=True)``),
+        whether it belongs to the note's event: the event happened to the
+        item (a transition matches ``explains``) and the transition is the
+        event or what comes with it. All False when it did not happen, and
+        for a note that is not ``partial`` when anything else happened too."""
+        if not any(p.matches(t) for t in transitions for p in self.explains):
+            return [False] * len(transitions)
+        patterns = self.explains + self.alongside
+        flags = [any(p.matches(t) for p in patterns) for t in transitions]
+        if not self.partial and not all(flags):
+            return [False] * len(transitions)
+        return flags
+
+    def explains_change(self, transitions: Sequence[Transition]) -> bool:
+        """Whether the note explains all of a change with these transitions
+        (``transitions(diff, full_text=True)``)."""
+        return bool(transitions) and all(self.accounts_for(transitions))
+
+
+@dataclass(frozen=True)
+class NoteRules:
+    """``build_notes.toml``, read."""
+
+    notes: Tuple[Note, ...]
+    digest: str
+
+    def of_build(self, slug: str) -> List[Note]:
+        return [note for note in self.notes if note.build == slug]
+
+
+def _pattern_value(raw: Any, is_text: bool, where: str) -> Any:
+    if isinstance(raw, str):
+        if raw == ABSENT:
+            return ABSENT
+        if is_text:
+            try:
+                return re.compile(raw, re.DOTALL)
+            except re.error as error:
+                raise RulesError(f"{where}: bad regular expression: {error}") from error
+        return raw
+    if isinstance(raw, bool) or not isinstance(raw, (int, list)):
+        raise RulesError(f"{where}: {raw!r} is not a number, a criterion or a string")
+    if isinstance(raw, list):
+        if len(raw) != 3 or not all(type(n) is int for n in raw):
+            raise RulesError(f"{where}: a criterion is [value1, value2, operator]")
+        return tuple(raw)
+    return raw
+
+
+def _pattern(raw: Any, where: str) -> Pattern:
+    if not isinstance(raw, dict) or not isinstance(raw.get("path"), str):
+        raise RulesError(f"{where}: a pattern is a table with a path")
+    unknown = set(raw) - {"path", "part", "old", "new"}
+    if unknown:
+        raise RulesError(f"{where}: unknown keys {sorted(unknown)}")
+    is_text = raw["path"] in ("name", "description")
+    return Pattern(
+        path=raw["path"],
+        part=raw.get("part"),
+        **{
+            side: _pattern_value(raw[side], is_text, f"{where} {side}")
+            for side in ("old", "new")
+            if side in raw
+        },
+    )
+
+
+def parse_notes(text: str) -> NoteRules:
+    try:
+        data = tomllib.loads(text)
+    except tomllib.TOMLDecodeError as error:
+        raise RulesError(f"build notes file: {error}") from error
+    notes = []
+    seen = set()
+    for index, raw in enumerate(data.get("note") or [], start=1):
+        where = f"note {index}"
+        for key in ("build", "title"):
+            if not isinstance(raw.get(key), str) or not raw[key].strip():
+                raise RulesError(f"{where}: {key} is required")
+        where = f"note '{raw['title']}' of {raw['build']}"
+        if (raw["build"], raw["title"]) in seen:
+            raise RulesError(f"{where}: defined twice")
+        seen.add((raw["build"], raw["title"]))
+        explains = tuple(
+            _pattern(p, f"{where} explains") for p in raw.get("explains") or []
+        )
+        if not explains:
+            raise RulesError(f"{where}: explains needs at least one pattern")
+        partial = raw.get("partial", True)
+        if type(partial) is not bool:
+            raise RulesError(f"{where}: partial is true or false")
+        notes.append(
+            Note(
+                build=raw["build"],
+                title=raw["title"],
+                body=raw.get("body"),
+                explains=explains,
+                alongside=tuple(
+                    _pattern(p, f"{where} alongside")
+                    for p in raw.get("alongside") or []
+                ),
+                partial=partial,
+            )
+        )
+    return NoteRules(
+        notes=tuple(notes), digest=hashlib.sha1(text.encode("utf-8")).hexdigest()
+    )
+
+
+# ---------------------------------------------------------------------------
+# Both files
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ChangeRules:
+    relevance: RelevanceRules
+    notes: NoteRules
+
+
+def read_rules(
+    relevance_file: Path = RELEVANCE_FILE, notes_file: Path = NOTES_FILE
+) -> ChangeRules:
+    return ChangeRules(
+        relevance=parse_relevance(relevance_file.read_text(encoding="utf-8")),
+        notes=parse_notes(notes_file.read_text(encoding="utf-8")),
+    )
+
+
+@lru_cache(maxsize=1)
+def default_rules() -> ChangeRules:
+    """The rules of the files in the repository, read once per process."""
+    return read_rules()

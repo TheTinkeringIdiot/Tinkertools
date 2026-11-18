@@ -5,19 +5,8 @@
  * Handles level-based calculations, IP distributions, skill caps, and stat modifications.
  */
 
-import {
-  STAT,
-  BREED,
-  PROFESSION,
-  BREED_ABILITY_DATA,
-  PROFESSION_VITALS,
-} from '../services/game-data';
-import {
-  getStatName,
-  getProfessionName,
-  getBreedName,
-  calculateTitleLevel,
-} from '../services/game-utils';
+import { BREED_ABILITY_DATA, PROFESSION_VITALS } from '../services/game-data';
+import { getStatName } from '../services/game-utils';
 
 // ============================================================================
 // Types and Interfaces
@@ -561,7 +550,7 @@ export function optimizeIPDistribution(
       current: currentStats[Number(stat)] || 0,
     }))
     .filter((item) => item.target > item.current)
-    .sort((a, b) => a.target - a.current);
+    .sort((a, b) => a.target - a.current - (b.target - b.current));
 
   for (const { stat, target, current } of sortedTargets) {
     const cost = calculateIPCost(current, target);

@@ -7,7 +7,7 @@ This document provides a comprehensive overview of the shared infrastructure, da
 - **Game Data Constants**: 2,150+ entries in `frontend/src/services/game-data.ts`
 - **API Client**: Unified typed client in `frontend/src/services/api-client.ts`
 - **State Management**: Pinia stores with cross-app sharing in `frontend/src/stores/`
-- **Database**: 23 core tables with PostgreSQL backend (includes source system)
+- **Database**: PostgreSQL; game data in the content-addressed store (schema `cas`), read through `backend/app/store/`
 - **Interpolation System**: Quality level interpolation across all items
 - **Profile System**: Character data management in `frontend/src/lib/tinkerprofiles/`
 
@@ -70,70 +70,59 @@ This document provides a comprehensive overview of the shared infrastructure, da
 - Typed HTTP client with Axios integration
 - Request/response typing for all endpoints
 - Error handling and retry logic (3 attempts, 1s delay)
-- Request batching and deduplication
 - Timeout configuration (30s default)
 
 **Available Endpoints:**
 ```typescript
 // Items
-getItems(query: ItemSearchQuery): Promise<PaginatedResponse<Item>>
-getItem(aoid: number): Promise<ApiResponse<Item>>  // Uses AOID for item lookup, includes sources
-getItemSources(aoid: number): Promise<ApiResponse<ItemSource[]>>  // Get sources for specific item
+searchItems(query: ItemSearchQuery): Promise<PaginatedResponse<Item>>
+getItem(aoid: number): Promise<ApiResponse<Item>>  // Uses AOID for item lookup
 interpolateItem(aoid: number, targetQl: number): Promise<InterpolationResponse>
 
-// Spells/Nanos  
-getSpells(query: SpellSearchQuery): Promise<PaginatedResponse<Spell>>
-getSpell(id: number): Promise<ApiResponse<Spell>>
-
 // Symbiants
-getSymbiants(query: SymbiantSearchQuery): Promise<PaginatedResponse<Symbiant>>
+searchSymbiants(query: SymbiantSearchQuery): Promise<PaginatedResponse<SymbiantItem>>
+getSymbiant(aoid: number): Promise<ApiResponse<SymbiantItem>>  // By AOID
+getSymbiantDroppedBy(aoid: number): Promise<ApiResponse<Mob[]>>
 
-// Pocket Bosses
-getPocketBosses(query: PocketBossSearchQuery): Promise<PaginatedResponse<PocketBoss>>
+// Mobs / Pocket Bosses
+searchMobs(query: MobSearchQuery): Promise<PaginatedResponse<Mob>>
+getMob(id: number): Promise<ApiResponse<Mob>>
+searchPocketBosses(query: MobSearchQuery): Promise<PaginatedResponse<Mob>>
+getPocketBoss(id: number): Promise<ApiResponse<Mob>>
+getPocketBossDrops(id: number): Promise<ApiResponse<SymbiantItem[]>>
 ```
 
 ### Backend API Routes (`backend/app/api/routes/`)
 
-- **items.py**: Item database, search, filtering, interpolation, and source endpoints
-- **spells.py**: Nano/spell programs with filtering by school
-- **symbiants.py**: Symbiant data for TinkerPlants integration
-- **pocket_bosses.py**: Pocket boss database for TinkerPocket
-- **stat_values.py**: Stat value lookups and calculations
-- **sources**: Source system for tracking item origins (crystals, NPCs, missions, etc.)
-- **health.py**: System health monitoring and diagnostics
-- **cache.py**: Cache management and performance metrics
-- **performance.py**: Performance monitoring endpoints
+- **items.py**: Item list, search, detail and interpolation
+- **item_revisions.py**: Item change history across game versions
+- **nanos.py**: Nano lists, search, strains, profession and offensive lists
+- **weapons.py**: Weapon analysis for TinkerFite
+- **implants.py**: Implant lookup by slot and clusters
+- **symbiants.py**, **mobs.py**: Symbiants, mobs and pocket boss drops
+- **perks.py**: Batch perk lookup for profile imports
+- **versions.py**: The builds the API serves
+- **legacy_item_ids.py**: Internal item ids of the old database to AOIDs (transitional; map loaded by the importer)
+- **aosetups.py**: Proxy for AO Setups profile imports
+- **health.py**, **cache.py**: Liveness check, response cache clearing
 
-### Database Connection (`backend/app/core/database.py`)
+### Store Read Layer (`backend/app/store/`)
 
-**Configuration:**
-- PostgreSQL connection pooling (pool size: 10, max overflow: 20)
-- Session management with FastAPI dependency injection
-- Environment-based configuration via DATABASE_URL
-- Connection pre-ping validation for reliability
+Every game-data route reads the content-addressed store (PostgreSQL schema `cas`) through this package: `context` (the build a request names, the session), `tables`, `presence` (the revisions of a build, filters, paging), `items` (item loader and the `ItemDetail` document) and `curated` (symbiants, mobs, perks). The module docstring of `backend/app/store/__init__.py` is the guide. Nothing reads any other schema: `backend/app/core/database.py` is the engine and no more.
 
-### Source System (`backend/app/models/source.py`)
+### Source System
 
-**Polymorphic source tracking for item origins:**
-- **SourceType**: Categories of sources (item, npc, boss, mission, vendor)
-- **Source**: Polymorphic references to actual source entities
-- **ItemSource**: Junction table with drop rates, QL ranges, and conditions
+**Item origins, as the store serves them** (`source_type`, `source`, `item_source` in `backend/database/cas/002_curated_and_derived.sql`):
+- Nanocrystals → nanoprograms (from `all_nanos_compacted.csv`); served when the build has the `sources` feature and the crystal is present in the build
+- Mobs → symbiants (from `database/symbiants.csv`, mob ids from `database/mob_ids.csv`); served when the build has the `symbiants` feature
 
-**Current Implementation:**
-- Nanocrystals → Nanoprograms (via update_nanos.py)
-- Ready for NPCs, missions, bosses, vendors (future)
-- JSONB metadata for flexible data storage
-- Performance optimized with proper indexing
+### Data Utilities (`backend/`)
 
-### Data Migration Utilities (`backend/`)
-
-**update_nanos.py**: Nano source system migration
-- Migrates crystal-nano relationships from CSV
-- Uses DATABASE_URL environment variable
-- Idempotent design (safe to run multiple times)
-- Extensible for future nano data updates
-
-**Other utilities:**
+- `import_cli.py import-cas`: loads the store from extracted client builds and the committed curated files (`backend/IMPORT_README.md`)
+- `import_cli.py load-legacy-ids`: loads the map of old internal item ids into a store restored from a dump (`DEPLOYMENT.md`)
+- `extract_builds.py`: extracts client builds with TinkerParse
+- `tools/verify_cas.py`, `tools/golden.py`: verification of the store and of API responses
+- `tools/export_legacy_item_ids.py`, `tools/drop_old_store.sql`: leaving the old store behind
 - `substrain_manager.py`: Substrain ID assignment
 - `compact_nanos.py`: CSV compaction tool
 - `comprehensive_nano_extractor.py`: Database export tool
@@ -148,7 +137,6 @@ getPocketBosses(query: PocketBossSearchQuery): Promise<PaginatedResponse<PocketB
 - **useAppStore**: Global application state, theme, notifications
 - **useProfileStore**: Character profile management, LocalStorage persistence
 - **useItemsStore**: Item data caching and search state (cached by AOID)
-- **useSpellsStore**: Nano/spell data management
 - **useSymbiantsStore**: Symbiant data for TinkerPlants
 - **usePocketBossesStore**: Pocket boss data for TinkerPocket
 
@@ -371,25 +359,18 @@ interface PaginatedResponse<T> extends ApiResponse<T[]> {
 
 ## 🗄️ Database Schema Reference
 
-### Core Tables (20 total)
+### Content-addressed store (schema `cas`)
 
-**Primary Data Tables:**
-- **items**: Main item database (weapons, armor, implants)
-- **spells**: Nano programs with school classifications
-- **symbiants**: Symbiant data for TinkerPlants
-- **pocket_bosses**: Pocket boss database for TinkerPocket
-- **stat_values**: Stat ID and value pairs with unique constraints
-- **criteria**: Requirement criteria for items and spells
+Defined in `backend/database/cas/001_store.sql` and `002_curated_and_derived.sql`; the part documents are described in `backend/app/core/parts.py`.
 
-**Junction Tables** (Many-to-Many Relationships):
-- **item_stats**: Items ↔ Stat Values
-- **spell_criteria**: Spells ↔ Criteria
-- **pocket_boss_symbiants**: Pocket Bosses ↔ Symbiants
-- **spell_data_spells**: Spell Data ↔ Spells
-- **action_criteria**: Actions ↔ Criteria
-
-**System Tables:**
-- **application_cache**: Application-level caching with TTL
+- **build**: One row per client build (branch, ordinal, display fields, feature flags); also the list of versions the API serves, presented as `backend/database/builds.toml` says
+- **item_revision**: One row per distinct content of an item; points to its parts
+- **part_text / part_stats / part_effects / part_actions / part_atkdef / part_misc**: De-duplicated part documents
+- **item_presence**: Runs of consecutive builds in which an item has one revision
+- **stat_entry / requirement / effect_entry / atkdef_entry**: Search projections of the parts
+- **nano_properties**, **symbiant_items**: Derived from items
+- **nano_overlay**, **perk**, **mob**, **source_type**, **source**, **item_source**: Curated data
+- **legacy_item_id**: Internal item ids of the old database, for the one-time client migration
 
 ### Performance Optimizations
 
@@ -446,7 +427,7 @@ interface PaginatedResponse<T> extends ApiResponse<T[]> {
 
 **Implementation Details:**
 - **Frontend Store Caching**: Items cached by AOID for efficient lookup
-- **Backend Database Query**: `Item.aoid` field used for item retrieval
+- **Backend Database Query**: Items are looked up by AOID in the requested build (`load_item_details`)
 - **URL Generation**: Item links automatically use `item.aoid` for navigation
 - **Share Functionality**: Generated URLs use AOID for game-relevant sharing
 
@@ -487,10 +468,24 @@ interface PaginatedResponse<T> extends ApiResponse<T[]> {
 - Development and production optimizations
 
 **Environment Variables:**
-- `VITE_API_BASE_URL`: Backend API base URL (default: `http://localhost:8000/api/v1`)
+- `VITE_API_BASE_URL`: Backend API base URL (default: `http://localhost:8000/api/v1`; `/api/v1` in the deployed image)
+- `VITE_VERSION_HOSTNAME_MAP`: JSON object of hostnames to the game family a first visit opens (deployed image: `{"prk.tinkeringidiot.com":"prk"}`)
 - `VITE_ICON_BASE_URL`: Icon CDN base URL including folder path (default: `https://cdn.tinkeringidiot.com/aoicons`)
 - `DATABASE_URL`: PostgreSQL connection string
 - `SQL_DEBUG`: Enable SQL query logging
+
+---
+
+## 🚢 Deployment
+
+One container stack, `docker-compose.yml`, for a workstation and for the server (Coolify, Docker Compose build pack). **`DEPLOYMENT.md` is the guide.**
+
+- **`db`**: `postgres:16`, the store in a named volume; loaded by restoring a dump of the development store, never by importing
+- **`api`**: `backend/Dockerfile`, gunicorn with uvicorn workers (`API_WORKERS`, default 2)
+- **`web`**: `frontend/Dockerfile`, Caddy (`deploy/Caddyfile`) serving the built frontend with SPA fallback and proxying `/api` to `api`; the only service the outside reaches, for every hostname
+- **Settings**: environment variables with defaults, listed in `.env.example`
+- **Data commands**: `scripts/deploy/dump-store.sh` (development machine) and `scripts/deploy/stack.sh restore | legacy-ids | mob-ids | verify | status` (the host running the stack)
+- **CI**: `.github/workflows/ci.yml` (frontend type-check, lint and tests; backend formatting; a build of both images)
 
 ---
 
@@ -501,7 +496,7 @@ interface PaginatedResponse<T> extends ApiResponse<T[]> {
 **Multi-Level Caching:**
 1. **Browser Cache**: Static assets and API responses
 2. **Service Cache**: Client-side data caching with TTL
-3. **Database Cache**: Application-level caching table
+3. **Response Cache**: In-process cache of API responses (`backend/app/core/cache.py`)
 
 **Cache Management:**
 - Automatic cleanup based on TTL
@@ -511,9 +506,7 @@ interface PaginatedResponse<T> extends ApiResponse<T[]> {
 ### Performance Monitoring
 
 **Available Endpoints:**
-- `/api/v1/health`: System health status
-- `/api/v1/performance`: Performance metrics
-- `/api/v1/cache/stats`: Cache utilization statistics
+- `/health`: Liveness check
 
 **Monitoring Targets:**
 - API response times under performance thresholds
@@ -544,8 +537,7 @@ interface PaginatedResponse<T> extends ApiResponse<T[]> {
 
 1. **Caching**: Leverage existing cache infrastructure
 2. **Interpolation**: Use interpolation system for quality scaling
-3. **Batching**: Use API client batching for multiple requests
-4. **Monitoring**: Check performance endpoints during development
+3. **Batching**: Use the batch endpoints (`POST /items/batch/interpolate`, `POST /perks/batch/lookup`) for multiple items
 
 ---
 

@@ -9,6 +9,13 @@
  */
 
 import { vi, beforeEach } from 'vitest';
+import axios, { AxiosHeaders } from 'axios';
+import {
+  ensureVersionsLoaded,
+  setCurrentVersion,
+  currentVersion,
+} from '@/composables/useGameVersion';
+import { TEST_VERSION, TEST_VERSION_REGISTRY } from './helpers/version-fixtures';
 
 // ============================================================================
 // Global Test Utilities
@@ -16,7 +23,7 @@ import { vi, beforeEach } from 'vitest';
 
 // Suppress console warnings in tests to reduce noise (optional)
 // Comment out these lines if you need to debug console output
-global.console = {
+globalThis.console = {
   ...console,
   warn: vi.fn(),
   // Keep error for important failures
@@ -54,14 +61,44 @@ function createLocalStorageMock() {
 
 // Install global localStorage mock
 const localStorageMock = createLocalStorageMock();
-Object.defineProperty(global, 'localStorage', {
+Object.defineProperty(globalThis, 'localStorage', {
   value: localStorageMock,
   writable: true,
   configurable: true,
 });
 
+// ============================================================================
+// Game Version Registry
+// ============================================================================
+
+/**
+ * Seed the version registry so nothing reaches the network for `GET /versions`,
+ * and so cache keys and versioned route paths are deterministic.
+ *
+ * ensureVersionsLoaded() memoizes its promise for the lifetime of the module,
+ * and Vitest gives every test file a fresh module registry, so resolving it
+ * once here means no later call can trigger a real request.
+ */
+const versionsSpy = vi.spyOn(axios, 'get').mockResolvedValue({
+  data: TEST_VERSION_REGISTRY,
+  status: 200,
+  statusText: 'OK',
+  headers: {},
+  config: { headers: new AxiosHeaders() },
+});
+
+await ensureVersionsLoaded();
+versionsSpy.mockRestore();
+
+await setCurrentVersion(TEST_VERSION);
+
 // Clear localStorage before each test to prevent cross-test contamination
-beforeEach(() => {
+beforeEach(async () => {
   localStorageMock.clear();
   vi.clearAllMocks();
+
+  // A version-switch test may have left another version active.
+  if (currentVersion.value !== TEST_VERSION) {
+    await setCurrentVersion(TEST_VERSION);
+  }
 });

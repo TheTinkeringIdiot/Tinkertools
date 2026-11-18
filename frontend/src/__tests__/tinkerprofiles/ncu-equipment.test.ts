@@ -1,7 +1,28 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { TinkerProfilesManager } from '@/lib/tinkerprofiles';
-import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
-import { BREED, PROFESSION } from '@/__tests__/helpers';
+import type { Item } from '@/types/api';
+import {
+  BREED,
+  PROFESSION,
+  createTestProfile,
+  createTestItem,
+  createSpellData,
+  createSpell,
+} from '@/__tests__/helpers';
+
+/** NCU memory whose Wear effect modifies Max NCU (stat 181) by `amount` */
+function createNcuMemory(name: string, amount: number): Item {
+  return createTestItem({
+    name,
+    ql: 200,
+    spell_data: [
+      createSpellData({
+        event: 14, // Wear event
+        spells: [createSpell({ spell_id: 53045, spell_params: { Stat: 181, Amount: amount } })],
+      }),
+    ],
+  });
+}
 
 describe('NCU Equipment Bonuses', () => {
   let manager: TinkerProfilesManager;
@@ -16,19 +37,18 @@ describe('NCU Equipment Bonuses', () => {
       validation: {
         strictMode: false,
         autoCorrect: true,
+        allowLegacyFormats: true,
       },
     });
 
     // Create a test profile
-    profileId = await manager.createProfile('NCU Test', {
-      Character: {
-        Name: 'NCU Test',
-        Profession: PROFESSION.NANO_TECHNICIAN,
-        Breed: BREED.OPIFEX,
-        Level: 200,
-        Gender: 'Male',
-      },
-    } as Partial<TinkerProfile>);
+    const { Character } = createTestProfile({
+      name: 'NCU Test',
+      profession: PROFESSION.NANO_TECHNICIAN,
+      breed: BREED.OPIFEX,
+      level: 200,
+    });
+    profileId = await manager.createProfile('NCU Test', { Character });
   });
 
   it('should update MaxNCU when equipping NCU items', async () => {
@@ -38,34 +58,12 @@ describe('NCU Equipment Bonuses', () => {
 
     // Get initial Max NCU value (stat ID 181)
     const initialMaxNCU = profile?.skills?.[181]?.total || 0;
-    console.log('Initial Max NCU:', initialMaxNCU);
 
-    // Simulate equipping an NCU item with +20 Max NCU (stat ID 181)
-    const ncuItem = {
-      aoid: 303992,
-      name: 'NCU Memory Test',
-      ql: 200,
-      spell_data: [
-        {
-          event: 14, // Wear event
-          spells: [
-            {
-              spell_id: 53045, // Modify Stat spell ID
-              spell_params: {
-                Stat: 181, // Max NCU stat ID
-                Amount: 20, // +20 Max NCU
-              },
-            },
-          ],
-        },
-      ],
-    };
-
-    // Equip the item in a slot (e.g., Chest slot for testing)
+    // Equip an NCU item with +20 Max NCU (stat ID 181)
     await manager.updateProfile(profileId, {
       Clothing: {
         ...profile?.Clothing,
-        Chest: ncuItem,
+        Chest: createNcuMemory('NCU Memory Test', 20),
       },
     });
 
@@ -73,17 +71,8 @@ describe('NCU Equipment Bonuses', () => {
     profile = await manager.loadProfile(profileId);
     expect(profile).toBeDefined();
 
-    // Check that Max NCU has increased
-    const updatedMaxNCU = profile?.skills?.[181]?.total || 0;
-    console.log('Updated Max NCU:', updatedMaxNCU);
-
-    // The Max NCU should have increased by the equipment bonus
-    expect(updatedMaxNCU).toBeGreaterThan(initialMaxNCU);
-
-    // Verify the equipment bonus was applied (should be at least 20 more)
-    // Note: The exact increase depends on how the equipment bonus calculator works
-    // but it should definitely be higher than before
-    expect(updatedMaxNCU).toBeGreaterThanOrEqual(initialMaxNCU + 20);
+    // Max NCU has no base value: it rises by exactly the equipment bonus
+    expect(profile?.skills?.[181]?.total).toBe(initialMaxNCU + 20);
   });
 
   it('should update MaxNCU when equipping multiple NCU items', async () => {
@@ -94,72 +83,13 @@ describe('NCU Equipment Bonuses', () => {
     // Get initial Max NCU value (stat ID 181)
     const initialMaxNCU = profile?.skills?.[181]?.total || 0;
 
-    // Simulate equipping multiple NCU items
-    const ncuItems = {
-      Chest: {
-        aoid: 303992,
-        name: 'NCU Memory 1',
-        ql: 200,
-        spell_data: [
-          {
-            event: 14,
-            spells: [
-              {
-                spell_id: 53045,
-                spell_params: {
-                  Stat: 181,
-                  Amount: 20,
-                },
-              },
-            ],
-          },
-        ],
-      },
-      Legs: {
-        aoid: 303993,
-        name: 'NCU Memory 2',
-        ql: 200,
-        spell_data: [
-          {
-            event: 14,
-            spells: [
-              {
-                spell_id: 53045,
-                spell_params: {
-                  Stat: 181,
-                  Amount: 25,
-                },
-              },
-            ],
-          },
-        ],
-      },
-      Head: {
-        aoid: 303994,
-        name: 'NCU Memory 3',
-        ql: 200,
-        spell_data: [
-          {
-            event: 14,
-            spells: [
-              {
-                spell_id: 53045,
-                spell_params: {
-                  Stat: 181,
-                  Amount: 30,
-                },
-              },
-            ],
-          },
-        ],
-      },
-    };
-
     // Equip all items at once
     await manager.updateProfile(profileId, {
       Clothing: {
         ...profile?.Clothing,
-        ...ncuItems,
+        Chest: createNcuMemory('NCU Memory 1', 20),
+        Legs: createNcuMemory('NCU Memory 2', 25),
+        Head: createNcuMemory('NCU Memory 3', 30),
       },
     });
 
@@ -167,42 +97,17 @@ describe('NCU Equipment Bonuses', () => {
     profile = await manager.loadProfile(profileId);
     expect(profile).toBeDefined();
 
-    // Check that Max NCU has increased significantly
-    const updatedMaxNCU = profile?.skills?.[181]?.total || 0;
-    console.log('Initial Max NCU:', initialMaxNCU);
-    console.log('Updated Max NCU with 3 items:', updatedMaxNCU);
-
-    // Should have increased by at least the sum of all bonuses (75)
-    expect(updatedMaxNCU).toBeGreaterThanOrEqual(initialMaxNCU + 75);
+    // Increased by the sum of all bonuses (75)
+    expect(profile?.skills?.[181]?.total).toBe(initialMaxNCU + 75);
   });
 
   it('should decrease MaxNCU when unequipping NCU items', async () => {
     // First equip an item
     let profile = await manager.loadProfile(profileId);
-    const ncuItem = {
-      aoid: 303992,
-      name: 'NCU Memory',
-      ql: 200,
-      spell_data: [
-        {
-          event: 14,
-          spells: [
-            {
-              spell_id: 53045,
-              spell_params: {
-                Stat: 181,
-                Amount: 50,
-              },
-            },
-          ],
-        },
-      ],
-    };
-
     await manager.updateProfile(profileId, {
       Clothing: {
         ...profile?.Clothing,
-        Chest: ncuItem,
+        Chest: createNcuMemory('NCU Memory', 50),
       },
     });
 
@@ -222,10 +127,7 @@ describe('NCU Equipment Bonuses', () => {
     profile = await manager.loadProfile(profileId);
     const withoutEquipmentNCU = profile?.skills?.[181]?.total || 0;
 
-    console.log('Max NCU with equipment:', withEquipmentNCU);
-    console.log('Max NCU without equipment:', withoutEquipmentNCU);
-
-    // Max NCU should have decreased
-    expect(withoutEquipmentNCU).toBeLessThan(withEquipmentNCU);
+    // Max NCU dropped by exactly the removed bonus
+    expect(withoutEquipmentNCU).toBe(withEquipmentNCU - 50);
   });
 });

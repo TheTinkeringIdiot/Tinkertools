@@ -102,10 +102,7 @@ export function calculateCastTime(
  * // Nano with 80cs base recharge, 50cs cap from stat 524
  * calculateRechargeTime(80, 50) // Returns 0.80 (above 50cs cap)
  */
-export function calculateRechargeTime(
-  baseRecharge: number,
-  rechargeDelayCap?: number
-): number {
+export function calculateRechargeTime(baseRecharge: number, rechargeDelayCap?: number): number {
   // Determine effective cap: use stat 524 if present, otherwise default 100cs (1.00s)
   const effectiveCap = rechargeDelayCap !== undefined ? rechargeDelayCap : DEFAULT_DELAY_CAP_CS;
 
@@ -178,6 +175,22 @@ export function calculateNanoCost(
  */
 export function centisecondsToSeconds(centiseconds: number): number {
   return Number((centiseconds / 100).toFixed(2));
+}
+
+/**
+ * Format a time in centiseconds for display as seconds
+ *
+ * Cast and recharge times are stat values in centiseconds; a nano's card and
+ * detail page show them as an item's page does.
+ *
+ * @param centiseconds - Time value in centiseconds (1/100 second)
+ * @returns The time in seconds with 2 decimals and its unit
+ *
+ * @example
+ * formatCentiseconds(150) // Returns "1.50s"
+ */
+export function formatCentiseconds(centiseconds: number): string {
+  return `${centisecondsToSeconds(centiseconds).toFixed(2)}s`;
 }
 
 /**

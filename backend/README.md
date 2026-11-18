@@ -15,17 +15,15 @@ The TinkerTools API serves as the backend for six web-based utilities:
 ## Technology Stack
 
 - **FastAPI** - Modern Python web framework
-- **SQLAlchemy** (async) - Database ORM
+- **SQLAlchemy** (synchronous, Core queries on the store's tables) - Database access
 - **PostgreSQL** - Primary database
-- **Redis** - Caching layer
 - **Pydantic** - Data validation and serialization
 - **uvicorn** - ASGI server
 
 ## Prerequisites
 
-- Python 3.9+
-- PostgreSQL 12+
-- Redis (optional, for caching)
+- Python 3.11+
+- PostgreSQL 13+
 - Virtual environment tool (venv, conda, etc.)
 
 ## Local Development Setup
@@ -48,36 +46,25 @@ venv\Scripts\activate     # Windows
 pip install -r requirements.txt
 ```
 
-### 4. Database Setup
-Ensure PostgreSQL is running and create the database:
-```bash
-# Run from project root
-cd ../database
-./setup.sh
-```
-
-### 5. Environment Configuration
-Copy the example environment file and configure:
-```bash
-cp .env.example .env
-```
-
-Edit `.env` with your local settings:
+### 4. Environment Configuration
+Create `backend/.env.local` (git-ignored) with your local settings:
 ```env
 DATABASE_URL=postgresql://tinker_user:dev_password@localhost:5432/tinkertools
 CORS_ORIGINS=http://localhost:5173
 APP_ENV=development
 LOG_LEVEL=INFO
-REDIS_URL=redis://localhost:6379/0
 ```
+Load it with `set -a && . ./.env.local && set +a`.
 
-### 6. Import Game Data
-Import the game data using the CLI tool:
+### 5. Import Game Data
+Game data lives in the content-addressed store (schema `cas`), built from extracted client builds:
 ```bash
-python import_cli.py --items items.json --nanos nanos.json --symbiants symbiants.csv
+python import_cli.py import-cas --extracts-dir ~/projects/AO/extracts --workers 8
+python tools/verify_cas.py --store --extracts-dir ~/projects/AO/extracts
 ```
+The importer creates the schema, its extensions and its tables. `IMPORT_README.md` is the guide: prerequisites, verification, adding a build, the files the importer reads, legacy item ids.
 
-### 7. Start Development Server
+### 6. Start Development Server
 ```bash
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
@@ -89,18 +76,27 @@ The API will be available at:
 
 ## API Endpoints
 
+Every route below also exists under `/api/v1/<version>/...` (a build slug from `/versions`, or `ao` / `prk`).
+
 ### Core Resources
-- `GET /api/v1/items` - Search and filter items
-- `GET /api/v1/nanos` - Nano program database
-- `GET /api/v1/spells` - Spell and nano data
-- `GET /api/v1/symbiants` - Symbiant database
-- `GET /api/v1/pocket-bosses` - Pocket boss information
-- `GET /api/v1/stat-values` - Game statistics reference
+- `GET /api/v1/versions` - Game versions served
+- `GET /api/v1/items`, `/items/search`, `/items/{aoid}` - Items
+- `GET /api/v1/items/{aoid}/interpolate`, `POST /api/v1/items/batch/interpolate` - Items at a quality level
+- `GET /api/v1/items/{aoid}/revisions`, `POST /api/v1/items/revisions/batch` - Item change history
+- `GET /api/v1/nanos`, `/nanos/search`, `/nanos/strains`, `/nanos/profession/{id}`, `/nanos/offensive/{id}` - Nano programs
+- `POST /api/v1/weapons/analyze` - Weapons a character can use
+- `POST /api/v1/implants/lookup` - Implant by slot and clusters
+- `GET /api/v1/symbiants`, `/symbiants/{aoid}`, `/symbiants/{aoid}/dropped-by` - Symbiants
+- `GET /api/v1/mobs`, `/mobs/{id}`, `/mobs/{id}/drops` - Mobs and pocket bosses (`is_pocket_boss` filter)
+- `POST /api/v1/perks/batch/lookup` - Perks by AOID
 
 ### System Endpoints
 - `GET /health` - Health check
-- `GET /api/v1/cache/stats` - Cache statistics
-- `GET /api/v1/performance/stats` - Performance metrics
+- `POST /api/v1/cache/clear` - Clear the response cache
+
+## Architecture
+
+Routes read the store through `app/store` (see the module docstring of `app/store/__init__.py`): a request names a build, queries start from the revisions present in that build, and items are loaded in a constant number of queries. `GET /versions` lists the store's builds; `POST /legacy-item-ids/resolve` translates internal item ids of the old database from a map the importer loads (`IMPORT_README.md`, "Legacy item ids").
 
 ## Development Commands
 
@@ -133,81 +129,51 @@ pytest app/tests/test_endpoints.py
 
 ## Database Management
 
-### Migrations (Alembic)
-```bash
-# Generate migration
-alembic revision --autogenerate -m "Description"
+The store's tables are defined in `database/cas/*.sql` and created or upgraded by `import_cli.py import-cas`. Never `DROP SCHEMA cas`; use `import-cas --reset --yes` on a scratch schema (see `IMPORT_README.md`).
 
-# Apply migrations
-alembic upgrade head
-
-# View migration history
-alembic history
-```
-
-### Manual Database Operations
 ```bash
 # Connect to database
 psql -U tinker_user -d tinkertools
-
-# Run schema tests
-psql -U tinker_user -d tinkertools -f ../database/tests/test_schema.sql
 ```
 
 ## Performance Considerations
 
-### Query Optimization
 - Complex stat queries target: < 500ms
-- All endpoints use proper database indexes
-- Async SQLAlchemy for concurrent request handling
-
-### Caching Strategy
-- Redis for frequently accessed data
-- Application-level caching for static game data
-- Cache invalidation on data updates
-
-### Resource Limits
-- Connection pooling configured for production load
-- Async I/O for database operations
-- Proper error handling and timeouts
+- Filters run on the store's search projections (`stat_entry`, `requirement`, `effect_entry`, `atkdef_entry`), which are indexed
+- Synchronous SQLAlchemy; FastAPI runs the routes in its thread pool
+- In-process response cache for static game data (`app/core/cache.py`), cleared with `POST /api/v1/cache/clear`
 
 ## Configuration
 
 ### Environment Variables
 - `DATABASE_URL` - PostgreSQL connection string
-- `CORS_ORIGINS` - Allowed frontend origins
+- `CORS_ORIGINS` - Allowed frontend origins, comma-separated; read when `APP_ENV` is not `development` (which allows every origin). The deployed frontend calls the API on its own origin and needs none
 - `APP_ENV` - Environment (development/production)
 - `LOG_LEVEL` - Logging level (DEBUG/INFO/WARNING/ERROR)
-- `REDIS_URL` - Redis connection string
+- `RESPONSE_CACHE_MAX_BYTES`, `CAS_SCHEMA`, `DEFAULT_GAME_VERSION`, `BUILD_REGISTRY_TTL` - see `app/core/config.py`
 
 ### Application Settings
 Configuration is managed through `app/core/config.py` using Pydantic Settings.
 
 ## Production Deployment
 
-### Docker Support
-```bash
-# Build image
-docker build -t tinkertools-api .
+The backend is deployed as the `api` service of the container stack in `../docker-compose.yml`: `Dockerfile` here builds the image (Python 3.12, gunicorn with uvicorn workers on port 8000, `GET /health` as its health check), and the `web` service proxies `/api` to it. `../DEPLOYMENT.md` describes the stack, its settings, how the server's database is loaded from a dump of the development store, and the steps in Coolify.
 
-# Run container
-docker run -p 8000:8000 tinkertools-api
+```bash
+# from the repository root
+docker compose up -d --build
 ```
 
-### Manual Deployment
-```bash
-# Install production dependencies
-pip install -r requirements.txt
+The number of workers is `API_WORKERS` (default 2), passed to gunicorn as `WEB_CONCURRENCY`.
 
-# Run with Gunicorn
-gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000
-```
+**Memory per worker.** Every worker is a process with a response cache of its own (`RESPONSE_CACHE_MAX_BYTES`, default 256 MB). A busy worker settles at about 130 MB when ready, plus the cache bound, plus up to 150 MB the allocator keeps: **550 MB with the default** (measured; `app/core/cache.py` has the figures). Size the host as workers x that, so 4 workers need 2.2 GB for the API alone, or lower the bound: 64 MB gives about 335 MB per worker. `MALLOC_ARENA_MAX=2` in the environment takes about 60 MB off each; the stack sets it. Workers do not share cached responses, so each warms up on its own.
+
+Replacing the production server of before the content-addressed store: `IMPORT_README.md`, "Production cutover".
 
 ## Monitoring and Observability
 
 ### Health Checks
 - `GET /health` - Basic health status
-- `GET /api/v1/performance/stats` - Detailed performance metrics
 
 ### Logging
 Structured logging with configurable levels. Logs include:
@@ -230,11 +196,6 @@ Structured logging with configurable levels. Logs include:
 - Server contains only static game reference data
 - No user accounts or authentication required
 
-### Legacy Compatibility
-- Database schema matches existing Django model structure
-- Maintains compatibility with existing data exports
-- Supports gradual migration from legacy systems
-
 ## Troubleshooting
 
 ### Common Issues
@@ -246,24 +207,6 @@ sudo systemctl status postgresql
 
 # Verify database exists
 psql -U postgres -l | grep tinkertools
-```
-
-**Import Errors**
-```bash
-# Check data file format
-head -n 5 items.json
-
-# Verify database schema
-psql -U tinker_user -d tinkertools -c "\dt"
-```
-
-**Performance Issues**
-```bash
-# Check database indexes
-psql -U tinker_user -d tinkertools -c "\di"
-
-# Monitor query performance
-tail -f /var/log/postgresql/postgresql.log
 ```
 
 For additional help, check the main project documentation in `../docs/` or the issue tracker.

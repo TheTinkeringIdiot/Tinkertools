@@ -16,12 +16,11 @@ import {
   buildCriteriaTree,
   shouldUseTreeDisplay,
   getTreeSummary,
-  type ParsedAction,
   type DisplayCriterion,
-  type CriteriaExpression,
-  type CriteriaTreeNode,
 } from '../services/action-criteria';
 import type { Action, Criterion } from '../types/api';
+
+type UnmetRequirement = ReturnType<typeof checkActionRequirements>['unmetRequirements'][number];
 
 // ============================================================================
 // Action Display Composable
@@ -182,6 +181,7 @@ export function useCriteriaEvaluation(
       return parsedActions.value.map((action) => ({
         action,
         canPerform: null,
+        status: null,
         unmetRequirements: [],
       }));
     }
@@ -191,6 +191,9 @@ export function useCriteriaEvaluation(
       return {
         action,
         canPerform: result.canPerform,
+        // 'unknown': nothing checkable fails, but conditions the profile doesn't
+        // record (a running nano, an item wielded...) decide it
+        status: result.status,
         unmetRequirements: result.unmetRequirements,
       };
     });
@@ -223,7 +226,7 @@ export function useCriteriaEvaluation(
    * Get all unmet requirements across all actions
    */
   const allUnmetRequirements = computed(() => {
-    const unmet = new Map<number, any>();
+    const unmet = new Map<number, UnmetRequirement>();
 
     for (const evaluation of actionEvaluations.value) {
       for (const req of evaluation.unmetRequirements) {
@@ -258,7 +261,7 @@ export function useCriteriaEvaluation(
         if (!criterion.isStatRequirement) continue;
 
         const currentValue = characterStats.value[criterion.stat] || 0;
-        let requiredValue = criterion.displayValue;
+        const requiredValue = criterion.displayValue;
 
         // Only consider "greater than or equal" requirements for minimums
         if (criterion.displaySymbol === '≥') {

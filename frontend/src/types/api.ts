@@ -5,6 +5,8 @@
  * following the patterns specified in docs/11_api_design_and_data_flow.md
  */
 
+import type { TinkerProfile } from '../lib/tinkerprofiles/types';
+
 // ============================================================================
 // Base API Types
 // ============================================================================
@@ -15,7 +17,7 @@ export interface ApiResponse<T> {
   error?: {
     code: string;
     message: string;
-    details?: any;
+    details?: JsonValue;
   };
   meta?: {
     timestamp: string;
@@ -37,54 +39,90 @@ export interface PaginatedResponse<T> {
 // ============================================================================
 // Game Data Models
 // ============================================================================
+//
+// AOID is the only identity an item has: the backend's row ids differ between
+// game versions, so nothing here carries one. Stats, effects, actions and
+// criteria are content and have no identity of their own.
 
 export interface StatValue {
-  id: number;
   stat: number;
   value: number;
 }
 
 export interface Criterion {
-  id: number;
   value1: number;
   value2: number;
   operator: number;
 }
 
+/**
+ * A value parsed from JSON. Deliberately not recursive: Vue's ref unwrapping
+ * and DeepReadonly recurse into recursive types without bound.
+ */
+export type JsonValue = string | number | boolean | null | object;
+
+/**
+ * Spell parameters: a JSON object whose keys depend on the spell format.
+ * The numeric parameters the frontend reads are typed; the rest are plain JSON.
+ */
+export interface SpellParams {
+  Stat?: number;
+  StatID?: number;
+  Amount?: number;
+  Value?: number;
+  MinValue?: number;
+  MaxValue?: number;
+  MinAmount?: number;
+  MaxAmount?: number;
+  ModifierStat?: number;
+  BitNum?: number;
+  School?: number;
+  NCU?: number;
+  NanoPoints?: number;
+  Level?: number;
+  Duration?: number;
+  StackingLine?: number;
+  AttackTime?: number;
+  RechargeTime?: number;
+  // Lower-case spellings seen in some records
+  stat?: number;
+  statId?: number;
+  amount?: number;
+  value?: number;
+  minValue?: number;
+  maxValue?: number;
+  modifierStat?: number;
+  [key: string]: JsonValue | undefined;
+}
+
 export interface Spell {
-  id: number;
   target?: number;
   tick_count?: number;
   tick_interval?: number;
   spell_id?: number;
   /** @deprecated Use spell_id to look up format from SPELL_FORMATS constant instead */
   spell_format?: string;
-  spell_params: Record<string, any>;
+  spell_params: SpellParams;
   criteria: Criterion[];
 }
 
 export interface SpellData {
-  id: number;
   event?: number;
   spells: Spell[];
 }
 
 export interface AttackDefense {
-  id: number;
   attack: StatValue[];
   defense: StatValue[];
 }
 
 export interface AnimationMesh {
-  id: number;
   animation?: StatValue;
   mesh?: StatValue;
 }
 
 export interface Action {
-  id: number;
   action?: number;
-  item_id: number;
   criteria: Criterion[];
 }
 
@@ -99,7 +137,7 @@ export interface Source {
   source_type_id: number;
   source_id: number;
   name: string;
-  extra_data: Record<string, any>;
+  extra_data: Record<string, JsonValue>;
   source_type?: SourceType;
 }
 
@@ -109,12 +147,11 @@ export interface ItemSource {
   min_ql?: number;
   max_ql?: number;
   conditions?: string;
-  extra_data: Record<string, any>;
+  extra_data: Record<string, JsonValue>;
 }
 
 export interface Item {
-  id: number;
-  aoid?: number;
+  aoid: number;
   name: string;
   ql?: number;
   description?: string;
@@ -136,7 +173,7 @@ export interface InterpolatedSpell {
   tick_interval?: number;
   spell_id?: number;
   spell_format?: string;
-  spell_params: Record<string, any>;
+  spell_params: SpellParams;
   criteria: Criterion[];
 }
 
@@ -152,8 +189,7 @@ export interface InterpolatedAction {
 
 export interface InterpolatedItem {
   // Original item data
-  id: number;
-  aoid?: number;
+  aoid: number;
   name: string;
   ql?: number;
   description?: string;
@@ -172,15 +208,6 @@ export interface InterpolatedItem {
   stats: StatValue[];
   spell_data: InterpolatedSpellData[];
   actions: InterpolatedAction[];
-
-  // Optional related data
-  attack_defense_id?: number;
-  animation_mesh_id?: number;
-}
-
-export interface InterpolationRequest {
-  aoid: number;
-  target_ql: number;
 }
 
 export interface InterpolationResponse {
@@ -236,10 +263,28 @@ export interface BatchPerkLookupRequest {
   aoids: number[];
 }
 
+/** A perk item from the perk lookup endpoints, with its perk metadata */
+export interface PerkLookupItem extends Item {
+  perk_name: string;
+  perk_counter: number;
+  perk_type: string;
+  perk_series?: string | null;
+  perk_professions: string[];
+  perk_breeds: string[];
+  perk_level_required: number;
+  perk_ai_level_required: number | null;
+  // Legacy aliases of the perk_* fields
+  counter: number;
+  type: string;
+  level: number;
+  ai_title: number | null;
+  formatted_name: string;
+}
+
 export interface BatchPerkResult {
   aoid: number;
   success: boolean;
-  perk: any | null;
+  perk: PerkLookupItem | null;
   error: string | null;
 }
 
@@ -250,12 +295,11 @@ export interface BatchPerkLookupResponse {
 }
 
 export interface SymbiantItem {
-  id: number;
   aoid: number;
   name: string;
   ql: number;
   slot_id: number;
-  family: 'Artillery' | 'Control' | 'Extermination' | 'Infantry' | 'Support';
+  family: 'Artillery' | 'Control' | 'Extermination' | 'Infantry' | 'Support' | null;
   actions: Action[];
   spell_data?: SpellData[];
 }
@@ -264,7 +308,7 @@ export interface SymbiantItem {
  * Type guard to distinguish symbiants from implants
  * Symbiants have family/slot_id, implants have item_class/icon_id
  */
-export function isSymbiant(item: Item | SymbiantItem): item is SymbiantItem {
+export function isSymbiant(item: object): item is SymbiantItem {
   return 'family' in item && 'slot_id' in item;
 }
 
@@ -276,7 +320,7 @@ export interface Mob {
   location: string;
   mob_names: string[];
   is_pocket_boss: boolean;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, JsonValue>;
   symbiant_count?: number;
 }
 
@@ -297,51 +341,11 @@ export interface StatBonus {
 // Character Profile Types (LocalStorage)
 // ============================================================================
 
-/** Skill entry with IP tracking */
-export interface SkillWithIP {
-  value: number;
-  ipSpent: number;
-  pointFromIp: number;
-}
-
-export interface TinkerProfile {
-  Character: {
-    Name: string;
-    Level: number;
-    Profession: string;
-    Breed: string;
-    Faction: string;
-    Expansion: string;
-    AccountType: string;
-    MaxHealth: number;
-    MaxNano: number;
-  };
-  Skills: {
-    Attributes: {
-      Intelligence: SkillWithIP;
-      Psychic: SkillWithIP;
-      Sense: SkillWithIP;
-      Stamina: SkillWithIP;
-      Strength: SkillWithIP;
-      Agility: SkillWithIP;
-    };
-    'Body & Defense': Record<string, SkillWithIP>;
-    ACs: Record<string, number>;
-    'Ranged Weapons': Record<string, SkillWithIP>;
-    'Ranged Specials': Record<string, SkillWithIP>;
-    'Melee Weapons': Record<string, SkillWithIP>;
-    'Melee Specials': Record<string, SkillWithIP>;
-    'Nanos & Casting': Record<string, SkillWithIP>;
-    Exploring: Record<string, SkillWithIP>;
-    'Trade & Repair': Record<string, SkillWithIP>;
-    'Combat & Healing': Record<string, SkillWithIP>;
-    Misc: Record<string, number>; // Misc doesn't use IP tracking
-  };
-  Weapons: Record<string, Item | null>;
-  Clothing: Record<string, Item | null>;
-  Implants: Record<string, Item | null>;
-  PerksAndResearch: any[];
-}
+/**
+ * Character profiles live in the TinkerProfiles library (v4, ID-keyed skills).
+ * Re-exported here for the many callers that import it alongside API types.
+ */
+export type { TinkerProfile };
 
 export interface UserPreferences {
   theme: 'light' | 'dark';
@@ -399,14 +403,6 @@ export interface ItemSearchQuery {
   sort_order?: 'asc' | 'desc';
 }
 
-export interface SpellSearchQuery {
-  search?: string;
-  has_criteria?: boolean;
-  spell_id?: number;
-  page?: number;
-  limit?: number;
-}
-
 // Pagination fields removed - all filtering now handled client-side
 export interface SymbiantSearchQuery {
   search?: string;
@@ -446,43 +442,6 @@ export interface StatRequirement {
   value: number;
 }
 
-export interface ItemFilterRequest {
-  stat_requirements?: StatRequirement[];
-  item_class?: number[];
-  ql_range?: [number, number];
-  is_nano?: boolean;
-  has_attack_defense?: boolean;
-  has_spell_data?: boolean;
-}
-
-export interface ItemFilters {
-  // Basic type filters
-  isNano?: boolean;
-  isWeapon?: boolean;
-  itemClasses?: number[];
-
-  // Quality level filters
-  minQL?: number;
-  maxQL?: number;
-
-  // Stat filters
-  statFilterMode?: 'any' | 'can_meet' | 'cannot_meet' | 'has_stats';
-  selectedStats?: number[];
-  statMinValues?: Record<number, number>;
-
-  // Property filters
-  hasEffects?: boolean | null;
-  hasRequirements?: boolean | null;
-  isTradeable?: boolean | null;
-  isDroppable?: boolean | null;
-
-  // Source filters
-  sources?: string[];
-
-  // Special filters
-  favorite_items?: boolean;
-}
-
 export interface PaginationInfo {
   page: number;
   limit: number;
@@ -490,19 +449,6 @@ export interface PaginationInfo {
   total: number;
   hasNext: boolean;
   hasPrev: boolean;
-}
-
-export interface ItemCompatibilityRequest {
-  profile: TinkerProfile;
-  item_ids: number[];
-  check_type: 'equip' | 'use' | 'cast';
-}
-
-export interface ItemCompatibilityResult {
-  item_id: number;
-  compatible: boolean;
-  missing_requirements?: StatRequirement[];
-  suggestions?: string[];
 }
 
 // ============================================================================
@@ -572,6 +518,8 @@ export interface UserFriendlyError {
   action: string;
   recoverable: boolean;
   retryAfter?: number;
+  /** HTTP status of the answer, when the server answered that what was asked for does not exist. */
+  status?: number;
 }
 
 // ============================================================================
@@ -600,31 +548,6 @@ export interface CacheConfig {
 }
 
 // ============================================================================
-// Request/Response Wrappers
-// ============================================================================
-
-export interface BatchRequest<T> {
-  items: T[];
-  include_related?: boolean;
-}
-
-export interface BatchItemRequest {
-  item_ids: number[];
-  include_stats?: boolean;
-  include_spells?: boolean;
-  include_actions?: boolean;
-}
-
-export interface SearchResponse<T> extends PaginatedResponse<T> {
-  facets?: {
-    item_class?: Array<{ value: number; count: number }>;
-    ql_range?: { min: number; max: number };
-    expansions?: Array<{ value: string; count: number }>;
-  };
-  suggestions?: string[];
-}
-
-// ============================================================================
 // TinkerPlants Types
 // ============================================================================
 
@@ -644,8 +567,11 @@ export interface ImplantSelection {
   slotBitflag: string;
   /** Full implant item data from API (null if not yet loaded, implants only) */
   item: Item | null;
-  /** Symbiant item data (symbiants only) */
-  symbiant?: SymbiantItem | null;
+  /**
+   * Symbiant item data (symbiants only). setSymbiant() swaps the SymbiantItem
+   * it is given for the full Item, and profiles store that Item.
+   */
+  symbiant?: Item | null;
 }
 
 /** Request format for implant lookup API */
@@ -722,14 +648,4 @@ export interface PerImplantRequirement {
   slotName: string;
   /** Requirements for this implant */
   requirements: ImplantRequirement[];
-}
-
-/** Validation result for implant configuration */
-export interface ImplantValidationResult {
-  /** Whether configuration is valid */
-  valid: boolean;
-  /** Blocking errors (invalid clusters, QoL out of range, etc.) */
-  errors: string[];
-  /** Non-blocking warnings (suboptimal choices, etc.) */
-  warnings: string[];
 }

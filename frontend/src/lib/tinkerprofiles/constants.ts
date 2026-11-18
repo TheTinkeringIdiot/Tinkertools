@@ -6,8 +6,8 @@
 
 import type { TinkerProfile, NanoCompatibleProfile, SkillData } from './types';
 import type { PerkSystem } from './perk-types';
-import { getBreedInitValue, calcHP, calcNP } from './ip-calculator';
-import { getBreedId, normalizeBreedToId, normalizeProfessionToId } from '../../services/game-utils';
+import { getBreedInitValue, calcHP, calcNP, ABILITY_INDEX_TO_STAT_ID } from './ip-calculator';
+import { getBreedId, normalizeBreedToId } from '../../services/game-utils';
 import { skillService } from '../../services/skill-service';
 
 // Import BASE_SKILL constant from ip-calculator
@@ -256,15 +256,15 @@ export const DEFAULT_CLOTHING = {
 } as const;
 
 export const DEFAULT_IMPLANTS = {
-  '2': null,    // Eyes (1 << 1)
-  '4': null,    // Head (1 << 2)
-  '8': null,    // Ears (1 << 3)
-  '16': null,   // RightArm (1 << 4)
-  '32': null,   // Chest (1 << 5)
-  '64': null,   // LeftArm (1 << 6)
-  '128': null,  // RightWrist (1 << 7)
-  '256': null,  // Waist (1 << 8)
-  '512': null,  // LeftWrist (1 << 9)
+  '2': null, // Eyes (1 << 1)
+  '4': null, // Head (1 << 2)
+  '8': null, // Ears (1 << 3)
+  '16': null, // RightArm (1 << 4)
+  '32': null, // Chest (1 << 5)
+  '64': null, // LeftArm (1 << 6)
+  '128': null, // RightWrist (1 << 7)
+  '256': null, // Waist (1 << 8)
+  '512': null, // LeftWrist (1 << 9)
   '1024': null, // RightHand (1 << 10)
   '2048': null, // Legs (1 << 11)
   '4096': null, // LeftHand (1 << 12)
@@ -279,7 +279,13 @@ export const STORAGE_KEYS = {
   PROFILES: 'tinkertools_profiles', // Legacy - for migration only
   PROFILE_INDEX: 'tinkertools_profile_index', // List of profile IDs
   PROFILE_PREFIX: 'tinkertools_profile_', // Individual profile prefix
+  /**
+   * Legacy global active-profile key. Kept for one-time migration only: the
+   * active profile is now stored per game version under
+   * `tinkertools_active_profile:<version-slug>` (ACTIVE_PROFILE_PREFIX).
+   */
   ACTIVE_PROFILE: 'tinkertools_active_profile',
+  ACTIVE_PROFILE_PREFIX: 'tinkertools_active_profile:',
   PROFILE_METADATA: 'tinkertools_profile_metadata',
   PROFILE_PREFERENCES: 'tinkertools_profile_preferences',
   VERSION: 'tinkertools_profiles_version',
@@ -290,7 +296,7 @@ export const STORAGE_KEYS = {
 // ============================================================================
 
 export const CURRENT_VERSION = '4.0.0';
-export const SUPPORTED_VERSIONS = ['1.0.0', '1.1.0', '2.0.0'];
+export const SUPPORTED_VERSIONS = ['1.0.0', '1.1.0', '2.0.0', '3.0.0', '4.0.0'];
 
 // ============================================================================
 // Profile Factories
@@ -325,37 +331,26 @@ function createDefaultPerkSystem(level: number = 1, alienLevel: number = 0): Per
 }
 
 /**
- * Get breed ID from breed name
- */
-function getBreedIdFromBreedName(breed: string): number {
-  const breedMap: Record<string, number> = {
-    Solitus: 1,
-    Opifex: 2,
-    Nanomage: 3,
-    Atrox: 4,
-  };
-  return breedMap[breed] || 1; // Default to Solitus
-}
-
-/**
  * Create default v4.0.0 skills map for a breed
  * Initializes all ~168 skills with appropriate base values
  */
-export function createDefaultSkillsV4(breed: string): { [skillId: number]: SkillData } {
+export function createDefaultSkillsV4(breed: string | number): {
+  [skillId: number]: SkillData;
+} {
   const skills: { [skillId: number]: SkillData } = {};
 
   // Get all skill IDs from SkillService
   const allSkillIds = skillService.getAllSkills();
 
   // Get breed ID for breed-specific ability lookup
-  const breedId = getBreedId(breed) || 1; // Default to Solitus
+  const breedId = normalizeBreedToId(breed); // Defaults to Solitus
 
   for (const skillId of allSkillIds) {
     const category = skillService.getCategory(Number(skillId));
 
     let baseValue = 5; // Default for trainable skills
 
-    if (category === 'Abilities') {
+    if (category === 'Attributes') {
       // For abilities, use breed-specific values from ip-calculator
       baseValue = getBreedInitValue(breedId, Number(skillId));
     } else if (category === 'Misc' || category === 'ACs') {
@@ -383,7 +378,7 @@ export function createDefaultSkillsV4(breed: string): { [skillId: number]: Skill
  */
 export function createDefaultProfile(
   name: string = 'New Character',
-  breed: string = 'Solitus'
+  breed: string | number = 'Solitus'
 ): TinkerProfile {
   const now = new Date().toISOString();
 
@@ -406,8 +401,8 @@ export function createDefaultProfile(
     Character: {
       Name: name,
       Level: 1,
-      Profession: professionId as any, // Store as numeric ID
-      Breed: breedId as any, // Store as numeric ID
+      Profession: professionId, // Store as numeric ID
+      Breed: breedId, // Store as numeric ID
       Faction: 'Neutral',
       Expansion: 'Lost Eden',
       AccountType: 'Paid',
@@ -416,7 +411,7 @@ export function createDefaultProfile(
       Specialization: 0,
     },
 
-    skills: createDefaultSkillsV4(breed),
+    skills: createDefaultSkillsV4(breedId),
 
     Weapons: structuredClone(DEFAULT_WEAPONS),
     Clothing: structuredClone(DEFAULT_CLOTHING),
@@ -457,12 +452,13 @@ export function createDefaultNanoProfile(
       Treatment: BASE_SKILL,
     },
     stats: {
-      Strength: getBreedInitValue(breedId, 0),
-      Agility: getBreedInitValue(breedId, 1),
-      Stamina: getBreedInitValue(breedId, 2),
-      Intelligence: getBreedInitValue(breedId, 3),
-      Sense: getBreedInitValue(breedId, 4),
-      Psychic: getBreedInitValue(breedId, 5),
+      // getBreedInitValue takes stat IDs (16-21), not ability indexes
+      Strength: getBreedInitValue(breedId, ABILITY_INDEX_TO_STAT_ID[0]),
+      Agility: getBreedInitValue(breedId, ABILITY_INDEX_TO_STAT_ID[1]),
+      Stamina: getBreedInitValue(breedId, ABILITY_INDEX_TO_STAT_ID[2]),
+      Intelligence: getBreedInitValue(breedId, ABILITY_INDEX_TO_STAT_ID[3]),
+      Sense: getBreedInitValue(breedId, ABILITY_INDEX_TO_STAT_ID[4]),
+      Psychic: getBreedInitValue(breedId, ABILITY_INDEX_TO_STAT_ID[5]),
     },
     activeNanos: [],
     memoryCapacity: 500,

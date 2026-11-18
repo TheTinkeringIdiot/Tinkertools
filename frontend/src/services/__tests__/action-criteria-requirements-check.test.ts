@@ -8,7 +8,7 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { checkActionRequirements, parseAction } from '../action-criteria';
-import type { Action, Criterion } from '../../types/api';
+import type { Action } from '../../types/api';
 
 // Mock game-data constants
 vi.mock('../game-data', () => ({
@@ -91,13 +91,11 @@ describe('checkActionRequirements - OR Logic Handling', () => {
     it('should pass when character meets first profession in OR', () => {
       // Action: Profession = NT OR Profession = MP
       const action: Action = {
-        id: 1,
         action: 6,
-        item_id: 1,
         criteria: [
-          { id: 1, value1: 368, value2: 11, operator: 0 }, // Profession = NT (11)
-          { id: 2, value1: 368, value2: 12, operator: 0 }, // Profession = MP (12)
-          { id: 3, value1: 0, value2: 0, operator: 3 }, // OR
+          { value1: 368, value2: 11, operator: 0 }, // Profession = NT (11)
+          { value1: 368, value2: 12, operator: 0 }, // Profession = MP (12)
+          { value1: 0, value2: 0, operator: 3 }, // OR
         ],
       };
 
@@ -113,13 +111,11 @@ describe('checkActionRequirements - OR Logic Handling', () => {
     it('should pass when character meets second profession in OR', () => {
       // Action: Profession = NT OR Profession = MP
       const action: Action = {
-        id: 1,
         action: 6,
-        item_id: 1,
         criteria: [
-          { id: 1, value1: 368, value2: 11, operator: 0 }, // Profession = NT (11)
-          { id: 2, value1: 368, value2: 12, operator: 0 }, // Profession = MP (12)
-          { id: 3, value1: 0, value2: 0, operator: 3 }, // OR
+          { value1: 368, value2: 11, operator: 0 }, // Profession = NT (11)
+          { value1: 368, value2: 12, operator: 0 }, // Profession = MP (12)
+          { value1: 0, value2: 0, operator: 3 }, // OR
         ],
       };
 
@@ -137,13 +133,11 @@ describe('checkActionRequirements - OR Logic Handling', () => {
     it('should fail when character meets neither profession in OR', () => {
       // Action: Profession = Soldier OR Profession = Doctor
       const action: Action = {
-        id: 1,
         action: 6,
-        item_id: 1,
         criteria: [
-          { id: 1, value1: 368, value2: 1, operator: 0 }, // Profession = Soldier (1)
-          { id: 2, value1: 368, value2: 10, operator: 0 }, // Profession = Doctor (10)
-          { id: 3, value1: 0, value2: 0, operator: 3 }, // OR
+          { value1: 368, value2: 1, operator: 0 }, // Profession = Soldier (1)
+          { value1: 368, value2: 10, operator: 0 }, // Profession = Doctor (10)
+          { value1: 0, value2: 0, operator: 3 }, // OR
         ],
       };
 
@@ -162,19 +156,17 @@ describe('checkActionRequirements - OR Logic Handling', () => {
       // Action: (((Prof=Soldier OR Prof=MA) OR Prof=Eng) OR Prof=Fix) OR Prof=Agent
       // This tests deeply nested OR chains like Pistol Mastery
       const action: Action = {
-        id: 1,
         action: 6,
-        item_id: 1,
         criteria: [
-          { id: 1, value1: 368, value2: 1, operator: 0 }, // Soldier
-          { id: 2, value1: 368, value2: 2, operator: 0 }, // MartialArtist
-          { id: 3, value1: 0, value2: 0, operator: 3 }, // OR
-          { id: 4, value1: 368, value2: 3, operator: 0 }, // Engineer
-          { id: 5, value1: 0, value2: 0, operator: 3 }, // OR
-          { id: 6, value1: 368, value2: 4, operator: 0 }, // Fixer
-          { id: 7, value1: 0, value2: 0, operator: 3 }, // OR
-          { id: 8, value1: 368, value2: 5, operator: 0 }, // Agent
-          { id: 9, value1: 0, value2: 0, operator: 3 }, // OR
+          { value1: 368, value2: 1, operator: 0 }, // Soldier
+          { value1: 368, value2: 2, operator: 0 }, // MartialArtist
+          { value1: 0, value2: 0, operator: 3 }, // OR
+          { value1: 368, value2: 3, operator: 0 }, // Engineer
+          { value1: 0, value2: 0, operator: 3 }, // OR
+          { value1: 368, value2: 4, operator: 0 }, // Fixer
+          { value1: 0, value2: 0, operator: 3 }, // OR
+          { value1: 368, value2: 5, operator: 0 }, // Agent
+          { value1: 0, value2: 0, operator: 3 }, // OR
         ],
       };
 
@@ -189,19 +181,17 @@ describe('checkActionRequirements - OR Logic Handling', () => {
 
     it('should fail when character matches none of five professions', () => {
       const action: Action = {
-        id: 1,
         action: 6,
-        item_id: 1,
         criteria: [
-          { id: 1, value1: 368, value2: 1, operator: 0 }, // Soldier
-          { id: 2, value1: 368, value2: 2, operator: 0 }, // MartialArtist
-          { id: 3, value1: 0, value2: 0, operator: 3 }, // OR
-          { id: 4, value1: 368, value2: 3, operator: 0 }, // Engineer
-          { id: 5, value1: 0, value2: 0, operator: 3 }, // OR
-          { id: 6, value1: 368, value2: 4, operator: 0 }, // Fixer
-          { id: 7, value1: 0, value2: 0, operator: 3 }, // OR
-          { id: 8, value1: 368, value2: 5, operator: 0 }, // Agent
-          { id: 9, value1: 0, value2: 0, operator: 3 }, // OR
+          { value1: 368, value2: 1, operator: 0 }, // Soldier
+          { value1: 368, value2: 2, operator: 0 }, // MartialArtist
+          { value1: 0, value2: 0, operator: 3 }, // OR
+          { value1: 368, value2: 3, operator: 0 }, // Engineer
+          { value1: 0, value2: 0, operator: 3 }, // OR
+          { value1: 368, value2: 4, operator: 0 }, // Fixer
+          { value1: 0, value2: 0, operator: 3 }, // OR
+          { value1: 368, value2: 5, operator: 0 }, // Agent
+          { value1: 0, value2: 0, operator: 3 }, // OR
         ],
       };
 
@@ -219,15 +209,13 @@ describe('checkActionRequirements - OR Logic Handling', () => {
     it('should pass when profession matches OR and skill meets AND', () => {
       // Action: (Profession=NT OR Profession=MP) AND Pistol>=100
       const action: Action = {
-        id: 1,
         action: 6,
-        item_id: 1,
         criteria: [
-          { id: 1, value1: 368, value2: 11, operator: 0 }, // Profession = NT
-          { id: 2, value1: 368, value2: 12, operator: 0 }, // Profession = MP
-          { id: 3, value1: 0, value2: 0, operator: 3 }, // OR
-          { id: 4, value1: 127, value2: 99, operator: 2 }, // Pistol > 99 (display as >= 100)
-          { id: 5, value1: 0, value2: 0, operator: 4 }, // AND
+          { value1: 368, value2: 11, operator: 0 }, // Profession = NT
+          { value1: 368, value2: 12, operator: 0 }, // Profession = MP
+          { value1: 0, value2: 0, operator: 3 }, // OR
+          { value1: 127, value2: 99, operator: 2 }, // Pistol > 99 (display as >= 100)
+          { value1: 0, value2: 0, operator: 4 }, // AND
         ],
       };
 
@@ -246,15 +234,13 @@ describe('checkActionRequirements - OR Logic Handling', () => {
     it('should fail when profession matches OR but skill fails AND', () => {
       // Action: (Profession=NT OR Profession=MP) AND Pistol>=100
       const action: Action = {
-        id: 1,
         action: 6,
-        item_id: 1,
         criteria: [
-          { id: 1, value1: 368, value2: 11, operator: 0 }, // Profession = NT
-          { id: 2, value1: 368, value2: 12, operator: 0 }, // Profession = MP
-          { id: 3, value1: 0, value2: 0, operator: 3 }, // OR
-          { id: 4, value1: 127, value2: 99, operator: 2 }, // Pistol > 99 (display as >= 100)
-          { id: 5, value1: 0, value2: 0, operator: 4 }, // AND
+          { value1: 368, value2: 11, operator: 0 }, // Profession = NT
+          { value1: 368, value2: 12, operator: 0 }, // Profession = MP
+          { value1: 0, value2: 0, operator: 3 }, // OR
+          { value1: 127, value2: 99, operator: 2 }, // Pistol > 99 (display as >= 100)
+          { value1: 0, value2: 0, operator: 4 }, // AND
         ],
       };
 
@@ -279,15 +265,13 @@ describe('checkActionRequirements - OR Logic Handling', () => {
     it('should fail when skill meets AND but profession fails OR', () => {
       // Action: (Profession=NT OR Profession=MP) AND Pistol>=100
       const action: Action = {
-        id: 1,
         action: 6,
-        item_id: 1,
         criteria: [
-          { id: 1, value1: 368, value2: 11, operator: 0 }, // Profession = NT
-          { id: 2, value1: 368, value2: 12, operator: 0 }, // Profession = MP
-          { id: 3, value1: 0, value2: 0, operator: 3 }, // OR
-          { id: 4, value1: 127, value2: 99, operator: 2 }, // Pistol > 99 (display as >= 100)
-          { id: 5, value1: 0, value2: 0, operator: 4 }, // AND
+          { value1: 368, value2: 11, operator: 0 }, // Profession = NT
+          { value1: 368, value2: 12, operator: 0 }, // Profession = MP
+          { value1: 0, value2: 0, operator: 3 }, // OR
+          { value1: 127, value2: 99, operator: 2 }, // Pistol > 99 (display as >= 100)
+          { value1: 0, value2: 0, operator: 4 }, // AND
         ],
       };
 
@@ -308,19 +292,17 @@ describe('checkActionRequirements - OR Logic Handling', () => {
     it('should pass when one profession matches and all skills meet requirements', () => {
       // Typical symbiant: (Prof=Soldier OR Prof=MA OR Prof=Eng) AND Stamina>=300 AND Strength>=250
       const action: Action = {
-        id: 1,
         action: 6,
-        item_id: 1,
         criteria: [
-          { id: 1, value1: 368, value2: 1, operator: 0 }, // Soldier
-          { id: 2, value1: 368, value2: 2, operator: 0 }, // MartialArtist
-          { id: 3, value1: 0, value2: 0, operator: 3 }, // OR
-          { id: 4, value1: 368, value2: 3, operator: 0 }, // Engineer
-          { id: 5, value1: 0, value2: 0, operator: 3 }, // OR
-          { id: 6, value1: 17, value2: 299, operator: 2 }, // Stamina > 299 (>= 300)
-          { id: 7, value1: 0, value2: 0, operator: 4 }, // AND
-          { id: 8, value1: 18, value2: 249, operator: 2 }, // Strength > 249 (>= 250)
-          { id: 9, value1: 0, value2: 0, operator: 4 }, // AND
+          { value1: 368, value2: 1, operator: 0 }, // Soldier
+          { value1: 368, value2: 2, operator: 0 }, // MartialArtist
+          { value1: 0, value2: 0, operator: 3 }, // OR
+          { value1: 368, value2: 3, operator: 0 }, // Engineer
+          { value1: 0, value2: 0, operator: 3 }, // OR
+          { value1: 17, value2: 299, operator: 2 }, // Stamina > 299 (>= 300)
+          { value1: 0, value2: 0, operator: 4 }, // AND
+          { value1: 18, value2: 249, operator: 2 }, // Strength > 249 (>= 250)
+          { value1: 0, value2: 0, operator: 4 }, // AND
         ],
       };
 
@@ -339,19 +321,17 @@ describe('checkActionRequirements - OR Logic Handling', () => {
 
     it('should fail when profession matches but skills do not', () => {
       const action: Action = {
-        id: 1,
         action: 6,
-        item_id: 1,
         criteria: [
-          { id: 1, value1: 368, value2: 1, operator: 0 }, // Soldier
-          { id: 2, value1: 368, value2: 2, operator: 0 }, // MartialArtist
-          { id: 3, value1: 0, value2: 0, operator: 3 }, // OR
-          { id: 4, value1: 368, value2: 3, operator: 0 }, // Engineer
-          { id: 5, value1: 0, value2: 0, operator: 3 }, // OR
-          { id: 6, value1: 17, value2: 299, operator: 2 }, // Stamina > 299 (>= 300)
-          { id: 7, value1: 0, value2: 0, operator: 4 }, // AND
-          { id: 8, value1: 18, value2: 249, operator: 2 }, // Strength > 249 (>= 250)
-          { id: 9, value1: 0, value2: 0, operator: 4 }, // AND
+          { value1: 368, value2: 1, operator: 0 }, // Soldier
+          { value1: 368, value2: 2, operator: 0 }, // MartialArtist
+          { value1: 0, value2: 0, operator: 3 }, // OR
+          { value1: 368, value2: 3, operator: 0 }, // Engineer
+          { value1: 0, value2: 0, operator: 3 }, // OR
+          { value1: 17, value2: 299, operator: 2 }, // Stamina > 299 (>= 300)
+          { value1: 0, value2: 0, operator: 4 }, // AND
+          { value1: 18, value2: 249, operator: 2 }, // Strength > 249 (>= 250)
+          { value1: 0, value2: 0, operator: 4 }, // AND
         ],
       };
 
@@ -384,9 +364,7 @@ describe('checkActionRequirements - OR Logic Handling', () => {
   describe('Empty criteria', () => {
     it('should pass with no unmet requirements for empty criteria', () => {
       const action: Action = {
-        id: 1,
         action: 1, // Get
-        item_id: 1,
         criteria: [],
       };
 
@@ -404,15 +382,13 @@ describe('checkActionRequirements - OR Logic Handling', () => {
     it('should correctly evaluate multiple AND requirements', () => {
       // Action: Pistol>=400 AND Level>=150 AND Intelligence>=300
       const action: Action = {
-        id: 1,
         action: 6,
-        item_id: 1,
         criteria: [
-          { id: 1, value1: 112, value2: 399, operator: 2 }, // Pistol > 399 (>= 400)
-          { id: 2, value1: 54, value2: 149, operator: 2 }, // Level > 149 (>= 150)
-          { id: 3, value1: 0, value2: 0, operator: 4 }, // AND
-          { id: 4, value1: 19, value2: 299, operator: 2 }, // Intelligence > 299 (>= 300)
-          { id: 5, value1: 0, value2: 0, operator: 4 }, // AND
+          { value1: 112, value2: 399, operator: 2 }, // Pistol > 399 (>= 400)
+          { value1: 54, value2: 149, operator: 2 }, // Level > 149 (>= 150)
+          { value1: 0, value2: 0, operator: 4 }, // AND
+          { value1: 19, value2: 299, operator: 2 }, // Intelligence > 299 (>= 300)
+          { value1: 0, value2: 0, operator: 4 }, // AND
         ],
       };
 
@@ -447,15 +423,13 @@ describe('checkActionRequirements - OR Logic Handling', () => {
     it('should handle Dark Pistol Attack requirements (AND with profession check)', () => {
       // Real example: Profession=Bureaucrat AND Pistol>=443 AND FlingShot>=222
       const action: Action = {
-        id: 93424,
         action: 8, // Attack
-        item_id: 129671,
         criteria: [
-          { id: 1, value1: 60, value2: 8, operator: 0 }, // Profession = Bureaucrat
-          { id: 2, value1: 112, value2: 442, operator: 2 }, // Pistol > 442 (>= 443)
-          { id: 3, value1: 0, value2: 0, operator: 4 }, // AND
-          { id: 4, value1: 150, value2: 221, operator: 2 }, // FlingShot > 221 (>= 222)
-          { id: 5, value1: 0, value2: 0, operator: 4 }, // AND
+          { value1: 60, value2: 8, operator: 0 }, // Profession = Bureaucrat
+          { value1: 112, value2: 442, operator: 2 }, // Pistol > 442 (>= 443)
+          { value1: 0, value2: 0, operator: 4 }, // AND
+          { value1: 150, value2: 221, operator: 2 }, // FlingShot > 221 (>= 222)
+          { value1: 0, value2: 0, operator: 4 }, // AND
         ],
       };
 
@@ -489,11 +463,9 @@ describe('checkActionRequirements - OR Logic Handling', () => {
   describe('Edge cases', () => {
     it('should handle missing character stats as 0', () => {
       const action: Action = {
-        id: 1,
         action: 6,
-        item_id: 1,
         criteria: [
-          { id: 1, value1: 112, value2: 99, operator: 2 }, // Pistol > 99 (>= 100)
+          { value1: 112, value2: 99, operator: 2 }, // Pistol > 99 (>= 100)
         ],
       };
 
@@ -509,11 +481,9 @@ describe('checkActionRequirements - OR Logic Handling', () => {
 
     it('should handle zero values correctly', () => {
       const action: Action = {
-        id: 1,
         action: 6,
-        item_id: 1,
         criteria: [
-          { id: 1, value1: 368, value2: 0, operator: 0 }, // Profession = 0 (Unknown)
+          { value1: 368, value2: 0, operator: 0 }, // Profession = 0 (Unknown)
         ],
       };
 
@@ -530,11 +500,9 @@ describe('checkActionRequirements - OR Logic Handling', () => {
   describe('Operator symbol handling', () => {
     it('should correctly evaluate not-equal operator', () => {
       const action: Action = {
-        id: 1,
         action: 6,
-        item_id: 1,
         criteria: [
-          { id: 1, value1: 368, value2: 5, operator: 24 }, // Profession ≠ Agent
+          { value1: 368, value2: 5, operator: 24 }, // Profession ≠ Agent
         ],
       };
 
@@ -555,11 +523,9 @@ describe('checkActionRequirements - OR Logic Handling', () => {
 
     it('should correctly evaluate less-than-or-equal operator', () => {
       const action: Action = {
-        id: 1,
         action: 6,
-        item_id: 1,
         criteria: [
-          { id: 1, value1: 54, value2: 200, operator: 1 }, // Level < 200 (display as <= 199)
+          { value1: 54, value2: 200, operator: 1 }, // Level < 200 (display as <= 199)
         ],
       };
 

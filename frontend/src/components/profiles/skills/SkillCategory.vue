@@ -59,7 +59,6 @@ Shows skills in a category with IP cost calculations and interactive value adjus
             <!-- Skills/Abilities List -->
             <div v-for="(skill, skillId) in skills" :key="skillId" class="skill-item">
               <SkillSlider
-                :skill-name="getSkillName(skillId)"
                 :skill-data="skill"
                 :is-ability="isAbilities"
                 :is-read-only="isReadOnly"
@@ -91,7 +90,6 @@ import { ref, computed, inject, provide } from 'vue';
 import Badge from 'primevue/badge';
 import SkillSlider from './SkillSlider.vue';
 import SkillsGrid from './SkillsGrid.vue';
-import { skillService } from '@/services/skill-service';
 import type { TinkerProfile } from '@/lib/tinkerprofiles';
 import type { SkillId, SkillData } from '@/types/skills';
 
@@ -110,8 +108,8 @@ const props = defineProps<{
 
 // Emits
 const emit = defineEmits<{
-  'skill-changed': [category: string, skillName: string, newValue: number];
-  'ability-changed': [abilityName: string, newValue: number];
+  'skill-changed': [category: string, skillId: number, newValue: number];
+  'ability-changed': [abilityId: number, newValue: number];
 }>();
 
 // Inject the profile from parent and re-provide for children
@@ -150,21 +148,12 @@ function toggleExpanded() {
   isExpanded.value = !isExpanded.value;
 }
 
-function getSkillName(skillId: SkillId | number): string {
-  try {
-    return skillService.getName(skillId);
-  } catch (error) {
-    console.warn(`[SkillCategory] Failed to resolve skill name for ID ${skillId}:`, error);
-    return `Unknown Skill (${skillId})`;
-  }
+function handleSkillChanged(category: string, skillId: number, newValue: number) {
+  emit('skill-changed', category, skillId, newValue);
 }
 
-function handleSkillChanged(category: string, skillName: string, newValue: number) {
-  emit('skill-changed', category, skillName, newValue);
-}
-
-function handleAbilityChanged(abilityName: string, newValue: number) {
-  emit('ability-changed', abilityName, newValue);
+function handleAbilityChanged(abilityId: number, newValue: number) {
+  emit('ability-changed', abilityId, newValue);
 }
 </script>
 

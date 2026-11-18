@@ -55,7 +55,7 @@ export class EquipmentPage {
 
   async getStatValue(statName: string): Promise<string> {
     const statRow = this.page.locator(`[data-testid="stat-${statName}"]`);
-    return await statRow.textContent() || '';
+    return (await statRow.textContent()) || '';
   }
 
   async addBuff(buffName: string) {

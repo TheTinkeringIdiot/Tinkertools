@@ -7,6 +7,8 @@
  * - LE Research: Free to assign (no point cost, only requirements)
  */
 
+import type { Item } from '@/types/api';
+
 // ============================================================================
 // Perk Entry Types
 // ============================================================================
@@ -17,7 +19,7 @@ export interface PerkEntry {
   name: string; // Perk name
   level: number; // Current owned level (1-10)
   type: 'SL' | 'AI'; // Point type used
-  item?: any; // Complete item details (optional for backwards compatibility)
+  item?: Item; // Complete item details (optional for backwards compatibility)
 }
 
 /** Research entry for LE perks that are free but requirement-based */
@@ -26,7 +28,7 @@ export interface ResearchEntry {
   name: string; // Research name
   level: number; // Current level
   type: 'LE'; // Always LE for research
-  item?: any; // Complete item details (optional for backwards compatibility)
+  item?: Item; // Complete item details (optional for backwards compatibility)
 }
 
 // ============================================================================

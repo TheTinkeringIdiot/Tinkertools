@@ -35,6 +35,7 @@ import TriStateCheckbox from 'primevue/tristatecheckbox';
 
 // Import global theme management system (initializes immediately)
 import './composables/useTheme';
+import { onGameVersionChange } from './composables/useGameVersion';
 
 import 'primeicons/primeicons.css';
 import './styles/main.css';
@@ -50,15 +51,26 @@ app.use(ToastService);
 app.use(pinia);
 app.use(router);
 
+// Switching game versions invalidates everything derived from the old database.
+// Registered after Pinia is installed so the handler can resolve stores; it is
+// not called for the first version resolution, only for real switches.
+// The store barrel is imported lazily so it stays out of the initial chunk.
+onGameVersionChange(async (next, previous) => {
+  const { handleGameVersionChange } = await import('./stores');
+  await handleGameVersionChange(next, previous);
+});
+
 // Global PrimeVue component registration
 app.component('Accordion', Accordion);
 app.component('AccordionTab', AccordionTab);
 app.component('Badge', Badge);
+// eslint-disable-next-line vue/no-reserved-component-names -- PrimeVue's registered name, used as <Button> in templates
 app.component('Button', Button);
 app.component('Card', Card);
 app.component('Checkbox', Checkbox);
 app.component('ConfirmDialog', ConfirmDialog);
 app.component('ContextMenu', ContextMenu);
+// eslint-disable-next-line vue/no-reserved-component-names -- PrimeVue's registered name, used as <Dialog> in templates
 app.component('Dialog', Dialog);
 app.component('Dropdown', Dropdown);
 app.component('FileUpload', FileUpload);
@@ -74,6 +86,7 @@ app.component('Slider', Slider);
 app.component('TabView', TabView);
 app.component('TabPanel', TabPanel);
 app.component('Tag', Tag);
+// eslint-disable-next-line vue/no-reserved-component-names -- PrimeVue's registered name, used as <Textarea> in templates
 app.component('Textarea', Textarea);
 app.component('TriStateCheckbox', TriStateCheckbox);
 
@@ -81,3 +94,13 @@ app.component('TriStateCheckbox', TriStateCheckbox);
 app.directive('tooltip', Tooltip);
 
 app.mount('#app');
+
+// The first version switch must not wait for its code to download.
+const warmVersionSwitch = (): void => {
+  void import('./stores').then(({ warmVersionSwitch: warm }) => warm());
+};
+if (typeof requestIdleCallback === 'function') {
+  requestIdleCallback(warmVersionSwitch, { timeout: 5000 });
+} else {
+  setTimeout(warmVersionSwitch, 2000);
+}

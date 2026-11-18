@@ -46,7 +46,8 @@ STORAGE_KEYS = {
   PROFILE_INDEX: 'tinkertools_profile_index', // Array of profile IDs
   PROFILE_PREFIX: 'tinkertools_profile_', // Prefix for individual profiles
   PROFILES: 'tinkertools_profiles', // LEGACY - migration only
-  ACTIVE_PROFILE: 'tinkertools_active_profile',
+  ACTIVE_PROFILE: 'tinkertools_active_profile', // LEGACY - migration only
+  ACTIVE_PROFILE_PREFIX: 'tinkertools_active_profile:', // + game version slug
   PROFILE_METADATA: 'tinkertools_profile_metadata',
   PROFILE_PREFERENCES: 'tinkertools_profile_preferences',
   VERSION: 'tinkertools_version',
@@ -85,6 +86,31 @@ constructor(options: ProfileStorageOptions = {}) {
   // ... other setup
   this.migrateFromLegacyStorage(); // Handles legacy → individual migration
 }
+```
+
+## Game Versions
+
+Every profile is tagged with the game database it was built against
+(`TinkerProfile.gameVersion`, a version slug such as `ao-2024-02`). This is not
+the schema version: `version` stays `'4.0.0'`.
+
+- **Tagging**: `game-version.ts` decides the tag. New profiles and profiles saved
+  before multi-version support get the version being browsed; a PRK export gets a
+  `prk`-family version; an AOSetups import gets an `ao`-family one.
+- **Migration**: an untagged profile is stamped and re-saved the first time
+  `loadProfile()` reads it.
+- **Active profile is per version**: `tinkertools_active_profile:<slug>`. The old
+  global key migrates into the current version once. `loadActiveProfile()` refuses
+  a profile whose tag does not match the version asked for, so equip checks never
+  see stats from another database.
+- **Moving between versions is a copy**, never in place: `version-copy.ts`
+  re-resolves every embedded item by AOID and QL against the target version.
+  Items that version lacks keep their old snapshot and gain `missingInVersion`.
+
+```typescript
+// Copy the active profile into the version being browsed
+const result = await manager.copyProfileToVersion(profileId, 'ao-2024-02');
+// result.summary === "42 items updated · 2 not in this version"
 ```
 
 ## Working with Storage

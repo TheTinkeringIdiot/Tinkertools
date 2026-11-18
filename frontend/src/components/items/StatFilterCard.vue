@@ -21,13 +21,13 @@ Shows a summary of the filter with remove option
 
     <!-- Remove Button -->
     <Button
+      v-tooltip.left="'Remove Filter'"
       icon="pi pi-times"
       size="small"
       text
       severity="danger"
-      @click="$emit('remove')"
-      v-tooltip.left="'Remove Filter'"
       class="flex-shrink-0 ml-2"
+      @click="$emit('remove')"
     />
   </div>
 </template>
@@ -35,19 +35,19 @@ Shows a summary of the filter with remove option
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { StatFilter } from '@/types/api';
-import { STAT } from '@/services/game-data';
+import { getStatName } from '@/services/game-utils';
 
 const props = defineProps<{
   filter: StatFilter;
 }>();
 
-const emit = defineEmits<{
+defineEmits<{
   remove: [];
 }>();
 
 // Get stat name from STAT mapping
 const statName = computed(() => {
-  return STAT[props.filter.stat] || 'Unknown';
+  return getStatName(props.filter.stat) || 'Unknown';
 });
 
 // Badge styling based on function type

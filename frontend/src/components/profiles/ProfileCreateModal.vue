@@ -10,7 +10,17 @@ Modal for creating new character profiles
     :style="{ width: '600px' }"
     @update:visible="$emit('update:visible', $event)"
   >
-    <form @submit.prevent="createProfile" class="space-y-4">
+    <form class="space-y-4" @submit.prevent="createProfile">
+      <!-- Game version this profile will be built against -->
+      <div
+        class="flex items-center gap-2 text-sm text-surface-600 dark:text-surface-400 bg-surface-50 dark:bg-surface-800 rounded px-3 py-2"
+      >
+        <i class="pi pi-database text-xs"></i>
+        <span>
+          This profile is for <strong>{{ currentVersionLabel }}</strong>
+        </span>
+      </div>
+
       <!-- Character Name -->
       <div class="field">
         <label for="profile-name" class="font-semibold text-surface-900 dark:text-surface-50">
@@ -163,9 +173,10 @@ import {
   ACCOUNT_TYPES,
 } from '@/lib/tinkerprofiles';
 import { normalizeProfessionToId, normalizeBreedToId } from '@/services/game-utils';
+import { gameVersionDisplayName } from '@/lib/tinkerprofiles/game-version';
 
 // Props & Emits
-const props = defineProps<{
+defineProps<{
   visible: boolean;
 }>();
 
@@ -200,6 +211,9 @@ const expansionOptions = ANARCHY_EXPANSIONS.map((e) => e);
 const accountTypeOptions = ACCOUNT_TYPES.map((a) => a);
 
 // Computed
+/** New profiles are tagged with the version being browsed; say which one. */
+const currentVersionLabel = computed(() => gameVersionDisplayName(profilesStore.gameVersion));
+
 const isValid = computed(() => {
   return formData.name.trim().length > 0 && !errors.value.name;
 });
@@ -230,7 +244,7 @@ async function createProfile() {
   try {
     // Create v4.0.0 profile with ID-based skill structure
     // CRITICAL: Convert profession and breed to numeric IDs for validation
-    // Note: Partial Character is merged with defaults in ProfileManager.createProfile()
+    // MaxHealth/MaxNano are recalculated from skills by ProfileManager.createProfile()
     const profileId = await profilesStore.createProfile(formData.name.trim(), {
       Character: {
         Name: formData.name.trim(),
@@ -240,8 +254,10 @@ async function createProfile() {
         Faction: formData.faction,
         Expansion: formData.expansion,
         AccountType: formData.accountType,
+        MaxHealth: 0,
+        MaxNano: 0,
       },
-    } as any);
+    });
 
     if (formData.setAsActive) {
       await profilesStore.setActiveProfile(profileId);

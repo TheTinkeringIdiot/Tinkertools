@@ -29,7 +29,6 @@ Shows profile information in a compact, action-friendly card format
               <Badge
                 :value="`Level ${profile.level}`"
                 :severity="getLevelSeverity(profile.level)"
-                size="small"
               />
               <span class="text-sm text-surface-600 dark:text-surface-400">
                 {{ profile.profession }}
@@ -38,8 +37,19 @@ Shows profile information in a compact, action-friendly card format
           </div>
         </div>
 
-        <!-- Active Badge -->
-        <Badge v-if="isActive" value="Active" severity="success" size="small" />
+        <div class="flex flex-col items-end gap-1">
+          <!-- Active Badge -->
+          <Badge v-if="isActive" value="Active" severity="success" />
+
+          <!-- Built against another game version -->
+          <span
+            v-if="otherVersionLabel"
+            class="text-xs italic text-surface-500 dark:text-surface-400 whitespace-nowrap"
+            :title="`Built against ${otherVersionLabel}. Selecting it offers a copy for the version you are browsing.`"
+          >
+            <i class="pi pi-database text-xs mr-1"></i>{{ otherVersionLabel }}
+          </span>
+        </div>
       </div>
 
       <!-- Character Details -->
@@ -66,12 +76,12 @@ Shows profile information in a compact, action-friendly card format
             Character Stats
           </span>
           <Button
+            v-tooltip.top="'View Full Details'"
             icon="pi pi-eye"
             size="small"
             severity="secondary"
             text
             @click="$emit('view-details', profile)"
-            v-tooltip.top="'View Full Details'"
           />
         </div>
 
@@ -102,35 +112,35 @@ Shows profile information in a compact, action-friendly card format
           label="View Details"
           icon="pi pi-eye"
           size="small"
-          @click="$emit('view-details', profile)"
           class="flex-1 mr-2"
+          @click="$emit('view-details', profile)"
         />
 
         <!-- Quick Actions Menu -->
         <div class="flex items-center gap-1">
           <Button
             v-if="!isActive"
+            v-tooltip.top="'Set as Active Profile'"
             icon="pi pi-check"
             size="small"
             severity="success"
             outlined
             @click="$emit('set-active', profile)"
-            v-tooltip.top="'Set as Active Profile'"
           />
 
           <!-- More Actions Menu -->
           <Button
+            ref="moreActionsButton"
+            v-tooltip.top="'More Actions'"
             icon="pi pi-ellipsis-v"
             size="small"
             severity="secondary"
             outlined
             @click="toggleActionsMenu"
-            ref="moreActionsButton"
-            v-tooltip.top="'More Actions'"
           />
 
           <!-- Actions Menu -->
-          <Menu :model="actionMenuItems" :popup="true" ref="actionsMenu" />
+          <Menu ref="actionsMenu" :model="actionMenuItems" :popup="true" />
         </div>
       </div>
     </div>
@@ -144,6 +154,8 @@ import Badge from 'primevue/badge';
 import Menu from 'primevue/menu';
 import type { MenuItem } from 'primevue/menuitem';
 import type { ProfileMetadata } from '@/lib/tinkerprofiles';
+import { gameVersionDisplayName } from '@/lib/tinkerprofiles/game-version';
+import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
 
 // Props
 const props = defineProps<{
@@ -164,7 +176,19 @@ const emit = defineEmits<{
 const moreActionsButton = ref();
 const actionsMenu = ref();
 
+const profilesStore = useTinkerProfilesStore();
+
 // Computed
+/**
+ * Version tag, shown only when the profile was built against a different game
+ * database than the one being browsed. Same-version profiles need no tag.
+ */
+const otherVersionLabel = computed(() => {
+  const slug = props.profile.gameVersion;
+  if (!slug || slug === profilesStore.gameVersion) return '';
+  return gameVersionDisplayName(slug);
+});
+
 const professionIcon = computed(() => {
   const iconMap: Record<string, string> = {
     Adventurer: 'pi pi-compass',

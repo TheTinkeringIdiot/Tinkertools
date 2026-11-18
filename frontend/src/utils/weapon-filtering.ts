@@ -45,31 +45,31 @@ interface MATier {
 const MA_TIERS: Record<1 | 2 | 3, MATier[]> = {
   // Family 1: Martial Artist
   1: [
-    { maxSkill: 200,      lowAoid: 211352, highAoid: 211353, qlOffset: 0 },
-    { maxSkill: 1000,     lowAoid: 211353, highAoid: 211354, qlOffset: 0 },
-    { maxSkill: 2000,     lowAoid: 211357, highAoid: 211358, qlOffset: 1000 },
+    { maxSkill: 200, lowAoid: 211352, highAoid: 211353, qlOffset: 0 },
+    { maxSkill: 1000, lowAoid: 211353, highAoid: 211354, qlOffset: 0 },
+    { maxSkill: 2000, lowAoid: 211357, highAoid: 211358, qlOffset: 1000 },
     { maxSkill: Infinity, lowAoid: 211363, highAoid: 211364, qlOffset: 2000 },
   ],
   // Family 2: Shade
   2: [
-    { maxSkill: 200,      lowAoid: 211349, highAoid: 211350, qlOffset: 0 },
-    { maxSkill: 1000,     lowAoid: 211350, highAoid: 211351, qlOffset: 0 },
-    { maxSkill: 2000,     lowAoid: 211359, highAoid: 211360, qlOffset: 1000 },
+    { maxSkill: 200, lowAoid: 211349, highAoid: 211350, qlOffset: 0 },
+    { maxSkill: 1000, lowAoid: 211350, highAoid: 211351, qlOffset: 0 },
+    { maxSkill: 2000, lowAoid: 211359, highAoid: 211360, qlOffset: 1000 },
     { maxSkill: Infinity, lowAoid: 211365, highAoid: 211366, qlOffset: 2000 },
   ],
   // Family 3: Generic fallback
   3: [
-    { maxSkill: 200,      lowAoid: 43712,  highAoid: 144745, qlOffset: 0 },
-    { maxSkill: 1000,     lowAoid: 144745, highAoid: 43713,  qlOffset: 0 },
-    { maxSkill: 2000,     lowAoid: 211355, highAoid: 211356, qlOffset: 1000 },
+    { maxSkill: 200, lowAoid: 43712, highAoid: 144745, qlOffset: 0 },
+    { maxSkill: 1000, lowAoid: 144745, highAoid: 43713, qlOffset: 0 },
+    { maxSkill: 2000, lowAoid: 211355, highAoid: 211356, qlOffset: 1000 },
     { maxSkill: Infinity, lowAoid: 211361, highAoid: 211362, qlOffset: 2000 },
   ],
 };
 
 function getMAFamily(profession: number): 1 | 2 | 3 {
-  if (profession === 2) return 1;   // Martial Artist
-  if (profession === 15) return 2;  // Shade
-  return 3;                          // Everyone else (including profession 0 = "Any")
+  if (profession === 2) return 1; // Martial Artist
+  if (profession === 15) return 2; // Shade
+  return 3; // Everyone else (including profession 0 = "Any")
 }
 
 function getMATier(family: 1 | 2 | 3, maSkill: number): MATier {

@@ -30,7 +30,7 @@ test.describe('Profile CRUD Operations', () => {
     await waitForPageReady(page);
   });
 
-  test('should create a new profile', async ({ page }) => {
+  test('should create a new profile', async () => {
     const { name, level, profession } = testProfiles.enforcer;
 
     // Get initial profile count
@@ -47,7 +47,7 @@ test.describe('Profile CRUD Operations', () => {
     expect(newCount).toBe(initialCount + 1);
   });
 
-  test('should edit an existing profile', async ({ page }) => {
+  test('should edit an existing profile', async () => {
     const { name, level, profession } = testProfiles.doctor;
     const newName = 'EditedDoctor';
 
@@ -63,7 +63,7 @@ test.describe('Profile CRUD Operations', () => {
     expect(await profilePage.hasProfile(newName)).toBe(true);
   });
 
-  test('should delete a profile', async ({ page }) => {
+  test('should delete a profile', async () => {
     const { name, level, profession } = testProfiles.trader;
 
     // Create profile
@@ -84,7 +84,7 @@ test.describe('Profile CRUD Operations', () => {
     expect(newCount).toBe(initialCount - 1);
   });
 
-  test('should complete full CRUD lifecycle', async ({ page }) => {
+  test('should complete full CRUD lifecycle', async () => {
     const { name, level, profession } = testProfiles.enforcer;
     const editedName = 'UpdatedEnforcer';
 
@@ -106,7 +106,7 @@ test.describe('Profile CRUD Operations', () => {
     expect(await profilePage.hasProfile(editedName)).toBe(false);
   });
 
-  test('should handle multiple profiles', async ({ page }) => {
+  test('should handle multiple profiles', async () => {
     // Create multiple profiles
     await profilePage.createProfile(
       testProfiles.enforcer.name,

@@ -68,83 +68,6 @@ if (response.success && response.item) {
 
 ---
 
-#### `getAvailableImplants()`
-
-Get all available implants for a specific slot at a given QL.
-
-**Signature**:
-```typescript
-async getAvailableImplants(
-  slot: number,
-  ql: number = 1
-): Promise<ApiResponse<Item[]>>
-```
-
-**Parameters**:
-- `slot` (number): Slot bitflag or position number
-- `ql` (number, default: 1): Quality Level for filtering
-
-**Returns**: `ApiResponse<Item[]>`
-- Wrapped in standard `ApiResponse` format
-- `success` (boolean): Whether request succeeded
-- `data` (Item[]): Array of available implant items
-
-**Backend Endpoint**: `GET /implants/slots/{slot}/available?ql={ql}`
-
-**Example**:
-```typescript
-const response = await apiClient.getAvailableImplants(2, 200);
-if (response.success) {
-  console.log(`Found ${response.data.length} implants for Eyes at QL 200`);
-}
-```
-
-**Changes from Previous**:
-- Now wraps response in `ApiResponse<T>` format
-- Handles both wrapped and unwrapped backend responses
-- Returns empty array on failure instead of throwing
-
----
-
-#### `validateClusters()`
-
-Validate cluster configuration for correctness (no duplicate stats, valid cluster positions).
-
-**Signature**:
-```typescript
-async validateClusters(
-  clusters: Record<string, number>
-): Promise<ApiResponse<{ valid: boolean; message: string }>>
-```
-
-**Parameters**:
-- `clusters` (Record<string, number>): Cluster configuration (same format as `lookupImplant()`)
-
-**Returns**: `ApiResponse<{ valid: boolean; message: string }>`
-- `valid` (boolean): Whether configuration is valid
-- `message` (string): Validation message or error details
-
-**Backend Endpoint**: `POST /implants/validate-clusters`
-
-**Example**:
-```typescript
-const response = await apiClient.validateClusters({
-  'Shiny': 112,
-  'Bright': 112,  // Duplicate stat!
-  'Faded': 134
-});
-
-if (response.success && !response.data.valid) {
-  console.error('Invalid clusters:', response.data.message);
-}
-```
-
-**Changes from Previous**:
-- Now wraps response in `ApiResponse<T>` format
-- Provides type-safe validation result
-
----
-
 ### API Client Enhancements
 
 **Error Handling**:
@@ -521,12 +444,12 @@ interface ApiResponse<T> {
 
 **Example**:
 ```typescript
-// Backend returns raw array
-const response = await apiClient.getAvailableImplants(2, 200);
+// Backend returns a bare object
+const response = await apiClient.lookupImplant(2, 200, clusters);
 
 // Client wraps it
 if (response.success) {
-  const items: Item[] = response.data;  // Type-safe access
+  const item = response.item;  // Type-safe access
 }
 ```
 
@@ -652,7 +575,6 @@ if (response.success) {
 
 1. **Attribute Preference Filtering**:
    - Backend support for filtering implants by preferred attribute
-   - Client-side filtering in `getAvailableImplants()`
 
 2. **Batch Lookup API**:
    - Single API call to lookup all slots at once

@@ -33,40 +33,20 @@ BREED_NAME_TO_ID = {
 }
 ```
 
-### Enhanced Perk Model (`backend/app/models/perk.py`)
+### Perk table (`backend/database/cas/002_curated_and_derived.sql`)
 
-The `Perk` model defines the database structure for storing perk data:
+Perks are curated data of the content-addressed store: one row of `perk` per perk item, keyed by AOID, with `name`, `perk_series`, `counter`, `type` (SL/AI/LE), `level_required`, `ai_level_required`, `professions` and `breeds`. A build is served with perks when it has the `perks` feature and the perk item is present in it.
 
-```python
-class Perk(Base):
-    __tablename__ = 'perks'
+### Import (`backend/app/core/cas_curated.py`)
 
-    item_id = Column(Integer, ForeignKey('items.id', ondelete='CASCADE'), primary_key=True)
-    name = Column(String(128), nullable=False)
-    perk_series = Column(String(128), nullable=False)
-    counter = Column(Integer, nullable=False)
-    type = Column(String(10), nullable=False)  # SL/AI/LE
-    level_required = Column(Integer, nullable=False)
-    ai_level_required = Column(Integer, nullable=False)
-    professions = Column(ARRAY(Integer), nullable=False)
-    breeds = Column(ARRAY(Integer), nullable=False)
-```
-
-### Enhanced Import System (`backend/app/core/importer.py`)
-
-The import system has been enhanced with:
-
-- **Validation Integration**: Uses PerkValidator for all perk data validation
-- **Error Handling**: Comprehensive error logging and recovery
-- **Batch Processing**: Efficient bulk import operations
-- **Progress Tracking**: Real-time import progress reporting
+`read_perks` reads `backend/database/perks.json`, validates every row with the perk validator and leaves out profession and breed names the application does not know (with a warning). `sync_curated` makes the table equal to the file on every `import_cli.py import-cas` run.
 
 ## Data Flow
 
 1. **JSON Source Processing**: Raw perk data loaded from JSON files
 2. **Data Validation**: Each field validated using PerkValidator functions
 3. **Type Conversion**: String values converted to appropriate database types
-4. **Database Insertion**: Validated data inserted into perks table
+4. **Database Insertion**: The store's `perk` table is made equal to the validated rows
 5. **Error Reporting**: Validation failures logged with detailed messages
 
 ## Validation Rules
@@ -101,9 +81,8 @@ The import system has been enhanced with:
 
 ### Core Validation Files
 - `backend/app/core/perk_validator.py` - Main validation utilities
-- `backend/app/models/perk.py` - Perk database model
-- `backend/app/api/schemas/perk.py` - Perk API schemas
-- `backend/app/services/perk_service.py` - Perk business logic
+- `backend/app/core/cas_curated.py` - `read_perks`, `sync_curated`
+- `backend/app/store/curated.py` - `lookup_perks`, the perk lookup the API serves
 
 ### API Integration
 - `backend/app/api/routes/perks.py` - Perk API endpoints
@@ -111,8 +90,8 @@ The import system has been enhanced with:
 - Consistent error response formats
 
 ### Test Infrastructure
-- `backend/tests/test_perk_import.py` - Import system tests
-- `backend/tests/test_perk_api.py` - API endpoint tests
+- `backend/app/tests/test_cas_store.py` - Import of the perk file (`test_perks_keep_the_professions_the_application_knows`)
+- `backend/app/tests/test_perk_endpoints.py`, `test_curated_endpoints.py` - API endpoint tests
 - Comprehensive test coverage for validation scenarios
 
 ## Usage Examples

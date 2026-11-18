@@ -13,12 +13,20 @@
 import type { Item as ItemDetail, Spell } from '@/types/api';
 import type { OffensiveNano, DamageType } from '@/types/offensive-nano';
 import type { NanoSchool } from '@/types/nano';
+import { apiBaseFor } from '@/services/api-config';
+import { dataVersion } from '@/composables/useGameVersion';
 
 // ============================================================================
 // API Configuration
 // ============================================================================
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+/**
+ * Version-scoped API base. Read it per call, not once at module load: the user
+ * can switch game versions without a reload.
+ */
+function apiBase(): string {
+  return apiBaseFor(dataVersion.value);
+}
 
 // ============================================================================
 // Damage Type Mapping
@@ -53,7 +61,7 @@ const MODIFIER_STAT_TO_DAMAGE_TYPE: Record<number, DamageType> = {
 export async function fetchOffensiveNanos(professionId: number): Promise<ItemDetail[]> {
   try {
     const response = await fetch(
-      `${API_BASE_URL}/nanos/offensive/${professionId}?page=1&page_size=1000`
+      `${apiBase()}/nanos/offensive/${professionId}?page=1&page_size=1000`
     );
 
     if (!response.ok) {
@@ -170,7 +178,7 @@ function extractLevel(item: ItemDetail): number {
 export function buildOffensiveNano(item: ItemDetail): OffensiveNano | null {
   // Validate item has spell data
   if (!item.spell_data || item.spell_data.length === 0) {
-    console.warn(`[buildOffensiveNano] Item ${item.id} has no spell_data`);
+    console.warn(`[buildOffensiveNano] Item ${item.aoid} has no spell_data`);
     return null;
   }
 
@@ -189,7 +197,7 @@ export function buildOffensiveNano(item: ItemDetail): OffensiveNano | null {
   }
 
   if (offensiveSpells.length === 0) {
-    console.warn(`[buildOffensiveNano] Item ${item.id} has no offensive spell`);
+    console.warn(`[buildOffensiveNano] Item ${item.aoid} has no offensive spell`);
     return null;
   }
 
@@ -233,7 +241,6 @@ export function buildOffensiveNano(item: ItemDetail): OffensiveNano | null {
     item,
 
     // Base NanoProgram fields
-    id: item.id,
     aoid: item.aoid,
     name: item.name,
     school: extractNanoSchool(item),
@@ -241,7 +248,6 @@ export function buildOffensiveNano(item: ItemDetail): OffensiveNano | null {
     description: item.description || '',
     level: extractLevel(item),
     qualityLevel: item.ql || 0,
-    castingRequirements: [], // Legacy field, use item.actions instead
 
     // Offensive-specific fields
     minDamage,

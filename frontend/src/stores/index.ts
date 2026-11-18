@@ -8,7 +8,6 @@
 export { useAppStore } from './app';
 export { useTinkerProfilesStore } from './tinkerProfiles';
 export { useItemsStore } from './items';
-export { useSpellsStore } from './spells';
 export { useSymbiantsStore } from './symbiants';
 export { usePocketBossesStore } from './pocket-bosses';
 
@@ -19,8 +18,6 @@ export { offlineManager } from '../services/offline-manager';
 
 // Composable exports
 export { useItems } from '../composables/useItems';
-export { useSearch } from '../composables/useSearch';
-export { useFilters } from '../composables/useFilters';
 
 // Type exports
 export type { ApplicationName, CrossAppContext, AppNotification } from './app';
@@ -85,33 +82,79 @@ async function preloadCommonData(): Promise<void> {
 }
 
 /**
- * Clear all store caches and reset to initial state
+ * Clear all store caches, including the active version's persisted copies,
+ * and reset to initial state.
+ *
+ * Everything here holds server-derived data: item, nano, spell and symbiant
+ * records, anything keyed by AOID, and the derived lookups built from them.
+ * This must reach every cache, not just the Pinia stores. Add new caches here
+ * when you add them (and to resetForVersionChange() if they hold data from one
+ * game version). A version switch uses resetForVersionChange() instead, which
+ * keeps each version's persisted caches.
  */
 export async function resetAllStores(): Promise<void> {
-  const { useAppStore } = await import('./app');
-  const { useTinkerProfilesStore } = await import('./tinkerProfiles');
-  const { useItemsStore } = await import('./items');
-  const { useSpellsStore } = await import('./spells');
-  const { useSymbiantsStore } = await import('./symbiants');
-  const { usePocketBossesStore } = await import('./pocket-bosses');
-  const { offlineManager } = await import('../services/offline-manager');
-  const { cacheManager } = await import('../services/cache-manager');
+  const [
+    { useAppStore },
+    { useItemsStore },
+    { useSymbiantsStore },
+    { usePocketBossesStore },
+    { usePocketBossStore },
+    { useNanosStore },
+    { useTinkerPlantsStore },
+    { offlineManager },
+    { cacheManager },
+    { interpolationService },
+    { clearNanoNameCache },
+    weaponCache,
+    indexedDbWeaponCache,
+  ] = await Promise.all([
+    import('./app'),
+    import('./items'),
+    import('./symbiants'),
+    import('./pocket-bosses'),
+    import('./pocketBossStore'),
+    import('./nanosStore'),
+    import('./tinkerPlants'),
+    import('../services/offline-manager'),
+    import('../services/cache-manager'),
+    import('../services/interpolation-service'),
+    import('../composables/useNanoNameResolver'),
+    import('../services/weapon-cache'),
+    import('../services/indexed-db-weapon-cache'),
+  ]);
 
-  // Clear all store caches
   const appStore = useAppStore();
   const itemsStore = useItemsStore();
-  const spellsStore = useSpellsStore();
   const symbiantsStore = useSymbiantsStore();
   const pocketBossesStore = usePocketBossesStore();
+  const pocketBossStore = usePocketBossStore();
+  const nanosStore = useNanosStore();
+  const plantsStore = useTinkerPlantsStore();
 
-  await Promise.all([
+  // Module-level caches with no store behind them.
+  clearNanoNameCache();
+  interpolationService.clearAllCaches();
+  weaponCache.clearWeaponCache();
+
+  // Store-backed caches. Failures are reported, never fatal: a stale cache is
+  // worse than a noisy console, so every one of these still gets its turn.
+  const outcomes = await Promise.allSettled([
     itemsStore.clearCache(),
-    spellsStore.clearCache(),
     symbiantsStore.clearCache(),
     pocketBossesStore.clearCache(),
+    pocketBossStore.clearCache(),
+    nanosStore.clearCache(),
+    plantsStore.clearCache(),
+    indexedDbWeaponCache.clearWeaponCache(),
     offlineManager.clearOfflineData(),
     cacheManager.clear(),
   ]);
+
+  for (const outcome of outcomes) {
+    if (outcome.status === 'rejected') {
+      console.warn('Store reset: a cache failed to clear:', outcome.reason);
+    }
+  }
 
   // Clear global selections and notifications
   appStore.clearAllSelections();
@@ -122,21 +165,156 @@ export async function resetAllStores(): Promise<void> {
 }
 
 /**
- * Get store hydration data for SSR/preloading
+ * Re-point every cache at the game version just switched to.
+ *
+ * Unlike resetAllStores(), nothing persisted is deleted here: persisted caches
+ * are keyed per version, so the new version's saved data is still valid and is
+ * reloaded, and user data keyed by AOID (nano favorites, farm lists) stays put
+ * for every version. Only in-memory state derived from the old version goes.
  */
-export function getStoreHydrationData(): Record<string, any> {
-  // This would be used for server-side rendering or data preloading
-  // Return minimal data needed to hydrate stores on client
-  return {
-    // Add hydration data as needed
-  };
+export async function resetForVersionChange(): Promise<void> {
+  const [
+    { useAppStore },
+    { useItemsStore },
+    { useSymbiantsStore },
+    { usePocketBossesStore },
+    { usePocketBossStore },
+    { useNanosStore },
+    { useTinkerPlantsStore },
+    { offlineManager },
+    { interpolationService },
+    { clearNanoNameCache },
+  ] = await Promise.all([
+    import('./app'),
+    import('./items'),
+    import('./symbiants'),
+    import('./pocket-bosses'),
+    import('./pocketBossStore'),
+    import('./nanosStore'),
+    import('./tinkerPlants'),
+    import('../services/offline-manager'),
+    import('../services/interpolation-service'),
+    import('../composables/useNanoNameResolver'),
+  ]);
+
+  clearNanoNameCache();
+  interpolationService.clearAllCaches();
+
+  useItemsStore().clearCache();
+  usePocketBossesStore().clearCache();
+  usePocketBossStore().clearCache();
+  useTinkerPlantsStore().clearCache();
+  useNanosStore().resetForVersionChange();
+  useSymbiantsStore().resetForVersionChange();
+
+  // Offline state keys are per version: reload the flags for this one.
+  try {
+    await offlineManager.initialize();
+  } catch (error) {
+    console.warn('Version reset: offline state could not be reloaded:', error);
+  }
+
+  const appStore = useAppStore();
+  appStore.clearAllSelections();
+  appStore.clearAllNotifications();
+  appStore.clearGlobalError();
 }
 
 /**
- * Hydrate stores with preloaded data
+ * Remove persisted server-derived caches belonging to game versions other than
+ * the active one, so localStorage and IndexedDB do not fill up with snapshots
+ * of versions the user is no longer browsing. User data (favorites, farm lists,
+ * collection progress) is never purged.
  */
-export function hydrateStores(data: Record<string, any>): void {
-  // This would hydrate stores with preloaded data
-  // Useful for SSR or cached state restoration
-  console.log('Hydrating stores with data:', data);
+export async function purgeOtherVersionCaches(version?: string): Promise<void> {
+  // Caches are filed under the build, which a 'latest' alias only points at.
+  const { dataSlug } = await import('../composables/useGameVersion');
+  const slug = dataSlug(version) ?? undefined;
+  const [
+    { cacheManager },
+    weaponCache,
+    indexedDbWeaponCache,
+    { NANOS_CACHE_BASE },
+    { SYMBIANTS_CACHE_BASE },
+    { purgeOtherVersions, purgeIdbOtherVersions },
+  ] = await Promise.all([
+    import('../services/cache-manager'),
+    import('../services/weapon-cache'),
+    import('../services/indexed-db-weapon-cache'),
+    import('./nanosStore'),
+    import('./symbiants'),
+    import('../services/version-keys'),
+  ]);
+
+  const outcomes = await Promise.allSettled([
+    cacheManager.purgeOtherVersions(slug),
+    Promise.resolve(weaponCache.purgeOtherVersionWeaponCaches(slug)),
+    indexedDbWeaponCache.purgeOtherVersionWeaponCaches(slug),
+    Promise.resolve(purgeOtherVersions(NANOS_CACHE_BASE, slug)),
+    purgeIdbOtherVersions(SYMBIANTS_CACHE_BASE, slug),
+  ]);
+
+  for (const outcome of outcomes) {
+    if (outcome.status === 'rejected') {
+      console.warn('Version purge: a cache could not be purged:', outcome.reason);
+    }
+  }
+}
+
+/** Run `task` once the browser has nothing more urgent to do (soon, where it cannot say). */
+function whenIdle(task: () => void): void {
+  if (typeof requestIdleCallback === 'function') {
+    requestIdleCallback(() => task(), { timeout: 3000 });
+  } else {
+    setTimeout(task, 0);
+  }
+}
+
+/**
+ * Load the code a version switch runs, ahead of the first switch: the switch
+ * is awaited by the router guard, and must not wait for chunks to download.
+ */
+export async function warmVersionSwitch(): Promise<void> {
+  await Promise.allSettled([
+    import('./app'),
+    import('./items'),
+    import('./symbiants'),
+    import('./pocket-bosses'),
+    import('./pocketBossStore'),
+    import('./nanosStore'),
+    import('./tinkerPlants'),
+    import('../services/offline-manager'),
+    import('../services/interpolation-service'),
+    import('../composables/useNanoNameResolver'),
+    import('../services/cache-manager'),
+    import('../services/weapon-cache'),
+    import('../services/indexed-db-weapon-cache'),
+    import('../services/version-keys'),
+  ]);
+}
+
+/**
+ * Hook run on every game version switch, before the new version's route
+ * renders (the router guard awaits it): drop in-memory data from the old
+ * version and reclaim the storage other versions' caches use. Warming the
+ * common datasets waits until the new page has had its turn: its requests and
+ * the work on their answers would otherwise compete with the page the user
+ * asked for.
+ *
+ * Registered once at startup (see main.ts).
+ */
+export async function handleGameVersionChange(next: string, previous: string | null) {
+  console.log(`[stores] Game version changed ${previous ?? '(none)'} -> ${next}; resetting caches`);
+
+  await resetForVersionChange();
+  await purgeOtherVersionCaches(next);
+  whenIdle(() => {
+    // Only for the version still being browsed: a quick second switch has its own turn.
+    void import('../composables/useGameVersion').then(({ currentVersion }) => {
+      if (currentVersion.value !== next) return;
+      void preloadCommonData().catch((error) =>
+        console.warn('[stores] Preload after version change failed:', error)
+      );
+    });
+  });
 }

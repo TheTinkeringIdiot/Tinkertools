@@ -1,18 +1,26 @@
 // Nano-related TypeScript types for TinkerNanos application
 
+import type { Action } from './api';
+import type { DisplayCriterion } from '@/services/action-criteria';
+
 export interface NanoProgram {
-  id: number;
-  aoid?: number;
+  aoid: number;
   name: string;
   icon?: string;
-  school: NanoSchool;
-  strain: string;
+  /** The game's NanoSchool stat (405); null when the nano has none */
+  school: NanoSchoolName | null;
+  /** The NanoStrain stat (75): nanos of one strain don't stack; null when it has none */
+  strainId: number | null;
+  /** strainId's name, for display; null when it has none or the ID is unnamed */
+  strain: string | null;
   description?: string;
 
-  // Casting requirements
-  castingRequirements?: CastingRequirement[];
+  // The nano item's actions; the Use action's criteria are its casting requirements
+  actions?: Action[];
   nanoPointCost?: number;
+  /** Time to cast, in centiseconds (AttackDelay, stat 294) */
   castingTime?: number;
+  /** Time to recharge, in centiseconds (RechargeDelay, stat 210) */
   rechargeTime?: number;
 
   // Effects
@@ -21,20 +29,17 @@ export interface NanoProgram {
   targeting?: TargetingData;
 
   // Meta information
-  level: number;
+  /**
+   * Lowest character level that can cast it: 1 when the Use action asks for no
+   * level, null when the nano has no Use action (not player-castable)
+   */
+  level: number | null;
   qualityLevel: number;
-  profession?: string;
+  /** Professions that can cast it; empty when the Use action doesn't restrict it */
+  professions: string[];
   sourceLocation?: string;
   acquisitionMethod?: string;
   memoryUsage?: number;
-}
-
-export interface CastingRequirement {
-  type: 'skill' | 'stat' | 'nano' | 'item' | 'level';
-  requirement: number | string;
-  value: number;
-  operator?: string; // 'GreaterThan' | 'LessThan' | 'Equal' | etc.
-  critical?: boolean; // Must be met vs recommended
 }
 
 export interface NanoEffect {
@@ -47,6 +52,10 @@ export interface NanoEffect {
   conflicts?: number[]; // Conflicting nano IDs
 }
 
+/** NanoSchool stat (405) values, as the /nanos endpoints name them */
+export type NanoSchoolName = 'Combat' | 'Medical' | 'Protection' | 'Psi' | 'Space';
+
+/** The nano skills (MC, MM, BM, PM, SI, TS), which TinkerNukes calls schools */
 export type NanoSchool =
   | 'Matter Metamorphosis'
   | 'Biological Metamorphosis'
@@ -69,7 +78,7 @@ export type EffectModifier = 'add' | 'multiply' | 'set' | 'percentage';
 
 export interface EffectCondition {
   type: string;
-  value: any;
+  value: unknown;
 }
 
 export interface EffectDuration {
@@ -84,61 +93,68 @@ export interface TargetingData {
 }
 
 // Nano filtering types
+/**
+ * TinkerNanos search filters. School, profession, strain, QL and level go to
+ * the /nanos endpoints; the compatibility filters (skillCompatible, castable,
+ * skillGapThreshold) run client-side against the active profile.
+ */
 export interface NanoFilters {
+  /** NanoSchool names; a nano in any of them matches */
   schools: string[];
-  strains: string[];
+  /** NanoStrain IDs; a nano of any of them matches */
+  strainIds: number[];
+  /** Profession names; a nano any of them can cast matches */
   professions: string[];
-  qualityLevels: number[];
-  effectTypes?: string[];
-  durationType?: string[];
-  targetTypes?: string[];
-  levelRange?: [number, number];
-  memoryUsageRange?: [number, number];
-  nanoPointRange?: [number, number];
-  skillGapThreshold?: number | null;
+  qlRange: [number, number];
+  /** Lowest casting level; the full range filters nothing */
+  levelRange: [number, number];
+  skillGapThreshold: number | null;
   skillCompatible: boolean;
   castable: boolean;
-  sortBy?: string;
-  sortDescending?: boolean;
+  sortBy: NanoSortField;
+  sortDescending: boolean;
 }
 
-// Character profile for compatibility checking
-export interface TinkerProfile {
-  id: string;
-  name: string;
-  profession: string;
-  level: number;
-  skills: Record<string, number>;
-  stats: Record<string, number>;
-  activeNanos?: number[];
-  memoryCapacity?: number;
-  nanoPoints?: number;
+/** A strain among the nanos some filters match, from GET /nanos/strains */
+export interface NanoStrainOption {
+  id: number;
+  name: string | null;
+  /** Nanos of this strain the filters match */
+  count: number;
 }
+
+/** name, qualityLevel and level sort on the server; compatibility client-side */
+export type NanoSortField = 'name' | 'qualityLevel' | 'level' | 'compatibility';
 
 // Compatibility analysis results
 export interface NanoCompatibilityInfo {
+  /**
+   * castable: every requirement is met. unverified: none the profile can
+   * check fails, but some it can't check (a running nano, a perk, the
+   * target...) decide it. blocked: a requirement fails.
+   */
+  castState: NanoCastState;
+  /** Nothing the profile can check stops it: castable or unverified */
   canCast: boolean;
   compatibilityScore: number; // 0-100
-  averageSkillGap: number;
-  skillDeficits: SkillDeficit[];
-  statDeficits: StatDeficit[];
-  levelDeficit: number;
+  unmetRequirements: UnmetNanoRequirement[];
+  /** The requirements that couldn't be checked, when unverified (one per description) */
+  unverifiedRequirements: DisplayCriterion[];
   memoryUsage: number;
   nanoPointCost: number;
 }
 
-export interface SkillDeficit {
-  skill: string;
-  current: number;
-  required: number;
-  deficit: number;
-}
+export type NanoCastState = 'castable' | 'unverified' | 'blocked';
 
-export interface StatDeficit {
-  stat: string;
-  current: number;
+/** A casting requirement the character does not meet, from checkActionRequirements */
+export interface UnmetNanoRequirement {
+  stat: number;
+  statName: string;
   required: number;
-  deficit: number;
+  current: number;
+  operator: string;
+  /** Set for requirements that aren't a stat comparison, or read better as text */
+  description?: string;
 }
 
 // Nano lineup management
@@ -249,81 +265,7 @@ export interface FacetCount {
   count: number;
 }
 
-// Analysis and recommendations
-export interface NanoAnalysisResult {
-  character: TinkerProfile;
-  availableNanos: CastingAnalysis[];
-  effects: EffectAnalysis[];
-  interactions: EffectInteraction[];
-  recommendedLineups: NanoLineup[];
-  timestamp: Date;
-}
-
-export interface CastingAnalysis {
-  nanoId: number;
-  character: TinkerProfile;
-  analysis: CastingResult;
-  recommendations: CastingRecommendation[];
-  alternatives: AlternativeNano[];
-}
-
-export interface CastingResult {
-  canCast: boolean;
-  successRate: number;
-  requirements: RequirementCheck[];
-  resourceCosts: ResourceCost;
-  limitations: CastingLimitation[];
-  optimizations: CastingOptimization[];
-}
-
-export interface RequirementCheck {
-  requirement: CastingRequirement;
-  met: boolean;
-  currentValue: number;
-  shortfall: number;
-  timeToMeet?: number;
-}
-
-export interface ResourceCost {
-  nanoPoints: number;
-  nanoPointsPercentage: number;
-  castingTime: number;
-  rechargeTime: number;
-  opportunity: OpportunityCost;
-}
-
-export interface OpportunityCost {
-  alternativeNanos: number;
-  memoryUsage: number;
-  conflictingEffects: number;
-}
-
-export interface CastingLimitation {
-  type: string;
-  description: string;
-  severity: 'low' | 'medium' | 'high';
-}
-
-export interface CastingOptimization {
-  type: string;
-  description: string;
-  benefit: number;
-}
-
-export interface CastingRecommendation {
-  type: string;
-  description: string;
-  priority: number;
-  actionRequired: string;
-}
-
-export interface AlternativeNano {
-  nanoId: number;
-  similarity: number;
-  advantages: string[];
-  disadvantages: string[];
-}
-
+// Effect analysis
 export interface EffectAnalysis {
   effectId: string;
   effects: NanoEffect[];
@@ -371,7 +313,7 @@ export interface SynergyBenefit {
 
 export interface SynergyRequirement {
   type: string;
-  value: any;
+  value: unknown;
   description: string;
 }
 
@@ -417,14 +359,4 @@ export interface NanoApiResponse {
   page: number;
   size: number;
   facets?: SearchFacets;
-}
-
-export interface NanoSearchRequest {
-  query?: string;
-  filters?: Partial<NanoFilters>;
-  page?: number;
-  size?: number;
-  sort?: string;
-  includeCompatibility?: boolean;
-  profileId?: string;
 }

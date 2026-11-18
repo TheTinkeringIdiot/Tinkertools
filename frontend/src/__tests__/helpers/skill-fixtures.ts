@@ -369,7 +369,7 @@ export const SKILL_COMBOS = {
  * Type guard for skill ID validation
  */
 export function isValidSkillId(id: number): boolean {
-  return Object.values(SKILL_ID).includes(id as any);
+  return (Object.values(SKILL_ID) as number[]).includes(id);
 }
 
 /**
@@ -377,6 +377,6 @@ export function isValidSkillId(id: number): boolean {
  * Note: This is for test debugging only. Production code uses getSkillName() from skill-mappings.ts
  */
 export function getTestSkillName(skillId: number): string {
-  const entry = Object.entries(SKILL_ID).find(([_, id]) => id === skillId);
+  const entry = Object.entries(SKILL_ID).find((entry) => entry[1] === skillId);
   return entry ? entry[0] : `Unknown Skill ${skillId}`;
 }

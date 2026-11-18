@@ -57,7 +57,7 @@ export class TinkerPlantsPage {
   }
 
   async getTreatmentRequirement(): Promise<string> {
-    return await this.treatmentDisplay.textContent() || '';
+    return (await this.treatmentDisplay.textContent()) || '';
   }
 
   async optimizeImplants() {

@@ -19,7 +19,6 @@ Provides a responsive grid layout for skills with stat breakdown tooltips
         class="skill-grid-item bg-surface-50 dark:bg-surface-800 rounded-lg p-3 transition-all duration-200 hover:bg-surface-100 dark:hover:bg-surface-700 hover:shadow-sm"
       >
         <SkillSlider
-          :skill-name="getSkillName(skillId)"
           :skill-data="skill"
           :is-ability="isAbilities"
           :is-read-only="isReadOnly"
@@ -44,7 +43,6 @@ Provides a responsive grid layout for skills with stat breakdown tooltips
 <script setup lang="ts">
 import { computed, inject, provide } from 'vue';
 import SkillSlider from './SkillSlider.vue';
-import { skillService } from '@/services/skill-service';
 import type { TinkerProfile } from '@/lib/tinkerprofiles';
 import type { SkillId, SkillData } from '@/types/skills';
 
@@ -54,15 +52,15 @@ const props = defineProps<{
   category: string;
   isAbilities?: boolean;
   isReadOnly?: boolean;
-  breed?: string;
-  profession?: string;
+  breed?: number;
+  profession?: number;
   gridMode?: 'compact' | 'detailed' | 'list';
 }>();
 
 // Emits
 const emit = defineEmits<{
-  'skill-changed': [category: string, skillName: string, newValue: number];
-  'ability-changed': [abilityName: string, newValue: number];
+  'skill-changed': [category: string, skillId: number, newValue: number];
+  'ability-changed': [abilityId: number, newValue: number];
 }>();
 
 // Inject the profile from parent and re-provide for children
@@ -78,22 +76,12 @@ const skillCount = computed(() => {
 });
 
 // Methods
-function getSkillName(skillId: SkillId | string): string {
-  try {
-    const numericId = typeof skillId === 'string' ? parseInt(skillId, 10) : skillId;
-    return skillService.getName(numericId);
-  } catch (error) {
-    console.warn(`[SkillsGrid] Failed to resolve skill name for ID ${skillId}:`, error);
-    return `Unknown Skill (${skillId})`;
-  }
+function handleSkillChanged(category: string, skillId: number, newValue: number) {
+  emit('skill-changed', category, skillId, newValue);
 }
 
-function handleSkillChanged(category: string, skillName: string, newValue: number) {
-  emit('skill-changed', category, skillName, newValue);
-}
-
-function handleAbilityChanged(abilityName: string, newValue: number) {
-  emit('ability-changed', abilityName, newValue);
+function handleAbilityChanged(abilityId: number, newValue: number) {
+  emit('ability-changed', abilityId, newValue);
 }
 </script>
 

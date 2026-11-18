@@ -1,733 +1,521 @@
 #!/usr/bin/env python3
 """
-TinkerTools Data Import Utility
+TinkerTools data import.
 
-A standalone utility for importing game data into the TinkerTools database.
-Uses the DATABASE_URL environment variable to connect to the database.
+Game data lives in the content-addressed store (schema ``cas``; design:
+docs/plans/content-addressed-store/design.md, tables: database/cas/). One
+command loads it, from nothing or on top of what is there:
 
-Usage:
-    # Set database URL
     export DATABASE_URL="postgresql://aodbuser:password@localhost:5432/tinkertools"
 
-    # Import individual datasets (standard mode)
-    python import_cli.py symbiants --clear
-    python import_cli.py items --chunk-size 50
-    python import_cli.py nanos
+    # every importable build of the extracts folder, oldest first
+    python import_cli.py import-cas --extracts-dir ~/projects/AO/extracts --workers 8
 
-    # Import with optimized mode (10-20x faster)
-    python import_cli.py items --optimized --batch-size 2000
-    python import_cli.py nanos --optimized
-    python import_cli.py all --optimized --clear
+    # with the internal ids of the old production database (see IMPORT_README.md)
+    python import_cli.py import-cas --extracts-dir ~/projects/AO/extracts \\
+        --legacy-ids-file legacy_item_ids.csv
 
-    # Import all data
-    python import_cli.py all --clear
+    # a scratch store with a few builds
+    python import_cli.py import-cas --extracts-dir ~/projects/AO/extracts --schema cas_dev \\
+        --slug ao-14-2-2 --slug ao-15-0-1 --slug ao-17-10-5
 
-    # Validate files exist
-    python import_cli.py validate
+Besides the extracts it reads committed files: the curated data
+(all_nanos_compacted.csv, database/perks.json, database/symbiants.csv,
+database/mob_ids.csv), how builds are presented (database/builds.toml) and the
+rules of the change log (database/change_relevance.toml,
+database/build_notes.toml). It needs nothing else from the database than the
+schema it writes. IMPORT_README.md is the guide.
 
-Requirements:
-    - items.json (407MB)
-    - nanos.json (44MB)
-    - symbiants.csv (208KB)
+A second command needs no extracts. It makes the map of old internal ids of a
+loaded store equal to a file, on a server whose store was restored from a dump
+(DEPLOYMENT.md):
+
+    python import_cli.py load-legacy-ids --legacy-ids-file legacy_item_ids.csv
 """
 
 import argparse
+import json
 import logging
-import sys
 import os
+import sys
+import time
 from pathlib import Path
-from typing import Optional
 
-# Add the backend directory to the Python path
 sys.path.append(str(Path(__file__).parent))
-
-from app.core.importer import DataImporter
-from app.core.optimized_importer import OptimizedImporter
-from app.core.database import create_tables, get_table_count, get_db
-from app.core.csv_transformer import StreamingCSVTransformer, load_perk_metadata
-from app.core.csv_loader import StreamingCSVLoader
-from app.core.indexes import create_performance_indexes
-
-# Setup logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler('import.log')
-    ]
-)
 
 logger = logging.getLogger(__name__)
 
-
-def resolve_data_file_path(cli_path: Optional[str], default_filename: str) -> Path:
-    """
-    Resolve data file path from CLI argument or default location.
-    Supports home directory (~) and environment variable expansion.
-
-    Args:
-        cli_path: Path provided via CLI argument (None if not provided)
-        default_filename: Default filename to use in backend/database/
-
-    Returns:
-        Resolved Path object
-
-    Raises:
-        FileNotFoundError: If resolved path doesn't exist
-    """
-    if cli_path:
-        # Expand environment variables and home directory
-        expanded_path = os.path.expandvars(cli_path)
-        file_path = Path(expanded_path).expanduser()
-    else:
-        file_path = Path(__file__).parent / "database" / default_filename
-
-    if not file_path.exists():
-        raise FileNotFoundError(f"Data file not found: {file_path}")
-
-    return file_path
+EXTRACT_STATUSES = {"extracted", "duplicate", "failed", "missing_db"}
 
 
-def ensure_tables_exist():
-    """Ensure database tables exist, create them if they don't."""
-    try:
-        table_count = get_table_count()
-        logger.info(f"Current table count: {table_count}")
-
-        if table_count == 0:
-            logger.info("No tables found, creating database schema...")
-            create_tables()
-            new_count = get_table_count()
-            logger.info(f"Created {new_count} tables")
-        else:
-            logger.info("Database tables already exist")
-
-        return True
-    except Exception as e:
-        logger.error(f"Failed to ensure tables exist: {e}")
-        return False
+def given_path(text: str) -> Path:
+    """A path from the command line, with ``~`` and variables expanded."""
+    return Path(os.path.expandvars(text)).expanduser()
 
 
-def create_database_indexes():
-    """Create performance indexes after data import."""
-    logger.info("=== Creating Performance Indexes ===")
-
-    db_session = next(get_db())
-    try:
-        created_indexes = create_performance_indexes(db_session)
-        logger.info(f"Successfully created {len(created_indexes)} performance indexes")
-        logger.info("Indexes created:")
-        for idx_name in created_indexes:
-            logger.info(f"  ✓ {idx_name}")
-        return True
-    except Exception as e:
-        logger.error(f"Failed to create indexes: {e}")
-        import traceback
-        logger.error(traceback.format_exc())
-        return False
-    finally:
-        db_session.close()
-
-
-def import_symbiants(args):
-    """Import mobs and sources from symbiants CSV."""
-    logger.info(f"Starting mobs and sources import from symbiants.csv...")
-
-    # Ensure database tables exist (unless we're doing a full reset)
-    if not args.clear and not ensure_tables_exist():
-        return False
-
-    # Resolve file path (from CLI arg or default location)
-    try:
-        file_path = resolve_data_file_path(args.symbiants_file, "symbiants.csv")
-    except FileNotFoundError as e:
-        logger.error(str(e))
-        return False
-
-    # Use regular importer (optimized doesn't have this method)
-    importer = DataImporter(chunk_size=args.chunk_size)
-    try:
-        # Import mobs and sources from CSV
-        stats = importer.import_mobs_and_sources(str(file_path))
-        logger.info(f"Successfully imported mobs and sources:")
-        logger.info(f"  - Mobs: {stats['mobs']}")
-        logger.info(f"  - Sources: {stats['sources']}")
-        logger.info(f"  - Item-Source links: {stats['item_sources']}")
-        return True
-    except Exception as e:
-        logger.error(f"Mobs and sources import failed: {e}")
-        import traceback
-        logger.error(traceback.format_exc())
-        return False
-
-
-def import_items(args):
-    """Import items from JSON."""
-    if hasattr(args, 'ultra') and args.ultra:
-        mode = "ULTRA"
-    elif args.optimized:
-        mode = "OPTIMIZED"
-    else:
-        mode = "STANDARD"
-    logger.info(f"Starting items import ({mode} mode)...")
-
-    # Validate ultra mode requirements
-    if hasattr(args, 'ultra') and args.ultra and not args.optimized:
-        logger.error("--ultra flag requires --optimized flag")
-        return False
-
-    # Ensure database tables exist (unless we're doing a full reset)
-    if not args.clear and not ensure_tables_exist():
-        return False
-
-    # Resolve file paths
-    try:
-        items_path = resolve_data_file_path(args.items_file, "items.json")
-        perks_path = resolve_data_file_path(args.perks_file, "perks.json")
-    except FileNotFoundError as e:
-        logger.error(str(e))
-        return False
-
-    try:
-        if args.optimized:
-            # Ultra mode warning
-            if hasattr(args, 'ultra') and args.ultra:
-                logger.warning("⚠️  ULTRA MODE ENABLED")
-                logger.warning("    - 40-60x faster than standard mode")
-                logger.warning("    - synchronous_commit=OFF (data loss on crash)")
-                logger.warning("    - UNLOGGED tables (not crash-safe)")
-                logger.warning("    - Indexes dropped (database not queryable during import)")
-                logger.warning("    - PostgreSQL COPY protocol (bypasses normal query path)")
-                if not args.clear:
-                    logger.error("--ultra mode requires --clear flag for safety")
-                    return False
-
-                try:
-                    response = input("⚠️  Continue with ULTRA MODE? (yes/NO): ").strip().lower()
-                    if response != 'yes':
-                        logger.info("Import cancelled")
-                        return False
-                except EOFError:
-                    # Non-interactive environment
-                    logger.info("Non-interactive environment, proceeding with ULTRA MODE")
-
-            # Use optimized importer with larger batch size
-            batch_size = args.batch_size if args.batch_size else 5000
-            ultra_mode = hasattr(args, 'ultra') and args.ultra
-            logger.info(f"Using OptimizedImporter with batch_size={batch_size}, ultra_mode={ultra_mode}")
-            importer = OptimizedImporter(batch_size=batch_size, perks_file=str(perks_path), ultra_mode=ultra_mode)
-
-            stats = importer.import_items_from_json(
-                str(items_path),
-                is_nano=False,
-                clear_existing=args.clear
+def read_extract_index(root: Path) -> list:
+    path = root / "index.json"
+    with open(path) as f:
+        entries = json.load(f)
+    if not isinstance(entries, list):
+        raise ValueError(f"{path} must hold a list of builds")
+    for entry in entries:
+        missing = {"slug", "family", "status"} - set(entry)
+        if missing:
+            raise ValueError(f"{path}: entry {entry} lacks {sorted(missing)}")
+        if entry["status"] not in EXTRACT_STATUSES:
+            raise ValueError(
+                f"{path}: unknown status {entry['status']!r} for {entry['slug']}"
             )
-
-            logger.info(f"Items import completed: "
-                       f"Created={stats['items_created']}, "
-                       f"Updated={stats['items_updated']}, "
-                       f"Errors={stats['errors']}, "
-                       f"Rate={stats.get('items_per_second', 0):.1f} items/sec")
-            return stats['errors'] == 0
-        else:
-            # Use standard importer
-            importer = DataImporter(chunk_size=args.chunk_size, perks_file=str(perks_path))
-            stats = importer.import_items_from_json(
-                str(items_path),
-                is_nano=False,
-                clear_existing=False,  # Don't use old clear method
-                full_reset=args.clear  # Use new full reset with migrations
-            )
-            logger.info(f"Items import completed: "
-                       f"Created={stats.items_created}, "
-                       f"Updated={stats.items_updated}, "
-                       f"Errors={stats.errors}")
-            return stats.errors == 0
-    except Exception as e:
-        logger.error(f"Items import failed: {e}")
-        import traceback
-        logger.error(traceback.format_exc())
-        return False
+    return entries
 
 
-def import_nanos(args):
-    """Import nanos from JSON."""
-    if hasattr(args, 'ultra') and args.ultra:
-        mode = "ULTRA"
-    elif args.optimized:
-        mode = "OPTIMIZED"
-    else:
-        mode = "STANDARD"
-    logger.info(f"Starting nanos import ({mode} mode)...")
+def read_legacy_id_files(given) -> tuple:
+    """The rows of one legacy id file or of several, and how to name them in
+    a message. Several files are one map: an export per family, when each
+    family was served from a database of its own."""
+    from app.core.cas_legacy import read_legacy_ids
+    from app.core.cas_store import StoreError
 
-    # Validate ultra mode requirements
-    if hasattr(args, 'ultra') and args.ultra and not args.optimized:
-        logger.error("--ultra flag requires --optimized flag")
-        return False
-
-    # Ensure database tables exist (unless we're doing a full reset)
-    if not args.clear and not ensure_tables_exist():
-        return False
-
-    # Resolve file paths
-    try:
-        nanos_path = resolve_data_file_path(args.nanos_file, "nanos.json")
-        perks_path = resolve_data_file_path(args.perks_file, "perks.json")
-    except FileNotFoundError as e:
-        logger.error(str(e))
-        return False
-
-    try:
-        if args.optimized:
-            # Use optimized importer
-            batch_size = args.batch_size if args.batch_size else 5000
-            ultra_mode = hasattr(args, 'ultra') and args.ultra
-            logger.info(f"Using OptimizedImporter with batch_size={batch_size}, ultra_mode={ultra_mode}")
-            importer = OptimizedImporter(batch_size=batch_size, perks_file=str(perks_path), ultra_mode=ultra_mode)
-
-            stats = importer.import_items_from_json(
-                str(nanos_path),
-                is_nano=True,
-                clear_existing=False  # Don't clear for nanos
-            )
-
-            logger.info(f"Nanos import completed: "
-                       f"Created={stats['items_created']}, "
-                       f"Updated={stats['items_updated']}, "
-                       f"Errors={stats['errors']}, "
-                       f"Rate={stats.get('items_per_second', 0):.1f} items/sec")
-            return stats['errors'] == 0
-        else:
-            # Use standard importer
-            importer = DataImporter(chunk_size=args.chunk_size, perks_file=str(perks_path))
-            # Note: For nanos, we typically don't want to reset the entire database
-            # since they're usually imported after items.
-            stats = importer.import_items_from_json(
-                str(nanos_path),
-                is_nano=True,
-                clear_existing=False,
-                full_reset=False  # Don't reset for nanos
-            )
-            logger.info(f"Nanos import completed: "
-                       f"Created={stats.items_created}, "
-                       f"Updated={stats.items_updated}, "
-                       f"Errors={stats.errors}")
-            return stats.errors == 0
-    except Exception as e:
-        logger.error(f"Nanos import failed: {e}")
-        import traceback
-        logger.error(traceback.format_exc())
-        return False
+    paths = [
+        given_path(text) for text in ([given] if isinstance(given, str) else given)
+    ]
+    rows, seen = [], {}
+    for path in paths:
+        if not path.is_file():
+            raise FileNotFoundError(f"Legacy id file not found: {path}")
+        read = read_legacy_ids(path)
+        for row in read:
+            if row[:2] in seen:
+                raise StoreError(
+                    f"{path}: id {row[1]} of {row[0]} is also listed in "
+                    f"{seen[row[:2]]}"
+                )
+        seen.update((row[:2], path) for row in read)
+        rows.extend(read)
+    return rows, ", ".join(str(path) for path in paths)
 
 
-def import_all_csv_mode(args):
+def import_cas(args) -> bool:
+    """Import builds from an extracts folder into the content-addressed store.
+
+    The extracts folder, its index, the manifests of the planned builds, the
+    committed files, the legacy id file if one is given and the options are
+    checked before anything is written. Curated data, the presentation of the
+    stored builds and the change log are then brought in line with their
+    files. Builds load in index order, each in its own transaction; builds
+    already in the store are skipped, so the command can be re-run and picks
+    up where it stopped.
+
+    The legacy id map is written last, once every planned build is stored. An
+    API serving the schema answers for an id as soon as the map has rows, and
+    an id whose item the newest stored build lacks is one the client drops for
+    good: with the map in place before the builds, that would be most ids.
+    For the same reason a run that would leave the store without the newest
+    build of a family the file names (``--slug`` with older builds only) is
+    refused before anything is written.
+
+    The nano strain policy follows the store: after every commit the newest
+    stored build of each branch is the one served with the curated strains,
+    whatever the index lists beyond it.
     """
-    Import all data using CSV pipeline (55x faster).
-
-    Workflow:
-    1. Merge items.json + nanos.json
-    2. Transform to 16 CSV files
-    3. Transform symbiants.csv to 3 CSV files
-    4. Load all 19 CSVs via PostgreSQL COPY
-    5. Refresh symbiant_items view
-    """
-    import tempfile
-    import json
-    import shutil
-
-    logger.info("Starting CSV pipeline import...")
-
-    # Handle --clear flag (must reset before CSV import)
-    if args.clear:
-        logger.info("=== Performing full database reset with --clear flag ===")
-        from app.core.migration_runner import MigrationRunner
-
-        try:
-            runner = MigrationRunner()
-            success = runner.reset_database()
-            if not success:
-                logger.error("Failed to reset database")
-                return False
-            logger.info("Database reset completed successfully")
-        except Exception as e:
-            logger.error(f"Failed to reset database: {e}")
-            return False
-
-    # Resolve file paths
-    try:
-        items_path = resolve_data_file_path(args.items_file, "items.json")
-        nanos_path = resolve_data_file_path(args.nanos_file, "nanos.json")
-        perks_path = resolve_data_file_path(args.perks_file, "perks.json")
-        symbiants_path = resolve_data_file_path(args.symbiants_file, "symbiants.csv")
-    except FileNotFoundError as e:
-        logger.error(str(e))
-        return False
-
-    csv_dir = tempfile.mkdtemp(prefix='tinkertools_csv_')
-    logger.info(f"CSV directory: {csv_dir}")
-
-    try:
-        # === PHASE 1: Transform items + nanos ===
-        logger.info("=== Phase 1: Items/Nanos ===")
-
-        # Merge JSON (avoid CSV overwrite bug)
-        logger.info("Merging items and nanos JSON...")
-        with open(items_path) as f:
-            items_data = json.load(f)
-        with open(nanos_path) as f:
-            nanos_data = json.load(f)
-
-        # Mark nanos
-        for nano in nanos_data:
-            nano['__is_nano__'] = True
-
-        merged_data = items_data + nanos_data
-        logger.info(f"Merged {len(items_data)} items + {len(nanos_data)} nanos")
-
-        # Write temp file
-        merged_json = tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False)
-        json.dump(merged_data, merged_json)
-        merged_json.close()
-
-        # Transform
-        perk_metadata = load_perk_metadata(str(perks_path))
-        transformer = StreamingCSVTransformer(output_dir=csv_dir)
-        transform_stats = transformer.transform_items(
-            merged_json.name,
-            is_nano=False,
-            perk_metadata=perk_metadata
-        )
-
-        os.unlink(merged_json.name)
-        logger.info(f"Transformed {transform_stats['items']} items in {transform_stats['total_time']:.1f}s")
-
-        # === PHASE 2: Transform symbiants ===
-        logger.info("=== Phase 2: Symbiants ===")
-
-        SOURCE_TYPE_MOB_ID = 3  # From migration 005
-        symbiant_stats = transformer.transform_symbiants(
-            str(symbiants_path),
-            source_type_id=SOURCE_TYPE_MOB_ID
-        )
-        logger.info(f"Transformed {symbiant_stats['mobs']} mobs, "
-                   f"{symbiant_stats['sources']} sources, "
-                   f"{symbiant_stats['item_sources']} item_sources")
-
-        # === PHASE 3: Load CSV ===
-        logger.info("=== Phase 3: Loading ===")
-
-        db_session = next(get_db())
-        try:
-            loader = StreamingCSVLoader(db_session, csv_dir=csv_dir)
-            load_stats = loader.load_all()
-
-            db_session.commit()
-            logger.info(f"Loaded {load_stats['tables_loaded']} tables, "
-                       f"{load_stats['total_rows']} rows in {load_stats['total_time']:.1f}s")
-
-        finally:
-            db_session.close()
-
-        # === PHASE 4: Create Indexes ===
-        logger.info("=== Phase 4: Indexes ===")
-        if not create_database_indexes():
-            logger.warning("Index creation failed, but data import succeeded")
-
-        # === SUMMARY ===
-        total_time = transform_stats['total_time'] + symbiant_stats.get('symbiant_time', 0) + load_stats['total_time']
-        logger.info("="*60)
-        logger.info("CSV PIPELINE COMPLETE")
-        logger.info(f"  Total:      {total_time:.1f}s")
-        logger.info(f"  Items:      {transform_stats['items']}")
-        logger.info(f"  Mobs:       {symbiant_stats['mobs']}")
-        logger.info(f"  Throughput: {load_stats['rows_per_second']:.0f} rows/sec")
-        logger.info("="*60)
-
-        return True
-
-    except Exception as e:
-        logger.error(f"CSV import failed: {e}")
-        import traceback
-        logger.error(traceback.format_exc())
-        return False
-
-    finally:
-        shutil.rmtree(csv_dir, ignore_errors=True)
-
-
-def import_all(args):
-    """Import all data files in order."""
-    # Use CSV mode if requested
-    if hasattr(args, 'csv_mode') and args.csv_mode:
-        return import_all_csv_mode(args)
-
-    logger.info("Starting full data import...")
-
-    # If --clear is specified, do the full reset once at the beginning
-    if args.clear:
-        logger.info("=== Performing full database reset with --clear flag ===")
-        from app.core.migration_runner import MigrationRunner
-
-        try:
-            runner = MigrationRunner()
-            success = runner.reset_database()
-            if not success:
-                logger.error("Failed to reset database")
-                return False
-            logger.info("Database reset completed successfully")
-        except Exception as e:
-            logger.error(f"Failed to reset database: {e}")
-            return False
-
-    # Import in order: items (contains symbiants), nanos, then mobs/sources
-    success = True
-
-    # Create a modified args object that doesn't trigger reset for individual imports
-    import argparse
-    # Keep clear=True for ultra mode (needed for UNLOGGED tables and safety checks)
-    # But the actual reset already happened above, so clear_existing won't run again
-    ultra_mode = args.ultra if hasattr(args, 'ultra') else False
-    individual_args = argparse.Namespace(
-        chunk_size=args.chunk_size if hasattr(args, 'chunk_size') else 100,
-        batch_size=args.batch_size if hasattr(args, 'batch_size') else 5000,
-        optimized=args.optimized if hasattr(args, 'optimized') else False,
-        ultra=ultra_mode,
-        clear=ultra_mode if ultra_mode else False,  # Keep clear=True for ultra mode safety checks
-        # PASS THROUGH FILE PATHS
-        items_file=args.items_file if hasattr(args, 'items_file') else None,
-        nanos_file=args.nanos_file if hasattr(args, 'nanos_file') else None,
-        symbiants_file=args.symbiants_file if hasattr(args, 'symbiants_file') else None,
-        perks_file=args.perks_file if hasattr(args, 'perks_file') else None
+    from app.core import cas_store, change_analysis
+    from app.core.cas_curated import CuratedFiles, sync_curated
+    from app.core.cas_extract import (
+        BUILDS_FILE,
+        ExtractReader,
+        plan_builds,
+        read_build_descriptions,
+        read_manifest,
     )
+    from app.core.cas_legacy import sync_legacy_ids
+    from app.core.change_rules import read_rules
 
-    # Items first (contains all symbiant items that mobs will reference)
-    logger.info("=== Importing Items ===")
-    if not import_items(individual_args):
-        success = False
-        logger.error("Items import failed, continuing with nanos...")
-
-    # Nanos
-    logger.info("=== Importing Nanos ===")
-    if not import_nanos(individual_args):
-        success = False
-        logger.error("Nanos import failed, continuing with symbiants...")
-
-    # Symbiants/Mobs last (creates links to items that now exist)
-    logger.info("=== Importing Mobs and Sources ===")
-    if not import_symbiants(individual_args):
-        success = False
-        logger.error("Symbiant/Mobs import failed")
-
-    # Create performance indexes after all data is imported
-    logger.info("=== Creating Performance Indexes ===")
-    if not create_database_indexes():
-        logger.warning("Index creation failed, but data import succeeded")
-
-    if success:
-        logger.info("All imports completed successfully!")
-    else:
-        logger.warning("Some imports failed, check logs for details")
-
-    return success
-
-
-def validate_files(args=None):
-    """
-    Validate that all required files exist.
-
-    Args:
-        args: Optional argparse.Namespace with file path overrides
-    """
-    files_to_check = {
-        'items.json': getattr(args, 'items_file', None) if args else None,
-        'nanos.json': getattr(args, 'nanos_file', None) if args else None,
-        'symbiants.csv': getattr(args, 'symbiants_file', None) if args else None,
-        'perks.json': getattr(args, 'perks_file', None) if args else None,
-    }
-
-    missing = []
-
-    for default_filename, cli_path in files_to_check.items():
-        try:
-            path = resolve_data_file_path(cli_path, default_filename)
-            size_mb = path.stat().st_size / (1024 * 1024)
-            logger.info(f"✓ {path}: {size_mb:.1f} MB")
-        except FileNotFoundError:
-            missing.append(default_filename)
-            logger.error(f"✗ {default_filename}: Not found")
-
-    if missing:
-        logger.error(f"Missing files: {', '.join(missing)}")
+    if args.workers < 0:
+        logger.error("--workers must be 0 or more")
+        return False
+    if not args.extracts_dir:
+        logger.error("--extracts-dir is required")
+        return False
+    database_url = args.database_url or os.environ.get("DATABASE_URL")
+    if not database_url:
+        logger.error("DATABASE_URL is not set")
+        return False
+    root = given_path(args.extracts_dir)
+    started = time.perf_counter()
+    timings = {}
+    conn = None
+    try:
+        if not root.is_dir():
+            raise FileNotFoundError(f"Extracts folder not found: {root}")
+        if not (root / "index.json").is_file():
+            raise FileNotFoundError(f"No index.json in the extracts folder {root}")
+        if args.reset and not args.yes:
+            raise ValueError(
+                f"--reset drops every table of schema {args.schema}; re-run with --yes"
+            )
+        entries = read_extract_index(root)
+        known = {e["slug"] for e in entries}
+        for slug in args.slug or []:
+            if slug not in known:
+                # A folder outside the index: take what the manifest says.
+                manifest = read_manifest(root, slug)
+                entries.append(
+                    {
+                        "slug": slug,
+                        "family": manifest.get("family") or "ao",
+                        "build": manifest.get("client_build"),
+                        "status": "extracted",
+                        "extract_slug": slug,
+                        "rdb_dat_sha256": manifest.get("rdb_dat_sha256"),
+                    }
+                )
+        files = CuratedFiles()
+        for attribute, given in (
+            ("nanos_csv", args.nanos_csv),
+            ("perks_json", args.perks_file),
+            ("symbiants_csv", args.symbiants_file),
+            ("mob_ids_csv", args.mob_ids_file),
+        ):
+            if given:
+                setattr(files, attribute, given_path(given))
+            if not getattr(files, attribute).exists():
+                raise FileNotFoundError(
+                    f"Data file not found: {getattr(files, attribute)}"
+                )
+        rules = read_rules()
+        described = read_build_descriptions(
+            given_path(args.builds_file) if args.builds_file else BUILDS_FILE
+        )
+        legacy_ids = None
+        if args.legacy_ids_file:
+            legacy_ids, legacy_file = read_legacy_id_files(args.legacy_ids_file)
+        planned = plan_builds(root, entries, described)
+        specs = [spec for spec in planned if not args.slug or spec.slug in args.slug]
+        unknown = set(args.slug or []) - {spec.slug for spec in specs}
+        if unknown:
+            raise ValueError(f"No importable extract for: {', '.join(sorted(unknown))}")
+        conn = cas_store.connect(database_url, args.schema)
+        if legacy_ids is not None:
+            # (slug, family) of the builds the store will hold after this run
+            held = {(spec.slug, spec.branch) for spec in specs}
+            if not args.reset and cas_store.store_exists(conn, args.schema):
+                held.update(conn.execute("SELECT slug, branch FROM build").fetchall())
+            newest = {spec.branch: spec.slug for spec in planned}
+            for family in sorted({row[0] for row in legacy_ids}):
+                if family not in {branch for _, branch in held}:
+                    raise ValueError(
+                        f"{legacy_file} holds ids of family '{family}', and the "
+                        f"store would hold no build of it after this run"
+                    )
+                if family in newest and (newest[family], family) not in held:
+                    raise ValueError(
+                        f"--legacy-ids-file needs the newest build of every "
+                        f"family it names in the store, and {newest[family]} "
+                        f"('{family}') is neither stored nor selected: clients "
+                        f"would drop the ids of items an older build lacks. "
+                        f"Select it too, or leave out --legacy-ids-file until "
+                        f"it is imported"
+                    )
+    except (cas_store.StoreError, FileNotFoundError, ValueError) as e:
+        logger.error(str(e))
+        if conn is not None:
+            conn.close()
         return False
 
-    logger.info("All import files found")
+    reader = None
+    try:
+        if args.reset:
+            cas_store.drop_store(conn, args.schema)
+        if cas_store.create_store(conn, args.schema):
+            logger.info(f"Created the store's tables in schema {args.schema}")
+        cas_store.upgrade_store(conn, args.schema)
+        conn.commit()
+        stored = {row[0] for row in conn.execute("SELECT slug FROM build")}
+
+        with cas_store.phase(timings, "curated data"):
+            written = sync_curated(conn, files)
+            for spec in planned:
+                if spec.slug in stored:
+                    cas_store.update_presentation(conn, spec)
+            cas_store.assign_strain_policy(conn)
+            if written["nano_overlay"]:
+                cas_store.apply_nano_overlay(conn)
+            else:
+                cas_store.sync_nano_properties(conn)
+            conn.commit()
+        if any(written.values()):
+            logger.info(
+                "Curated rows written: "
+                + ", ".join(
+                    f"{table} {count}" for table, count in written.items() if count
+                )
+            )
+        with cas_store.phase(timings, "change analysis"):
+            analysed = change_analysis.sync(conn, rules)
+            conn.commit()
+        if any(analysed.values()):
+            logger.info(
+                "Change log brought in line with the rules: "
+                + ", ".join(
+                    f"{what} {count}" for what, count in analysed.items() if count
+                )
+            )
+
+        todo = [spec for spec in specs if spec.slug not in stored]
+        # Refuse an out-of-order build before anything is read. A duplicate of
+        # the build before it needs no data read at all.
+        newest_extract, needs_content = {}, {}
+        for spec in todo:
+            if spec.branch not in newest_extract:
+                newest = cas_store.newest_build(conn, spec.branch)
+                cas_store.require_newer(newest, spec)
+                newest_extract[spec.branch] = newest["extract_slug"] if newest else None
+            needs_content[spec.slug] = (
+                spec.extract_slug == spec.slug
+                or newest_extract[spec.branch] != spec.extract_slug
+            )
+            newest_extract[spec.branch] = spec.extract_slug
+        reader = ExtractReader(
+            [root / spec.extract_slug for spec in todo if needs_content[spec.slug]],
+            args.workers,
+        )
+
+        logger.info(
+            f"{len(specs) - len(todo)} build(s) already in the store, "
+            f"{len(todo)} to import"
+        )
+        for spec in todo:
+            content = None
+            if needs_content[spec.slug]:
+                with cas_store.phase(timings, "read and split (waiting)"):
+                    content = reader.next()
+            try:
+                result = cas_store.import_build(conn, spec, content, timings, rules)
+                with cas_store.phase(timings, "commit"):
+                    conn.commit()
+            finally:
+                if content is not None:
+                    content.close()
+            if result.same_as_previous:
+                logger.info(f"  {spec.slug:<20} same data as the build before it")
+            else:
+                logger.info(
+                    f"  {spec.slug:<20} {result.items:>6} items, "
+                    f"{result.new_revisions:>6} new revisions, "
+                    f"+{result.added} -{result.removed} ~{result.changed}, "
+                    f"new parts {sum(result.new_parts.values())}"
+                )
+
+        if legacy_ids is not None:
+            with cas_store.phase(timings, "legacy ids"):
+                changed = sync_legacy_ids(conn, legacy_ids)
+                conn.commit()
+            logger.info(
+                f"Legacy item ids: {len(legacy_ids)} in the file, "
+                f"{changed} written or removed"
+            )
+        if todo or legacy_ids is not None:
+            with cas_store.phase(timings, "analyze"):
+                cas_store.analyze(conn, args.schema)
+                conn.commit()
+    except cas_store.StoreError as e:
+        logger.error(str(e))
+        return False
+    finally:
+        if reader is not None:
+            reader.close()
+        conn.close()
+
+    logger.info("=" * 60)
+    for name, seconds in timings.items():
+        logger.info(f"  {name:<28} {seconds:8.1f} s")
+    logger.info(f"  {'total (wall clock)':<28} {time.perf_counter() - started:8.1f} s")
+    logger.info("=" * 60)
+    return True
+
+
+def load_legacy_ids(args) -> bool:
+    """Make the legacy id map of a loaded store equal to a file.
+
+    For a store that was not imported where it is served (restored from a
+    dump), so there is no extracts folder to tell which build is the newest.
+    The builds file stands in for the index: a build it describes and the
+    store lacks means the store is older than this code, and clients would
+    drop the ids of items only the missing build has. The map is then
+    refused, as it is for a family the store holds no build of.
+    """
+    from app.core import cas_store
+    from app.core.cas_extract import BUILDS_FILE, read_build_descriptions
+    from app.core.cas_legacy import sync_legacy_ids
+
+    if not args.legacy_ids_file:
+        logger.error("--legacy-ids-file is required")
+        return False
+    database_url = args.database_url or os.environ.get("DATABASE_URL")
+    if not database_url:
+        logger.error("DATABASE_URL is not set")
+        return False
+    conn = None
+    try:
+        legacy_ids, legacy_file = read_legacy_id_files(args.legacy_ids_file)
+        described = read_build_descriptions(
+            given_path(args.builds_file) if args.builds_file else BUILDS_FILE
+        )
+        conn = cas_store.connect(database_url, args.schema)
+        if not cas_store.store_exists(conn, args.schema):
+            raise ValueError(f"Schema {args.schema} holds no store")
+        stored = dict(conn.execute("SELECT slug, branch FROM build").fetchall())
+        for family in sorted({row[0] for row in legacy_ids}):
+            if family not in stored.values():
+                raise ValueError(
+                    f"{legacy_file} holds ids of family '{family}', and the "
+                    f"store holds no build of it"
+                )
+        missing = sorted(set(described) - set(stored))
+        if missing:
+            raise ValueError(
+                f"The builds file describes {', '.join(missing)}, which the "
+                f"store does not hold: clients would drop the ids of items an "
+                f"older build lacks. Load a store that holds every described "
+                f"build first"
+            )
+        changed = sync_legacy_ids(conn, legacy_ids)
+        conn.commit()
+        cas_store.analyze(conn, args.schema)
+        conn.commit()
+    except (cas_store.StoreError, FileNotFoundError, ValueError) as e:
+        logger.error(str(e))
+        return False
+    finally:
+        if conn is not None:
+            conn.close()
+    logger.info(
+        f"Legacy item ids: {len(legacy_ids)} in the file, {changed} written or removed"
+    )
     return True
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="TinkerTools Data Import Utility",
+        description="TinkerTools data import",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  # Default locations
-  python import_cli.py validate                    # Check if files exist
-  python import_cli.py symbiants --clear           # Import symbiants, clearing existing data
-  python import_cli.py items --chunk-size 50       # Import items with smaller chunks (standard mode)
-  python import_cli.py items --optimized           # Import items using optimized importer (10-20x faster)
-  python import_cli.py all --optimized --clear     # Import everything with optimized mode, clearing existing data
-
-  # Custom file paths
-  python import_cli.py items --items-file /data/items.json
-  python import_cli.py all --items-file ~/ao-data/items.json --nanos-file ~/ao-data/nanos.json
-  export AO_DATA=/mnt/data && python import_cli.py all --items-file $AO_DATA/items.json
-
-Optimization Modes:
-  Standard mode: Uses original importer, processes items one at a time (slower but stable)
-  Optimized mode (--optimized): Batch operations, singleton preloading, reduced flushes (10-20x faster)
-  ULTRA mode (--ultra --optimized --clear): EXPERIMENTAL! All aggressive optimizations (40-60x faster)
-    WARNING: Data loss possible on crash! Uses PostgreSQL COPY, drops indexes, UNLOGGED tables,
-    synchronous_commit=OFF. Requires --clear flag. Only use with backups!
-
-Data Files (default locations):
-  items.json       407 MB    backend/database/items.json
-  nanos.json       44 MB     backend/database/nanos.json
-  symbiants.csv    208 KB    backend/database/symbiants.csv
-  perks.json       411 KB    backend/database/perks.json (internal dependency)
-
-  Use --{dataset}-file to override default locations. Supports ~ and environment variables.
-
-Environment:
-  DATABASE_URL    Database connection string (required)
-                  Example: postgresql://user:pass@localhost:5432/tinkertools
-        """
+        epilog=__doc__,
     )
-    
     parser.add_argument(
         "command",
-        choices=["symbiants", "items", "nanos", "all", "validate"],
-        help="Import command to run"
+        choices=["import-cas", "load-legacy-ids"],
+        help="import-cas: import builds from an extracts folder. "
+        "load-legacy-ids: make the map of old internal ids of a loaded store "
+        "equal to --legacy-ids-file, without extracts",
     )
     parser.add_argument(
-        "--clear",
-        action="store_true",
-        help="Drop all TinkerTools tables and recreate from migrations before import (WARNING: DESTRUCTIVE! All TinkerTools data will be lost!)"
+        "--extracts-dir",
+        type=str,
+        default=None,
+        help="Folder holding index.json and one <slug>/ per build "
+        "(required for import-cas)",
     )
     parser.add_argument(
-        "--chunk-size",
+        "--slug",
+        action="append",
+        default=None,
+        help="Build to import (repeatable; default: every build in index.json). "
+        "The builds of a branch are taken oldest first; one older than the newest "
+        "stored build of its branch is refused",
+    )
+    parser.add_argument(
+        "--schema",
+        type=str,
+        default="cas",
+        help="Schema holding the store (default: cas)",
+    )
+    parser.add_argument(
+        "--workers",
         type=int,
-        default=100,
-        help="Number of items to process per chunk (default: 100, used in standard mode)"
+        default=4,
+        help="Builds read and split in parallel, about 2 GB of memory each "
+        "(default: 4; 0 reads in this process)",
     )
     parser.add_argument(
-        "--batch-size",
-        type=int,
-        default=1000,
-        help="Batch size for optimized importer (default: 1000, used with --optimized)"
-    )
-    parser.add_argument(
-        "--optimized",
+        "--reset",
         action="store_true",
-        help="Use optimized importer (10-20x faster, maintains data accuracy)"
+        help="Drop the store's tables in --schema and import from scratch (needs --yes)",
     )
     parser.add_argument(
-        "--ultra",
-        action="store_true",
-        help="EXPERIMENTAL: Enable ULTRA MODE (40-60x faster, DATA LOSS RISK ON CRASH). "
-             "Uses all aggressive optimizations: PostgreSQL COPY, index dropping, "
-             "UNLOGGED tables, synchronous_commit=OFF. Requires --optimized flag. "
-             "WARNING: Data loss possible if server crashes during import!"
+        "--yes", action="store_true", help="Confirm --reset, which is destructive"
     )
     parser.add_argument(
-        "--csv-mode",
-        action="store_true",
-        help="Use CSV pipeline (55x faster, recommended). Streams data through CSV files "
-             "using PostgreSQL COPY for maximum performance. Works with 'all' command only."
-    )
-    parser.add_argument(
-        "--database-url",
-        help="Database URL (overrides DATABASE_URL environment variable)"
-    )
-    parser.add_argument(
-        "--items-file",
+        "--builds-file",
         type=str,
         default=None,
-        help="Path to items.json file (default: backend/database/items.json)"
+        help="How builds are presented (default: backend/database/builds.toml)",
     )
     parser.add_argument(
-        "--nanos-file",
-        type=str,
+        "--legacy-ids-file",
+        action="append",
         default=None,
-        help="Path to nanos.json file (default: backend/database/nanos.json)"
+        help="Internal item ids of the old store, as written by "
+        "tools/export_legacy_item_ids.py (repeatable: one file per family "
+        "that had a database of its own). The store's map is made equal to "
+        "the files together; without the option the map is left as it is",
     )
     parser.add_argument(
-        "--symbiants-file",
+        "--nanos-csv",
         type=str,
         default=None,
-        help="Path to symbiants.csv file (default: backend/database/symbiants.csv)"
+        help="Nano QL, strains and crystal sources "
+        "(default: backend/all_nanos_compacted.csv)",
     )
     parser.add_argument(
         "--perks-file",
         type=str,
         default=None,
-        help="Path to perks.json file (default: backend/database/perks.json)"
+        help="Perk metadata (default: backend/database/perks.json)",
+    )
+    parser.add_argument(
+        "--symbiants-file",
+        type=str,
+        default=None,
+        help="Mobs and their drops (default: backend/database/symbiants.csv)",
+    )
+    parser.add_argument(
+        "--mob-ids-file",
+        type=str,
+        default=None,
+        help="The id of every mob (default: backend/database/mob_ids.csv)",
+    )
+    parser.add_argument(
+        "--database-url",
+        type=str,
+        default=None,
+        help="Database to write (default: the DATABASE_URL variable)",
+    )
+    args = parser.parse_args()
+    handlers = [logging.StreamHandler()]
+    if args.command == "import-cas":
+        handlers.append(logging.FileHandler("import.log"))
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        handlers=handlers,
     )
 
-    args = parser.parse_args()
-
-    # Validate files first (doesn't need DB connection)
-    if args.command == "validate":
-        success = validate_files(args)
-        sys.exit(0 if success else 1)
-
-    # Check DATABASE_URL is set for import operations
-    if not args.database_url and not os.getenv("DATABASE_URL"):
-        logger.error("DATABASE_URL environment variable must be set or --database-url provided")
-        logger.error("Example: export DATABASE_URL='postgresql://user:pass@localhost:5432/tinkertools'")
-        sys.exit(1)
-
-    # Set database URL if provided
-    if args.database_url:
-        os.environ["DATABASE_URL"] = args.database_url
-
-    if not validate_files(args):
-        logger.error("File validation failed, aborting import")
-        sys.exit(1)
-    
-    # Warn about destructive operations
-    if args.clear:
-        logger.warning("⚠️  --clear flag specified: This will DROP ALL TINKERTOOLS TABLES and recreate them from migrations!")
-        logger.warning("    All existing TinkerTools data will be permanently deleted.")
-        logger.warning("    The TinkerTools schema will be rebuilt from scratch.")
-        try:
-            response = input("Are you sure you want to continue? (y/N): ").strip().lower()
-            if response != 'y':
-                logger.info("Import cancelled")
-                sys.exit(0)
-        except EOFError:
-            # Non-interactive environment, assume yes
-            logger.info("Non-interactive environment detected, proceeding with full database reset")
-    
-    # Run import command
-    success = False
-    
     try:
-        if args.command == "symbiants":
-            success = import_symbiants(args)
-        elif args.command == "items":
-            success = import_items(args)
-        elif args.command == "nanos":
-            success = import_nanos(args)
-        elif args.command == "all":
-            success = import_all(args)
+        if args.command == "load-legacy-ids":
+            success = load_legacy_ids(args)
+        else:
+            success = import_cas(args)
     except KeyboardInterrupt:
-        logger.info("\nImport interrupted by user")
+        logger.info("Import interrupted")
         sys.exit(1)
     except Exception as e:
         logger.error(f"Unexpected error: {e}")
+        import traceback
+
+        logger.error(traceback.format_exc())
         sys.exit(1)
-    
+
     sys.exit(0 if success else 1)
 
 

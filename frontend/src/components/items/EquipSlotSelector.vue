@@ -11,15 +11,15 @@ Shows available slots for an item and allows user to choose where to equip it
           <img
             v-if="iconUrl"
             :src="iconUrl"
-            :alt="item.name"
+            :alt="item?.name"
             class="w-10 h-10 object-contain"
             @error="onIconError"
           />
           <i v-else class="pi pi-box text-2xl text-surface-400"></i>
           <div>
-            <div class="font-medium">{{ item.name }}</div>
+            <div class="font-medium">{{ item?.name }}</div>
             <div class="text-sm text-surface-600 dark:text-surface-400">
-              QL {{ item.ql }} {{ itemTypeName }}
+              QL {{ item?.ql }} {{ itemTypeName }}
             </div>
           </div>
         </div>
@@ -43,8 +43,8 @@ Shows available slots for an item and allows user to choose where to equip it
             >
               <input
                 :id="`slot-${slot.name}`"
-                type="radio"
                 v-model="selectedSlot"
+                type="radio"
                 :value="slot.name"
                 class="sr-only"
               />
@@ -85,11 +85,11 @@ Shows available slots for an item and allows user to choose where to equip it
     </div>
 
     <template #footer>
-      <Button label="Cancel" @click="cancel" text />
+      <Button label="Cancel" text @click="cancel" />
       <Button
         label="Equip Item"
-        @click="confirm"
         :disabled="!selectedSlot || availableSlots.length === 0"
+        @click="confirm"
       />
     </template>
   </Dialog>
@@ -101,14 +101,15 @@ import Dialog from 'primevue/dialog';
 import Button from 'primevue/button';
 import Badge from 'primevue/badge';
 import Message from 'primevue/message';
-import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
+import type { Item } from '@/types/api';
+import type { ReadonlyTinkerProfile } from '@/lib/tinkerprofiles/types';
 import { getItemIconUrl } from '@/services/game-utils';
 
 // Props
 interface Props {
   visible: boolean;
-  item: any; // Item to equip
-  profile: TinkerProfile | null;
+  item: Pick<Item, 'name' | 'ql' | 'stats' | 'item_class'> | null; // Item to equip
+  profile: ReadonlyTinkerProfile | null;
   validSlots?: string[]; // Optional list of valid slots for this item
 }
 
@@ -155,7 +156,7 @@ const availableSlots = computed(() => {
     name: string;
     displayName: string;
     occupied: boolean;
-    currentItem: any;
+    currentItem: Pick<Item, 'name' | 'ql'>;
   }> = [];
 
   // If validSlots are provided (from stat 298), use them directly

@@ -7,26 +7,24 @@
  * @see https://test-utils.vuejs.org/ - Vue Test Utils documentation
  */
 
-import { mount, VueWrapper, shallowMount } from '@vue/test-utils';
+import { mount, VueWrapper, shallowMount, type MountingOptions } from '@vue/test-utils';
 import { createPinia, setActivePinia, type Pinia } from 'pinia';
-import { createRouter, createMemoryHistory, type Router } from 'vue-router';
+import { createRouter, createMemoryHistory, type Router, type RouteRecordRaw } from 'vue-router';
 import { vi } from 'vitest';
 import type { Component } from 'vue';
+import { TEST_VERSION } from './version-fixtures';
 
 // ============================================================================
 // Mount Options Interface
 // ============================================================================
 
+type BaseMountingOptions = MountingOptions<Record<string, unknown>>;
+type GlobalMountOptions = NonNullable<BaseMountingOptions['global']>;
+
 export interface MountOptions {
-  props?: Record<string, any>;
-  slots?: Record<string, any>;
-  global?: {
-    plugins?: any[];
-    components?: Record<string, Component>;
-    stubs?: Record<string, any>;
-    mocks?: Record<string, any>;
-    provide?: Record<string, any>;
-  };
+  props?: Record<string, unknown>;
+  slots?: BaseMountingOptions['slots'];
+  global?: Pick<GlobalMountOptions, 'plugins' | 'components' | 'stubs' | 'mocks' | 'provide'>;
   attachTo?: HTMLElement | string;
   shallow?: boolean;
 }
@@ -92,12 +90,67 @@ export function createTestPinia(): Pinia {
  * Create a test router with memory history
  * Useful for testing navigation without browser
  */
-export function createTestRouter(routes: any[] = []): Router {
-  return createRouter({
-    history: createMemoryHistory(),
-    routes:
-      routes.length > 0 ? routes : [{ path: '/', component: { template: '<div>Home</div>' } }],
+/**
+ * Create a test router with memory history.
+ *
+ * Every app route lives under a `/:version` parent, so the test router mirrors
+ * that shape: named routes resolve only if the `version` param can be
+ * inherited, and components that build versioned paths need a version in the
+ * current location. The history starts at `/<TEST_VERSION>/`, but the router
+ * only navigates there when installed, so `router.isReady()` never settles on
+ * an uninstalled router. A test that mounts components rendering named links
+ * must `await router.push(...)` first.
+ *
+ * Pass `routes` to replace the default child set; they are mounted as children
+ * of the version parent, so give them relative paths ('items', not '/items').
+ */
+export function createTestRouter(routes: RouteRecordRaw[] = []): Router {
+  const children: RouteRecordRaw[] =
+    routes.length > 0
+      ? routes
+      : [
+          { path: '', name: 'Home', component: { template: '<div>Home</div>' } },
+          { path: 'items', name: 'TinkerItems', component: { template: '<div>Items</div>' } },
+          {
+            path: 'items/:aoid',
+            name: 'ItemDetail',
+            component: { template: '<div>Item</div>' },
+          },
+          { path: 'profiles', name: 'TinkerProfiles', component: { template: '<div>P</div>' } },
+          {
+            path: 'profiles/:profileId',
+            name: 'TinkerProfileDetail',
+            component: { template: '<div>PD</div>' },
+          },
+          { path: 'nanos', name: 'TinkerNanos', component: { template: '<div>N</div>' } },
+          { path: 'fite', name: 'TinkerFite', component: { template: '<div>F</div>' } },
+          { path: 'plants', name: 'TinkerPlants', component: { template: '<div>Pl</div>' } },
+          { path: 'pocket', name: 'TinkerPocket', component: { template: '<div>Po</div>' } },
+          {
+            path: 'pocket/bosses/:id',
+            name: 'BossDetail',
+            component: { template: '<div>B</div>' },
+          },
+          { path: 'tinkernukes', name: 'TinkerNukes', component: { template: '<div>Nu</div>' } },
+        ];
+
+  // Start the history at the version root rather than pushing there: the
+  // router adopts the history's location on install, with no promise to drop.
+  const history = createMemoryHistory();
+  history.replace(`/${TEST_VERSION}/`);
+
+  const router = createRouter({
+    history,
+    routes: [
+      {
+        path: '/:version([a-z0-9][a-z0-9.-]{0,39})',
+        component: { template: '<router-view />' },
+        children,
+      },
+    ],
   });
+
+  return router;
 }
 
 // ============================================================================
@@ -400,7 +453,7 @@ export function mockLocalStorage() {
  */
 export function setupLocalStorageMock() {
   const mock = mockLocalStorage();
-  Object.defineProperty(global, 'localStorage', {
+  Object.defineProperty(globalThis, 'localStorage', {
     value: mock,
     writable: true,
   });
@@ -418,7 +471,7 @@ export function setupLocalStorageMock() {
  * await wrapper.vm.$emit('update', { value: 123 });
  * expectEmitted(wrapper, 'update', { value: 123 });
  */
-export function expectEmitted(wrapper: VueWrapper, eventName: string, payload?: any) {
+export function expectEmitted(wrapper: VueWrapper, eventName: string, payload?: unknown) {
   const emitted = wrapper.emitted(eventName);
   if (!emitted) {
     throw new Error(`Event "${eventName}" was not emitted`);

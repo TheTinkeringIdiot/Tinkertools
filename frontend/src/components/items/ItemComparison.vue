@@ -20,19 +20,19 @@ Allows comparing up to 3 items with detailed stat differences and recommendation
 
         <div class="flex items-center gap-2">
           <Button
+            v-tooltip.bottom="'Refresh Data'"
             icon="pi pi-refresh"
             size="small"
             text
             @click="refreshComparison"
-            v-tooltip.bottom="'Refresh Data'"
           />
           <Button
+            v-tooltip.bottom="'Clear All'"
             icon="pi pi-trash"
             size="small"
             text
             severity="danger"
             @click="$emit('clear-all')"
-            v-tooltip.bottom="'Clear All'"
           />
         </div>
       </div>
@@ -79,8 +79,8 @@ Allows comparing up to 3 items with detailed stat differences and recommendation
       <!-- Items Header -->
       <div class="grid gap-4" :style="{ gridTemplateColumns: `repeat(${items.length}, 1fr)` }">
         <div
-          v-for="(item, index) in items"
-          :key="item.id"
+          v-for="item in items"
+          :key="item.aoid"
           class="relative p-4 border border-surface-200 dark:border-surface-700 rounded-lg bg-surface-0 dark:bg-surface-950"
         >
           <!-- Remove Button -->
@@ -91,7 +91,7 @@ Allows comparing up to 3 items with detailed stat differences and recommendation
             text
             severity="danger"
             class="absolute top-1 right-1"
-            @click="$emit('remove-item', item.id)"
+            @click="$emit('remove-item', item.aoid)"
           />
 
           <!-- Item Basic Info -->
@@ -104,22 +104,22 @@ Allows comparing up to 3 items with detailed stat differences and recommendation
 
             <h4 class="font-semibold text-sm line-clamp-2">{{ item.name }}</h4>
             <div class="flex justify-center gap-1">
-              <Badge :value="`QL ${item.ql}`" severity="info" size="small" />
-              <Badge v-if="item.is_nano" value="Nano" severity="success" size="small" />
+              <Badge :value="`QL ${item.ql}`" severity="info" />
+              <Badge v-if="item.is_nano" value="Nano" severity="success" />
             </div>
 
             <!-- Overall Score -->
-            <div v-if="showCompatibility && comparisonScores[item.id]" class="mt-2">
+            <div v-if="showCompatibility && comparisonScores[item.aoid]" class="mt-2">
               <div class="text-xs text-surface-600 dark:text-surface-400 mb-1">
                 Compatibility Score
               </div>
               <ProgressBar
-                :value="comparisonScores[item.id].overall * 100"
+                :value="comparisonScores[item.aoid].overall * 100"
                 :show-value="true"
                 :class="{
-                  'progress-high': comparisonScores[item.id].overall >= 0.8,
-                  'progress-medium': comparisonScores[item.id].overall >= 0.5,
-                  'progress-low': comparisonScores[item.id].overall < 0.5,
+                  'progress-high': comparisonScores[item.aoid].overall >= 0.8,
+                  'progress-medium': comparisonScores[item.aoid].overall >= 0.5,
+                  'progress-low': comparisonScores[item.aoid].overall < 0.5,
                 }"
                 style="height: 8px"
               />
@@ -147,7 +147,7 @@ Allows comparing up to 3 items with detailed stat differences and recommendation
                 </div>
                 <div
                   v-for="item in items"
-                  :key="`ql-${item.id}`"
+                  :key="`ql-${item.aoid}`"
                   class="text-sm font-mono"
                   :class="getComparisonClass('ql', item.ql)"
                 >
@@ -157,12 +157,12 @@ Allows comparing up to 3 items with detailed stat differences and recommendation
                 <div class="text-xs font-medium text-surface-600 dark:text-surface-400">
                   Item Class
                 </div>
-                <div v-for="item in items" :key="`class-${item.id}`" class="text-sm">
-                  {{ getItemClassName(item.item_class) }}
+                <div v-for="item in items" :key="`class-${item.aoid}`" class="text-sm">
+                  {{ getItemClassLabel(item.item_class) }}
                 </div>
 
                 <div class="text-xs font-medium text-surface-600 dark:text-surface-400">Type</div>
-                <div v-for="item in items" :key="`type-${item.id}`" class="text-sm">
+                <div v-for="item in items" :key="`type-${item.aoid}`" class="text-sm">
                   {{ item.is_nano ? 'Nano Program' : 'Regular Item' }}
                 </div>
               </div>
@@ -196,7 +196,7 @@ Allows comparing up to 3 items with detailed stat differences and recommendation
                 </div>
                 <div
                   v-for="item in items"
-                  :key="`stat-${statId}-${item.id}`"
+                  :key="`stat-${statId}-${item.aoid}`"
                   class="text-sm font-mono"
                   :class="getStatComparisonClass(statId, getItemStat(item, statId))"
                 >
@@ -225,7 +225,7 @@ Allows comparing up to 3 items with detailed stat differences and recommendation
                 </div>
                 <div
                   v-for="item in items"
-                  :key="`req-${statId}-${item.id}`"
+                  :key="`req-${statId}-${item.aoid}`"
                   class="text-sm font-mono flex items-center gap-1"
                   :class="getRequirementComparisonClass(statId, getItemRequirement(item, statId))"
                 >
@@ -273,9 +273,15 @@ Allows comparing up to 3 items with detailed stat differences and recommendation
                     </div>
                     <div
                       v-for="item in items"
-                      :key="`attack-${statId}-${item.id}`"
+                      :key="`attack-${statId}-${item.aoid}`"
                       class="text-sm font-mono"
-                      :class="getStatComparisonClass(statId, getItemAttackStat(item, statId))"
+                      :class="
+                        getStatComparisonClass(
+                          statId,
+                          getItemAttackStat(item, statId),
+                          getItemAttackStat
+                        )
+                      "
                     >
                       {{ getItemAttackStat(item, statId) || '-' }}
                     </div>
@@ -300,9 +306,15 @@ Allows comparing up to 3 items with detailed stat differences and recommendation
                     </div>
                     <div
                       v-for="item in items"
-                      :key="`defense-${statId}-${item.id}`"
+                      :key="`defense-${statId}-${item.aoid}`"
                       class="text-sm font-mono"
-                      :class="getStatComparisonClass(statId, getItemDefenseStat(item, statId))"
+                      :class="
+                        getStatComparisonClass(
+                          statId,
+                          getItemDefenseStat(item, statId),
+                          getItemDefenseStat
+                        )
+                      "
                     >
                       {{ getItemDefenseStat(item, statId) || '-' }}
                     </div>
@@ -334,7 +346,7 @@ Allows comparing up to 3 items with detailed stat differences and recommendation
                     </p>
                     <div v-if="rec.winner" class="flex items-center gap-2">
                       <span class="text-xs font-medium">Best Choice:</span>
-                      <Badge :value="getItemName(rec.winner)" severity="primary" size="small" />
+                      <Badge :value="getItemName(rec.winner)" severity="primary" />
                     </div>
                   </div>
                 </div>
@@ -349,7 +361,12 @@ Allows comparing up to 3 items with detailed stat differences and recommendation
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
-import type { Item, TinkerProfile } from '@/types/api';
+import Sidebar from 'primevue/sidebar';
+import type { Item } from '@/types/api';
+import type { ReadonlyTinkerProfile } from '@/lib/tinkerprofiles/types';
+import { getItemClassName } from '@/services/game-utils';
+import { mapProfileToStats } from '@/utils/profile-stats-mapper';
+import { getItemRequirements } from './item-requirements';
 
 interface ComparisonScore {
   overall: number;
@@ -369,12 +386,12 @@ interface Recommendation {
 
 const props = defineProps<{
   items: Item[];
-  profile?: TinkerProfile | null;
+  profile?: ReadonlyTinkerProfile | null;
   showCompatibility?: boolean;
 }>();
 
-const emit = defineEmits<{
-  'remove-item': [itemId: number];
+defineEmits<{
+  'remove-item': [aoid: number];
   'clear-all': [];
   close: [];
 }>();
@@ -419,12 +436,15 @@ const displayedCommonStats = computed(() => {
     .slice(0, 8);
 });
 
+// Profile stats keyed by stat ID (covers level, attributes and skills)
+const profileStats = computed(() => (props.profile ? mapProfileToStats(props.profile) : null));
+
 const commonRequirements = computed(() => {
   if (props.items.length === 0) return [];
 
   const allReqStats = new Set<number>();
   props.items.forEach((item) => {
-    item.requirements?.forEach((req) => allReqStats.add(req.stat));
+    getItemRequirements(item).forEach((req) => allReqStats.add(req.stat));
   });
 
   return Array.from(allReqStats);
@@ -468,12 +488,14 @@ const recommendations = computed((): Recommendation[] => {
   const recs: Recommendation[] = [];
 
   // Quality Level recommendation
-  const qlWinner = props.items.reduce((best, current) => (current.ql > best.ql ? current : best));
+  const qlWinner = props.items.reduce((best, current) =>
+    (current.ql ?? 0) > (best.ql ?? 0) ? current : best
+  );
   recs.push({
     category: 'quality',
     title: 'Highest Quality',
     description: 'Higher quality items typically have better stats and effects.',
-    winner: qlWinner.id,
+    winner: qlWinner.aoid,
     icon: 'pi pi-star',
     color: '#fbbf24',
   });
@@ -481,7 +503,7 @@ const recommendations = computed((): Recommendation[] => {
   // Stats recommendation
   if (commonStats.value.length > 0) {
     const statTotals = props.items.map((item) => ({
-      id: item.id,
+      aoid: item.aoid,
       total: commonStats.value.reduce(
         (sum, statId) => sum + Math.abs(getItemStat(item, statId)),
         0
@@ -496,7 +518,7 @@ const recommendations = computed((): Recommendation[] => {
       category: 'stats',
       title: 'Best Overall Stats',
       description: 'Item with the highest combined stat bonuses.',
-      winner: statWinner.id,
+      winner: statWinner.aoid,
       icon: 'pi pi-chart-bar',
       color: '#10b981',
     });
@@ -505,10 +527,8 @@ const recommendations = computed((): Recommendation[] => {
   // Compatibility recommendation
   if (props.showCompatibility && props.profile) {
     const compatibilityScores = props.items.map((item) => ({
-      id: item.id,
-      compatible:
-        !item.requirements ||
-        item.requirements.every((req) => canMeetRequirement(req.stat, req.value)),
+      aoid: item.aoid,
+      compatible: getItemRequirements(item).every((req) => canMeetRequirement(req.stat, req.value)),
     }));
 
     const compatibleItems = compatibilityScores.filter((score) => score.compatible);
@@ -533,7 +553,7 @@ function getItemStat(item: Item, statId: number): number {
 }
 
 function getItemRequirement(item: Item, statId: number): number | null {
-  const req = item.requirements?.find((r) => r.stat === statId);
+  const req = getItemRequirements(item).find((r) => r.stat === statId);
   return req?.value || null;
 }
 
@@ -547,13 +567,13 @@ function getItemDefenseStat(item: Item, statId: number): number | null {
   return defense?.value || null;
 }
 
-function getComparisonClass(field: string, value: number): string {
+function getComparisonClass(field: string, value: number | undefined): string {
   const values = props.items.map((item) => {
     switch (field) {
       case 'ql':
-        return item.ql;
+        return item.ql ?? 0;
       default:
-        return value;
+        return value ?? 0;
     }
   });
 
@@ -566,8 +586,13 @@ function getComparisonClass(field: string, value: number): string {
   return '';
 }
 
-function getStatComparisonClass(statId: number, value: number): string {
-  const values = props.items.map((item) => getItemStat(item, statId)).filter((v) => v !== 0);
+function getStatComparisonClass(
+  statId: number,
+  statValue: number | null,
+  getValue: (item: Item, statId: number) => number | null = getItemStat
+): string {
+  const value = statValue ?? 0;
+  const values = props.items.map((item) => getValue(item, statId) ?? 0).filter((v) => v !== 0);
 
   if (values.length <= 1) return 'text-surface-500';
 
@@ -598,8 +623,8 @@ function getRequirementComparisonClass(statId: number, value: number | null): st
 }
 
 function canMeetRequirement(statId: number, value: number): boolean {
-  if (!props.profile) return false;
-  const characterStat = props.profile.stats?.[statId] || 0;
+  if (!profileStats.value) return false;
+  const characterStat = profileStats.value[statId] || 0;
   return characterStat >= value;
 }
 
@@ -626,26 +651,13 @@ function getStatName(statId: number): string {
   return statNames[statId] || `Stat ${statId}`;
 }
 
-function getItemClassName(classId: number): string {
-  const classNames: Record<number, string> = {
-    1: '1H Blunt',
-    2: '1H Edged',
-    3: '2H Blunt',
-    4: '2H Edged',
-    5: 'Ranged',
-    6: 'Body',
-    7: 'Head',
-    8: 'Arms',
-    9: 'Legs',
-    10: 'Feet',
-    15: 'Implant',
-    20: 'Utility',
-  };
-  return classNames[classId] || `Class ${classId}`;
+function getItemClassLabel(classId: number | undefined): string {
+  if (classId === undefined) return 'Unknown';
+  return getItemClassName(classId) || `Class ${classId}`;
 }
 
-function getItemName(itemId: number): string {
-  const item = props.items.find((i) => i.id === itemId);
+function getItemName(aoid: number): string {
+  const item = props.items.find((i) => i.aoid === aoid);
   return item?.name || 'Unknown';
 }
 
@@ -656,7 +668,7 @@ function refreshComparison() {
 
 function calculateComparisonScores() {
   props.items.forEach((item) => {
-    comparisonScores.value[item.id] = {
+    comparisonScores.value[item.aoid] = {
       overall: 0.8, // Mock score
       stats: 0.7,
       requirements: 0.9,
@@ -669,14 +681,14 @@ function exportComparison() {
   // Export comparison data as CSV or JSON
   const data = {
     items: props.items.map((item) => ({
-      id: item.id,
+      aoid: item.aoid,
       name: item.name,
       ql: item.ql,
       stats: item.stats,
-      requirements: item.requirements,
+      requirements: getItemRequirements(item),
     })),
     timestamp: new Date().toISOString(),
-    profile: props.profile?.name || null,
+    profile: props.profile?.Character.Name || null,
   };
 
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });

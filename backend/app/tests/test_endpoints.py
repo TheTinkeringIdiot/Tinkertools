@@ -1,25 +1,24 @@
 """
 Unit tests for API endpoints.
 
-Uses service layer mocking to avoid database transaction isolation issues.
-Tests validate HTTP request/response handling without database dependencies.
+Request validation is tested without a database. The list and search
+endpoints run against the real game data (the shared ``client`` fixture) and are
+compared with what the store's loader reads for the same build. The same
+routes are tested on controlled data in test_store_read.py and
+test_item_search.py.
 """
 
+import math
+
 import pytest
-from unittest.mock import Mock, patch
 from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
+from sqlalchemy import func, or_, select
 
 from app.main import app
-from app.core.database import get_db
-from app.api.schemas import (
-    ItemDetail,
-    StatValueResponse,
-    SpellDataResponse,
-    ActionResponse,
-    CriterionResponse,
-    SpellWithCriteria
-)
+from app.store import tables as t
+from app.store.items import load_records, load_sources
+from app.store.presence import revisions
+from app.tests.db_test_constants import ITEM_PISTOL_MASTERY
 
 
 class TestGeneralEndpoints:
@@ -27,14 +26,8 @@ class TestGeneralEndpoints:
 
     @pytest.fixture
     def client(self):
-        """Create a test client with mocked database dependency."""
-        def override_get_db():
-            return Mock(spec=Session)
-
-        app.dependency_overrides[get_db] = override_get_db
-        client = TestClient(app)
-        yield client
-        app.dependency_overrides.clear()
+        """Create a test client; these requests are answered without a database."""
+        return TestClient(app)
 
     def test_health_endpoint(self, client):
         """Test health check endpoint."""
@@ -60,410 +53,12 @@ class TestItemEndpoints:
 
     @pytest.fixture
     def client(self):
-        """Create a test client with mocked database dependency."""
-        def override_get_db():
-            return Mock(spec=Session)
-
-        app.dependency_overrides[get_db] = override_get_db
-        client = TestClient(app)
-        yield client
-        app.dependency_overrides.clear()
-
-    @pytest.fixture
-    def mock_item_detail(self):
-        """Create a mock ItemDetail response."""
-        return ItemDetail(
-            id=1,
-            aoid=12345,
-            name="Test Weapon",
-            ql=200,
-            item_class=1,
-            description="A test weapon",
-            is_nano=False,
-            stats=[
-                StatValueResponse(id=1, stat=16, value=50)
-            ],
-            spell_data=[
-                SpellDataResponse(
-                    id=1,
-                    event=1,
-                    spells=[
-                        SpellWithCriteria(
-                            id=1,
-                            target=1,
-                            tick_count=None,
-                            tick_interval=None,
-                            spell_id=98765,
-                            spell_format="Increase {stat} by {value}",
-                            spell_params={"stat": 96, "value": 15},
-                            criteria=[]
-                        )
-                    ]
-                )
-            ],
-            attack_stats=[
-                StatValueResponse(id=2, stat=100, value=200)
-            ],
-            defense_stats=[
-                StatValueResponse(id=3, stat=101, value=150)
-            ],
-            actions=[
-                ActionResponse(
-                    id=1,
-                    action=1,
-                    item_id=1,
-                    criteria=[
-                        CriterionResponse(id=1, value1=16, value2=100, operator=1)
-                    ]
-                )
-            ],
-            sources=[]
-        )
-
-    @pytest.fixture
-    def mock_enhanced_item_detail(self):
-        """Create a mock ItemDetail with all fields populated."""
-        return ItemDetail(
-            id=2,
-            aoid=54321,
-            name="Enhanced Test Weapon",
-            ql=150,
-            item_class=1,
-            description="A comprehensive test weapon",
-            is_nano=False,
-            stats=[
-                StatValueResponse(id=4, stat=16, value=50),  # Strength
-                StatValueResponse(id=5, stat=17, value=25)   # Intelligence
-            ],
-            spell_data=[
-                SpellDataResponse(
-                    id=2,
-                    event=1,
-                    spells=[
-                        SpellWithCriteria(
-                            id=2,
-                            target=1,
-                            tick_count=None,
-                            tick_interval=None,
-                            spell_id=98765,
-                            spell_format="Increase {stat} by {value}",
-                            spell_params={"stat": 96, "value": 15},
-                            criteria=[]
-                        )
-                    ]
-                )
-            ],
-            attack_stats=[
-                StatValueResponse(id=6, stat=100, value=200)
-            ],
-            defense_stats=[
-                StatValueResponse(id=7, stat=101, value=150)
-            ],
-            actions=[
-                ActionResponse(
-                    id=2,
-                    action=1,
-                    item_id=2,
-                    criteria=[
-                        CriterionResponse(id=2, value1=16, value2=100, operator=1)
-                    ]
-                )
-            ],
-            sources=[]
-        )
+        """Create a test client; these requests are answered without a database."""
+        return TestClient(app)
 
     # ============================================================================
-    # GET /api/v1/items Tests
+    # Validation Error Tests
     # ============================================================================
-
-    @patch('app.api.routes.items.build_item_detail')
-    def test_get_items_empty(self, mock_build_item_detail, client):
-        """Test getting items when no items match criteria."""
-        # Mock database query to return empty list
-        with patch('app.core.database.get_db') as mock_get_db:
-            mock_db = Mock()
-            mock_query = Mock()
-            mock_query.options.return_value.count.return_value = 0
-            mock_query.options.return_value.offset.return_value.limit.return_value.all.return_value = []
-            mock_db.query.return_value = mock_query
-            mock_get_db.return_value = mock_db
-
-            # Override get_db for this test
-            def override_get_db():
-                yield mock_db
-            app.dependency_overrides[get_db] = override_get_db
-
-            response = client.get("/api/v1/items")
-
-            app.dependency_overrides.clear()
-
-            # With mocked database, will get empty results
-            assert response.status_code == 200
-            data = response.json()
-            assert "items" in data
-            assert "total" in data
-            assert "page" in data
-
-    @patch('app.api.routes.items.build_item_detail')
-    def test_get_item_by_aoid_success(self, mock_build_item_detail, client, mock_item_detail):
-        """Test getting a specific item by AOID."""
-        mock_build_item_detail.return_value = mock_item_detail
-
-        # Mock the database query to return an item
-        mock_item = Mock()
-        mock_item.aoid = 12345
-
-        with patch('app.core.database.get_db') as mock_get_db:
-            mock_db = Mock()
-            mock_query = Mock()
-            mock_query.options.return_value.filter.return_value.first.return_value = mock_item
-            mock_db.query.return_value = mock_query
-            mock_get_db.return_value = mock_db
-
-            # Override get_db for this test
-            def override_get_db():
-                yield mock_db
-            app.dependency_overrides[get_db] = override_get_db
-
-            response = client.get("/api/v1/items/12345")
-
-            app.dependency_overrides.clear()
-
-            assert response.status_code == 200
-            data = response.json()
-            assert data["name"] == "Test Weapon"
-            assert data["aoid"] == 12345
-
-            # Check that all required fields are present
-            assert "stats" in data
-            assert "spell_data" in data
-            assert "attack_stats" in data
-            assert "defense_stats" in data
-            assert "actions" in data
-
-            # Verify they are lists
-            assert isinstance(data["stats"], list)
-            assert isinstance(data["spell_data"], list)
-            assert isinstance(data["attack_stats"], list)
-            assert isinstance(data["defense_stats"], list)
-            assert isinstance(data["actions"], list)
-
-    def test_get_item_not_found(self, client):
-        """Test getting non-existent item."""
-        # Mock the database query to return None
-        with patch('app.core.database.get_db') as mock_get_db:
-            mock_db = Mock()
-            mock_query = Mock()
-            mock_query.options.return_value.filter.return_value.first.return_value = None
-            mock_db.query.return_value = mock_query
-            mock_get_db.return_value = mock_db
-
-            # Override get_db for this test
-            def override_get_db():
-                yield mock_db
-            app.dependency_overrides[get_db] = override_get_db
-
-            response = client.get("/api/v1/items/999")
-
-            app.dependency_overrides.clear()
-
-            assert response.status_code == 404
-            data = response.json()
-            assert "error" in data
-
-    @patch('app.api.routes.items.build_item_detail')
-    def test_get_item_with_all_fields(self, mock_build_item_detail, client, mock_enhanced_item_detail):
-        """Test getting an item with all fields populated."""
-        mock_build_item_detail.return_value = mock_enhanced_item_detail
-
-        # Mock the database query to return an item
-        mock_item = Mock()
-        mock_item.aoid = 54321
-
-        with patch('app.core.database.get_db') as mock_get_db:
-            mock_db = Mock()
-            mock_query = Mock()
-            mock_query.options.return_value.filter.return_value.first.return_value = mock_item
-            mock_db.query.return_value = mock_query
-            mock_get_db.return_value = mock_db
-
-            # Override get_db for this test
-            def override_get_db():
-                yield mock_db
-            app.dependency_overrides[get_db] = override_get_db
-
-            response = client.get("/api/v1/items/54321")
-
-            app.dependency_overrides.clear()
-
-            assert response.status_code == 200
-            data = response.json()
-
-            # Basic item info
-            assert data["name"] == "Enhanced Test Weapon"
-            assert data["aoid"] == 54321
-            assert data["ql"] == 150
-            assert data["item_class"] == 1
-            assert data["is_nano"] is False
-
-            # Test stats (should have 2 stats)
-            assert len(data["stats"]) == 2
-            stat_values = [stat["value"] for stat in data["stats"]]
-            assert 50 in stat_values  # Strength
-            assert 25 in stat_values  # Intelligence
-
-            # Test spell data (should have 1 spell data with 1 spell)
-            assert len(data["spell_data"]) == 1
-            spell_data = data["spell_data"][0]
-            assert spell_data["event"] == 1
-            assert len(spell_data["spells"]) == 1
-
-            spell = spell_data["spells"][0]
-            assert spell["spell_id"] == 98765
-            assert spell["spell_format"] == "Increase {stat} by {value}"
-            assert spell["spell_params"]["stat"] == 96
-            assert spell["spell_params"]["value"] == 15
-
-            # Test attack/defense stats
-            assert len(data["attack_stats"]) == 1
-            assert len(data["defense_stats"]) == 1
-            assert data["attack_stats"][0]["value"] == 200
-            assert data["defense_stats"][0]["value"] == 150
-
-            # Test actions (should have 1 action with 1 criterion)
-            assert len(data["actions"]) == 1
-            action = data["actions"][0]
-            assert action["action"] == 1
-            assert len(action["criteria"]) == 1
-
-            criterion = action["criteria"][0]
-            assert criterion["value1"] == 16  # Strength stat
-            assert criterion["value2"] == 100  # Required value
-            assert criterion["operator"] == 1  # >= operator
-
-    # ============================================================================
-    # GET /api/v1/items/search Tests
-    # ============================================================================
-
-    @patch('app.api.routes.items.build_item_detail')
-    def test_search_items_success(self, mock_build_item_detail, client, mock_item_detail):
-        """Test item search functionality."""
-        mock_build_item_detail.return_value = mock_item_detail
-
-        # Mock the database query to return items
-        mock_item = Mock()
-        mock_item.aoid = 12345
-        mock_item.name = "Test Weapon"
-
-        with patch('app.core.database.get_db') as mock_get_db:
-            mock_db = Mock()
-            mock_query = Mock()
-            mock_query.options.return_value.filter.return_value.order_by.return_value.count.return_value = 1
-            mock_query.options.return_value.filter.return_value.order_by.return_value.offset.return_value.limit.return_value.all.return_value = [mock_item]
-            mock_db.query.return_value = mock_query
-            mock_get_db.return_value = mock_db
-
-            # Override get_db for this test
-            def override_get_db():
-                yield mock_db
-            app.dependency_overrides[get_db] = override_get_db
-
-            response = client.get("/api/v1/items/search?q=Test%20Weapon")
-
-            app.dependency_overrides.clear()
-
-            assert response.status_code == 200
-            data = response.json()
-            assert "items" in data
-            assert len(data["items"]) >= 0
-
-    @patch('app.api.routes.items.build_item_detail')
-    def test_search_items_returns_detailed_items(self, mock_build_item_detail, client, mock_enhanced_item_detail):
-        """Test that the item search endpoint returns detailed item information."""
-        mock_build_item_detail.return_value = mock_enhanced_item_detail
-
-        # Mock the database query
-        mock_item = Mock()
-        mock_item.aoid = 54321
-
-        with patch('app.core.database.get_db') as mock_get_db:
-            mock_db = Mock()
-            mock_query = Mock()
-            mock_query.options.return_value.filter.return_value.order_by.return_value.count.return_value = 1
-            mock_query.options.return_value.filter.return_value.order_by.return_value.offset.return_value.limit.return_value.all.return_value = [mock_item]
-            mock_db.query.return_value = mock_query
-            mock_get_db.return_value = mock_db
-
-            # Override get_db for this test
-            def override_get_db():
-                yield mock_db
-            app.dependency_overrides[get_db] = override_get_db
-
-            response = client.get("/api/v1/items/search?q=Enhanced%20Test%20Weapon")
-
-            app.dependency_overrides.clear()
-
-            assert response.status_code == 200
-            data = response.json()
-
-            assert len(data["items"]) == 1
-            item = data["items"][0]
-
-            # Verify all fields are present in search results
-            assert "stats" in item
-            assert "spell_data" in item
-            assert "attack_stats" in item
-            assert "defense_stats" in item
-            assert "actions" in item
-
-            # Should contain actual data
-            assert len(item["stats"]) == 2
-            assert len(item["spell_data"]) == 1
-            assert len(item["actions"]) == 1
-
-    # ============================================================================
-    # Pagination and Filtering Tests
-    # ============================================================================
-
-    @patch('app.api.routes.items.build_item_detail')
-    def test_pagination(self, mock_build_item_detail, client, mock_item_detail):
-        """Test pagination functionality."""
-        # Create multiple mock items
-        mock_items = []
-        for i in range(10):
-            mock_item = Mock()
-            mock_item.aoid = 10000 + i
-            mock_item.name = f"Pagination Test Item {i}"
-            mock_items.append(mock_item)
-
-        mock_build_item_detail.return_value = mock_item_detail
-
-        with patch('app.core.database.get_db') as mock_get_db:
-            mock_db = Mock()
-            mock_query = Mock()
-
-            # Mock first page
-            mock_query.options.return_value.filter.return_value.order_by.return_value.count.return_value = 10
-            mock_query.options.return_value.filter.return_value.order_by.return_value.offset.return_value.limit.return_value.all.return_value = mock_items[:5]
-            mock_db.query.return_value = mock_query
-            mock_get_db.return_value = mock_db
-
-            # Override get_db for this test
-            def override_get_db():
-                yield mock_db
-            app.dependency_overrides[get_db] = override_get_db
-
-            # Test first page
-            response = client.get("/api/v1/items/search?q=Pagination%20Test%20Item&page=1&page_size=5")
-
-            app.dependency_overrides.clear()
-
-            assert response.status_code == 200
-            data = response.json()
-            assert data["total"] == 10
-            assert data["pages"] == 2
-            assert data["has_next"] is True
-            assert data["has_prev"] is False
 
     def test_error_handling_validation(self, client):
         """Test validation error handling."""
@@ -473,117 +68,187 @@ class TestItemEndpoints:
         assert "error" in data
         assert data["code"] == "VALIDATION_ERROR"
 
-    # ============================================================================
-    # Edge Cases and Error Handling Tests
-    # ============================================================================
-
-    def test_get_items_with_filters(self, client):
-        """Test item filtering with query parameters."""
-        with patch('app.core.database.get_db') as mock_get_db:
-            mock_db = Mock()
-            mock_query = Mock()
-
-            # Need to handle complex filter chain with multiple filter() calls
-            # The actual query chain is: query.options().filter().filter().filter()...count()
-            mock_filtered = Mock()
-            mock_filtered.filter = Mock(return_value=mock_filtered)  # Return self for chaining
-            mock_filtered.distinct = Mock(return_value=mock_filtered)  # Return self for chaining
-            mock_filtered.count.return_value = 0
-            mock_filtered.offset.return_value.limit.return_value.all.return_value = []
-
-            # Setup the chain
-            mock_query.options.return_value = mock_filtered
-
-            mock_db.query.return_value = mock_query
-            mock_get_db.return_value = mock_db
-
-            # Override get_db for this test
-            def override_get_db():
-                yield mock_db
-            app.dependency_overrides[get_db] = override_get_db
-
-            response = client.get("/api/v1/items?item_class=1&min_ql=100&max_ql=200")
-
-            app.dependency_overrides.clear()
-
-            assert response.status_code == 200
-            data = response.json()
-            assert "items" in data
-            assert "total" in data
-
     def test_search_items_min_query_length(self, client):
         """Test search requires minimum query length."""
         response = client.get("/api/v1/items/search?q=")
         assert response.status_code == 422  # Validation error
 
-    @patch('app.api.routes.items.build_item_detail')
-    def test_search_with_exact_match_parameter(self, mock_build_item_detail, client, mock_item_detail):
-        """Test search with exact_match parameter."""
-        mock_build_item_detail.return_value = mock_item_detail
 
-        mock_item = Mock()
-        mock_item.aoid = 12345
+class TestItemListAndSearchEndpoints:
+    """Test cases for the item list and search endpoints against real data."""
 
-        with patch('app.core.database.get_db') as mock_get_db:
-            mock_db = Mock()
-            mock_query = Mock()
-            mock_query.options.return_value.filter.return_value.order_by.return_value.count.return_value = 1
-            mock_query.options.return_value.filter.return_value.order_by.return_value.offset.return_value.limit.return_value.all.return_value = [mock_item]
-            mock_db.query.return_value = mock_query
-            mock_get_db.return_value = mock_db
+    @pytest.fixture
+    def pistol_mastery(self, store_db, build):
+        """Pistol Mastery: a real item with stats, spell data and actions."""
+        (record,) = load_records(store_db, build, aoids=[ITEM_PISTOL_MASTERY])
+        return record
 
-            # Override get_db for this test
-            def override_get_db():
-                yield mock_db
-            app.dependency_overrides[get_db] = override_get_db
+    @pytest.fixture
+    def sources(self, store_db, build, pistol_mastery):
+        """The sources the build serves for Pistol Mastery."""
+        aoid = pistol_mastery.aoid
+        return load_sources(store_db, build, [aoid]).get(aoid, [])
 
-            # Test with exact match
-            response = client.get("/api/v1/items/search?q=Test&exact_match=true")
-            assert response.status_code == 200
+    # ============================================================================
+    # GET /api/v1/items Tests
+    # ============================================================================
 
-            # Test with fuzzy match
-            response = client.get("/api/v1/items/search?q=Test&exact_match=false")
-            assert response.status_code == 200
+    def test_get_items_empty(self, client):
+        """Test getting items when no items match criteria."""
+        response = client.get("/api/v1/items?min_ql=100000")
 
-            app.dependency_overrides.clear()
+        assert response.status_code == 200
+        data = response.json()
+        assert data["items"] == []
+        assert data["total"] == 0
+        assert data["page"] == 1
+        assert data["pages"] == 1
+        assert data["has_next"] is False
+        assert data["has_prev"] is False
 
-    @patch('app.api.routes.items.build_item_detail')
-    def test_get_items_returns_detailed_items(self, mock_build_item_detail, client, mock_enhanced_item_detail):
+    def test_get_items_with_filters(self, client, store_db, build):
+        """Test item filtering with query parameters."""
+        revision = t.item_revision
+        matching = revisions(build).where(
+            revision.c.item_class == 1, revision.c.ql >= 100, revision.c.ql <= 200
+        )
+        expected_total = store_db.execute(
+            select(func.count()).select_from(matching.subquery())
+        ).scalar_one()
+        assert expected_total > 0
+
+        response = client.get(
+            "/api/v1/items?item_class=1&min_ql=100&max_ql=200&page_size=100"
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == expected_total
+        assert len(data["items"]) == min(100, expected_total)
+        for item in data["items"]:
+            assert item["item_class"] == 1
+            assert 100 <= item["ql"] <= 200
+
+    def test_get_items_returns_detailed_items(self, client, pistol_mastery, sources):
         """Test that the items list endpoint returns detailed item information."""
-        mock_build_item_detail.return_value = mock_enhanced_item_detail
+        response = client.get(
+            f"/api/v1/items?min_ql={pistol_mastery.ql}&max_ql={pistol_mastery.ql}"
+            "&page_size=1000"
+        )
 
-        mock_item = Mock()
-        mock_item.aoid = 54321
+        assert response.status_code == 200
+        items = {item["aoid"]: item for item in response.json()["items"]}
+        assert pistol_mastery.aoid in items
+        self._assert_matches_store(items[pistol_mastery.aoid], pistol_mastery, sources)
 
-        with patch('app.core.database.get_db') as mock_get_db:
-            mock_db = Mock()
-            mock_query = Mock()
-            mock_query.options.return_value.filter.return_value.order_by.return_value.count.return_value = 1
-            mock_query.options.return_value.filter.return_value.order_by.return_value.offset.return_value.limit.return_value.all.return_value = [mock_item]
-            # For simple listing (no search), no order_by in chain
-            mock_query.options.return_value.count.return_value = 1
-            mock_query.options.return_value.offset.return_value.limit.return_value.all.return_value = [mock_item]
-            mock_db.query.return_value = mock_query
-            mock_get_db.return_value = mock_db
+    # ============================================================================
+    # GET /api/v1/items/{aoid} Tests
+    # ============================================================================
 
-            # Override get_db for this test
-            def override_get_db():
-                yield mock_db
-            app.dependency_overrides[get_db] = override_get_db
+    def test_get_item_returns_the_item_with_its_related_data(
+        self, client, pistol_mastery, sources
+    ):
+        """Item detail carries every part the store holds for the item."""
+        response = client.get(f"/api/v1/items/{pistol_mastery.aoid}")
 
-            response = client.get("/api/v1/items/search?q=Enhanced%20Test%20Weapon")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["aoid"] == pistol_mastery.aoid
+        assert data["stats"] and data["spell_data"] and data["sources"]
+        self._assert_matches_store(data, pistol_mastery, sources)
 
-            app.dependency_overrides.clear()
+    def test_get_item_not_found(self, client):
+        response = client.get("/api/v1/items/999999999")
 
+        assert response.status_code == 404
+        assert response.json() == {"error": "Item not found", "code": "HTTP_404"}
+
+    # ============================================================================
+    # GET /api/v1/items/search Tests
+    # ============================================================================
+
+    def test_search_items_success(self, client, pistol_mastery):
+        """Test item search finds a real item by name."""
+        response = client.get(f"/api/v1/items/search?q={pistol_mastery.name}")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] >= 1
+        assert all(
+            pistol_mastery.name.lower() in item["name"].lower()
+            or pistol_mastery.name.lower() in (item["description"] or "").lower()
+            for item in data["items"]
+        )
+        assert pistol_mastery.aoid in [item["aoid"] for item in data["items"]]
+
+    def test_search_items_returns_detailed_items(self, client, pistol_mastery, sources):
+        """Test that the item search endpoint returns detailed item information."""
+        response = client.get(
+            f"/api/v1/items/search?q={pistol_mastery.name}&page_size=1000"
+        )
+
+        assert response.status_code == 200
+        items = {item["aoid"]: item for item in response.json()["items"]}
+        assert pistol_mastery.aoid in items
+        self._assert_matches_store(items[pistol_mastery.aoid], pistol_mastery, sources)
+
+    def test_pagination(self, client, store_db, build, pistol_mastery):
+        """Test that search pages partition the full result set."""
+        # The term matches several items sharing a name ("Nano Can: Pistol
+        # Mastery"), so pages only partition cleanly with a unique sort order
+        term = pistol_mastery.name
+        text = t.part_text
+        expected_aoids = set(
+            store_db.execute(
+                revisions(build, t.item_revision.c.aoid)
+                .join(text, text.c.text_id == t.item_revision.c.text_id)
+                .where(
+                    or_(
+                        text.c.name.ilike(f"%{term}%"),
+                        text.c.description.ilike(f"%{term}%"),
+                    )
+                )
+            ).scalars()
+        )
+        page_size = 5
+        expected_pages = math.ceil(len(expected_aoids) / page_size)
+        assert expected_pages > 1
+
+        seen_aoids = []
+        for page in range(1, expected_pages + 1):
+            response = client.get(
+                f"/api/v1/items/search?q={term}&page={page}&page_size={page_size}"
+            )
             assert response.status_code == 200
             data = response.json()
+            assert data["total"] == len(expected_aoids)
+            assert data["pages"] == expected_pages
+            assert data["has_prev"] is (page > 1)
+            assert data["has_next"] is (page < expected_pages)
+            seen_aoids.extend(item["aoid"] for item in data["items"])
 
-            if len(data["items"]) > 0:
-                item = data["items"][0]
+        assert len(seen_aoids) == len(set(seen_aoids))
+        assert set(seen_aoids) == expected_aoids
 
-                # Verify all fields are present in list view
-                assert "stats" in item
-                assert "spell_data" in item
-                assert "attack_stats" in item
-                assert "defense_stats" in item
-                assert "actions" in item
+    def test_search_with_exact_match_parameter(self, client, pistol_mastery):
+        """Test search with exact_match parameter."""
+        for exact_match in ("true", "false"):
+            response = client.get(
+                f"/api/v1/items/search?q={pistol_mastery.name}"
+                f"&exact_match={exact_match}&page_size=1000"
+            )
+            assert response.status_code == 200
+            aoids = [item["aoid"] for item in response.json()["items"]]
+            assert pistol_mastery.aoid in aoids
+
+    @staticmethod
+    def _assert_matches_store(item_json, record, sources):
+        """Check an ItemDetail payload against the item the store holds."""
+        assert item_json["name"] == record.name
+        assert item_json["ql"] == record.ql
+        assert len(item_json["stats"]) == len(record.stats)
+        assert len(item_json["spell_data"]) == len(record.effects)
+        assert len(item_json["actions"]) == len(record.actions)
+        assert len(item_json["sources"]) == len(sources)
+        assert len(item_json["attack_stats"]) == len(record.attack)
+        assert len(item_json["defense_stats"]) == len(record.defense)

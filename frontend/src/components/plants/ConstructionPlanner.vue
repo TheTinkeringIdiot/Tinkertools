@@ -149,7 +149,7 @@ Advanced implant construction analysis and step-by-step instructions
               on-icon="pi pi-check"
               off-icon="pi pi-times"
               class="w-32"
-              @change="setAutoAnalysis($event.value)"
+              @change="setAutoAnalysis(autoAnalyze)"
             />
             <span class="text-xs text-surface-600 dark:text-surface-400">
               Auto-analyze when configuration changes
@@ -204,7 +204,7 @@ Advanced implant construction analysis and step-by-step instructions
 
     <!-- Construction Analysis Results -->
     <ConstructionSteps
-      v-if="currentPlan"
+      v-if="currentPlan && selectedSlot"
       :plan="currentPlan"
       :selected-slot="selectedSlot"
       :skills="currentSkills"
@@ -259,11 +259,11 @@ Advanced implant construction analysis and step-by-step instructions
 <script setup lang="ts">
 import { ref, computed, watch, reactive } from 'vue';
 import { useConstructionPlanner } from '@/composables/useConstructionPlanner';
+import type { ImplantsData } from '@/composables/useConstructionPlanner';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
 import { useTinkerPlantsStore } from '@/stores/tinkerPlants';
 import { skillService } from '@/services/skill-service';
 import { IMPLANT_SLOT } from '@/services/game-data';
-import Button from 'primevue/button';
 import Dropdown from 'primevue/dropdown';
 import InputNumber from 'primevue/inputnumber';
 import ToggleButton from 'primevue/togglebutton';
@@ -306,7 +306,7 @@ const slotNameToBitflag: Record<string, string> = {
 // Transform from bitflag keys + stat IDs to slot name keys + stat names
 const implantData = computed(() => {
   const config = tinkerPlantsStore.currentConfiguration;
-  const transformed: Record<string, any> = {};
+  const transformed: ImplantsData = {};
 
   // Transform from bitflag keys to slot name keys
   for (const [slotName, bitflag] of Object.entries(slotNameToBitflag)) {
@@ -330,13 +330,8 @@ const {
   currentPlan,
   selectedSlot,
   selectedImplantConfig,
-  isAnalyzing,
   lastError,
-  isAutoAnalyzing,
   availableSlots,
-  hasValidSkills,
-  hasValidImplantConfig,
-  canAnalyze,
   constructionFeasibility,
   skillRecommendations,
   setSkills,
@@ -395,7 +390,8 @@ function onSkillChange() {
 }
 
 function onSlotChange() {
-  selectSlotForAnalysis(selectedSlotLocal.value);
+  // No immediate analysis is requested, so there is nothing to await
+  void selectSlotForAnalysis(selectedSlotLocal.value);
 }
 
 // ============================================================================

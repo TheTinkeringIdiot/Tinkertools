@@ -9,11 +9,28 @@
 export { TinkerProfilesManager } from './manager';
 export { ProfileValidator } from './validator';
 export { ProfileStorage } from './storage';
-export { ProfileTransformer } from './transformer';
+export { ProfileTransformer, interpolatedToItem } from './transformer';
+
+export {
+  currentGameVersion,
+  gameVersionDisplayName,
+  firstVersionOfFamily,
+  familyOf,
+  versionForImport,
+  stampGameVersion,
+  profileMatchesVersion,
+} from './game-version';
+export type { ProfileImportSource, ImportVersionTarget } from './game-version';
+
+export { buildVersionCopy, buildSummary as buildVersionCopySummary } from './version-copy';
+export type { ProfileVersionCopyResult, MissingItemReport } from './version-copy';
 
 export type {
   TinkerProfile,
-  SkillWithIP,
+  ReadonlyTinkerProfile,
+  VersionFlaggedItem,
+  ImplantWithClusters,
+  SkillData,
   ProfileMetadata,
   ProfileExportFormat,
   ProfileImportResult,
@@ -23,6 +40,8 @@ export type {
   ProfileStorageOptions,
   ProfileEvents,
   TinkerProfilesConfig,
+  ProfileSearchFilters,
+  ProfileSortOptions,
 } from './types';
 
 export {

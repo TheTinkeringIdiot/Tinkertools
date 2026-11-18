@@ -1,8 +1,13 @@
 <template>
   <div class="criteria-display">
+    <!-- No Requirements -->
+    <div v-if="listedRequirements.length === 0 && !useTreeDisplay" class="no-requirements">
+      <span class="text-muted text-sm">No requirements</span>
+    </div>
+
     <!-- Tree Display Mode (default for complex criteria) -->
     <CriteriaTreeDisplay
-      v-if="useTreeDisplay"
+      v-else-if="useTreeDisplay"
       :criteria="criteria"
       :character-stats="characterStats"
       :show-summary="expanded"
@@ -13,11 +18,11 @@
     />
 
     <!-- Simple Chip Display (for basic requirements) -->
-    <div v-else-if="!expanded && statRequirements.length <= 2" class="simple-view">
+    <div v-else-if="!expanded && listedRequirements.length <= 2" class="simple-view">
       <div class="flex flex-wrap gap-2">
         <CriterionChip
-          v-for="criterion in statRequirements"
-          :key="criterion.id"
+          v-for="(criterion, index) in listedRequirements"
+          :key="index"
           :criterion="criterion"
           :character-stats="characterStats"
           size="small"
@@ -30,9 +35,11 @@
     <div v-else-if="!expanded" class="compact-view">
       <div class="flex items-center justify-between">
         <span class="text-sm font-medium">
-          {{ statRequirements.length }} requirement{{ statRequirements.length !== 1 ? 's' : '' }}
+          {{ listedRequirements.length }} requirement{{
+            listedRequirements.length !== 1 ? 's' : ''
+          }}
         </span>
-        <Button text size="small" @click="showExpanded = !showExpanded" class="text-xs">
+        <Button text size="small" class="text-xs" @click="showExpanded = !showExpanded">
           {{ showExpanded ? 'Hide' : 'Show' }}
         </Button>
       </div>
@@ -41,8 +48,8 @@
       <Transition name="slide-down">
         <div v-if="showExpanded" class="mt-2 space-y-2">
           <CriterionChip
-            v-for="criterion in statRequirements"
-            :key="criterion.id"
+            v-for="(criterion, index) in listedRequirements"
+            :key="index"
             :criterion="criterion"
             :character-stats="characterStats"
             size="small"
@@ -53,12 +60,12 @@
     </div>
 
     <!-- Fallback: Legacy Expanded View -->
-    <div v-else-if="!useTreeDisplay" class="legacy-expanded-view space-y-3">
+    <div v-else class="legacy-expanded-view space-y-3">
       <div class="text-sm font-medium mb-2">Requirements:</div>
       <div class="space-y-2">
         <CriterionChip
-          v-for="criterion in statRequirements"
-          :key="criterion.id"
+          v-for="(criterion, index) in listedRequirements"
+          :key="index"
           :criterion="criterion"
           :character-stats="characterStats"
           size="normal"
@@ -67,38 +74,41 @@
       </div>
 
       <!-- Character Evaluation Summary -->
-      <div v-if="characterStats && statRequirements.length > 0" class="evaluation-summary">
+      <div v-if="evaluation" class="evaluation-summary">
         <Divider />
         <div class="flex items-center justify-between">
           <span class="text-sm font-medium">Your Character:</span>
           <Tag
-            :severity="allRequirementsMet ? 'success' : 'danger'"
-            :value="allRequirementsMet ? 'Meets Requirements' : 'Missing Requirements'"
+            v-tooltip.top="
+              evaluation.status === 'unknown'
+                ? 'Depends on conditions your profile does not record'
+                : undefined
+            "
+            :severity="SUMMARY[evaluation.status].severity"
+            :value="SUMMARY[evaluation.status].label"
           />
         </div>
 
         <!-- Unmet Requirements -->
-        <div v-if="!allRequirementsMet && unmetRequirements.length > 0" class="mt-2">
+        <div v-if="evaluation.unmetRequirements.length > 0" class="mt-2">
           <div class="text-xs text-muted mb-1">Missing:</div>
-          <div class="space-y-1">
+          <div class="space-y-1 unmet-list">
             <div
-              v-for="req in unmetRequirements"
-              :key="`unmet-${req.stat}`"
+              v-for="(req, index) in evaluation.unmetRequirements"
+              :key="`unmet-${index}`"
               class="flex justify-between text-xs text-danger"
             >
-              <span>{{ req.statName }}</span>
-              <span class="font-mono">
-                {{ req.current }}/{{ req.required }} (need {{ req.required - req.current }} more)
-              </span>
+              <template v-if="req.description">{{ req.description }}</template>
+              <template v-else>
+                <span>{{ req.statName }}</span>
+                <span class="font-mono">
+                  {{ req.current }}/{{ req.required }} (need {{ req.required - req.current }} more)
+                </span>
+              </template>
             </div>
           </div>
         </div>
       </div>
-    </div>
-
-    <!-- No Requirements -->
-    <div v-else-if="!criteria || criteria.length === 0" class="no-requirements">
-      <span class="text-muted text-sm">No requirements</span>
     </div>
   </div>
 </template>
@@ -111,7 +121,12 @@ import Divider from 'primevue/divider';
 import CriterionChip from './CriterionChip.vue';
 import CriteriaTreeDisplay from './CriteriaTreeDisplay.vue';
 import { useCriteriaDisplay } from '../composables/useActionCriteria';
-import { shouldUseTreeDisplay } from '../services/action-criteria';
+import {
+  checkActionRequirements,
+  isRequirementCriterion,
+  parseAction,
+  shouldUseTreeDisplay,
+} from '../services/action-criteria';
 import type { Criterion } from '../types/api';
 import type { CharacterStats } from '../composables/useActionCriteria';
 
@@ -144,14 +159,7 @@ const showExpanded = ref(false);
 
 const criteriaRef = computed(() => props.criteria);
 
-const {
-  displayCriteria,
-  statRequirements,
-  logicalOperators,
-  expression,
-  formattedText,
-  groupedRequirements,
-} = useCriteriaDisplay(criteriaRef);
+const { displayCriteria } = useCriteriaDisplay(criteriaRef);
 
 // ============================================================================
 // Computed Properties
@@ -161,82 +169,23 @@ const useTreeDisplay = computed(() => {
   return shouldUseTreeDisplay(props.criteria);
 });
 
-const stateRequirements = computed(() => {
-  return displayCriteria.value.filter(
-    (c) => !c.isStatRequirement && !c.isLogicalOperator && !c.isSeparator
-  );
-});
+/** Everything the criteria require: stats, and conditions on nanos, items, state... */
+const listedRequirements = computed(() => displayCriteria.value.filter(isRequirementCriterion));
 
-const hasLogicalOperators = computed(() => {
-  return logicalOperators.value.length > 0;
-});
+const SUMMARY = {
+  met: { label: 'Meets Requirements', severity: 'success' },
+  unmet: { label: 'Missing Requirements', severity: 'danger' },
+  unknown: { label: 'Depends on Conditions', severity: 'info' },
+} as const;
 
-const allRequirementsMet = computed(() => {
-  if (!props.characterStats) return null;
-
-  return statRequirements.value.every((criterion) => {
-    const currentValue = props.characterStats![criterion.stat] || 0;
-
-    switch (criterion.displaySymbol) {
-      case '=':
-        return currentValue === criterion.displayValue;
-      case '≤':
-        return currentValue <= criterion.displayValue;
-      case '≥':
-        return currentValue >= criterion.displayValue;
-      case '≠':
-        return currentValue !== criterion.displayValue;
-      case 'has':
-        return (currentValue & criterion.displayValue) === criterion.displayValue;
-      case 'lacks':
-        return (currentValue & criterion.displayValue) === 0;
-      default:
-        return true;
-    }
-  });
-});
-
-const unmetRequirements = computed(() => {
-  if (!props.characterStats) return [];
-
-  return statRequirements.value
-    .map((criterion) => {
-      const currentValue = props.characterStats![criterion.stat] || 0;
-      let requirementMet = false;
-
-      switch (criterion.displaySymbol) {
-        case '=':
-          requirementMet = currentValue === criterion.displayValue;
-          break;
-        case '≤':
-          requirementMet = currentValue <= criterion.displayValue;
-          break;
-        case '≥':
-          requirementMet = currentValue >= criterion.displayValue;
-          break;
-        case '≠':
-          requirementMet = currentValue !== criterion.displayValue;
-          break;
-        case 'has':
-          requirementMet = (currentValue & criterion.displayValue) === criterion.displayValue;
-          break;
-        case 'lacks':
-          requirementMet = (currentValue & criterion.displayValue) === 0;
-          break;
-        default:
-          requirementMet = true;
-      }
-
-      return {
-        criterion,
-        met: requirementMet,
-        stat: criterion.stat,
-        statName: criterion.statName,
-        required: criterion.displayValue,
-        current: currentValue,
-      };
-    })
-    .filter((req) => !req.met);
+/**
+ * The shared evaluator, so OR/NOT groups, requirements on the target and
+ * conditions a profile doesn't record are judged the same way everywhere.
+ */
+const evaluation = computed(() => {
+  if (!props.characterStats || listedRequirements.value.length === 0) return null;
+  const parsed = parseAction({ action: 0, criteria: props.criteria });
+  return checkActionRequirements(parsed, props.characterStats);
 });
 </script>
 

@@ -7,7 +7,7 @@ Handles [LINK:AOID] placeholders and converts them to router links with item nam
     <template v-for="(part, index) in textParts" :key="index">
       <router-link
         v-if="part.type === 'link'"
-        :to="`/items/${part.aoid}`"
+        :to="{ name: 'ItemDetail', params: { aoid: String(part.aoid) } }"
         class="spell-link"
         :title="`Navigate to ${part.itemName}`"
       >
@@ -69,7 +69,7 @@ async function loadItemName(aoid: number) {
       name: item?.name || `Item ${aoid}`,
       loading: false,
     });
-  } catch (error) {
+  } catch {
     linkedItems.value.set(aoid, {
       name: `Item ${aoid}`,
       loading: false,
@@ -138,7 +138,8 @@ const extractAndLoadItems = () => {
 
   while ((match = linkRegex.exec(props.text)) !== null) {
     const aoid = parseInt(match[1]);
-    loadItemName(aoid);
+    // loadItemName handles its own failures (falls back to "Item <aoid>")
+    void loadItemName(aoid);
   }
 };
 

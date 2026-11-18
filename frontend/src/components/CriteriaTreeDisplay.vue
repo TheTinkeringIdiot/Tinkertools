@@ -64,7 +64,7 @@
 
       <!-- Expandable Details (for mobile/compact) -->
       <div v-if="collapsible && isCollapsed" class="collapsed-view">
-        <button @click="toggleExpanded" class="expand-button">
+        <button class="expand-button" @click="toggleExpanded">
           <span>{{ collapsedSummary }}</span>
           <i class="pi pi-chevron-down" :class="{ expanded: !isCollapsed }"></i>
         </button>
@@ -96,6 +96,7 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
+  characterStats: null,
   showSummary: true,
   showEvaluation: true,
   collapsible: false,

@@ -14,7 +14,7 @@ Provides search, filtering, comparison and analysis of all AO items with optiona
             <i class="pi pi-database mr-2"></i>
             TinkerItems
           </h1>
-          <Badge :value="totalItems" severity="info" v-if="totalItems > 0" />
+          <Badge v-if="totalItems > 0" :value="totalItems" severity="info" />
         </div>
 
         <!-- Display Options -->
@@ -39,20 +39,20 @@ Provides search, filtering, comparison and analysis of all AO items with optiona
             class="flex items-center gap-1 border border-surface-300 dark:border-surface-600 rounded"
           >
             <Button
+              v-tooltip.bottom="'Grid View'"
               icon="pi pi-th-large"
               :severity="viewMode === 'grid' ? 'primary' : 'secondary'"
               :outlined="viewMode !== 'grid'"
               size="small"
               @click="viewMode = 'grid'"
-              v-tooltip.bottom="'Grid View'"
             />
             <Button
+              v-tooltip.bottom="'List View'"
               icon="pi pi-list"
               :severity="viewMode === 'list' ? 'primary' : 'secondary'"
               :outlined="viewMode !== 'list'"
               size="small"
               @click="viewMode = 'list'"
-              v-tooltip.bottom="'List View'"
             />
           </div>
         </div>
@@ -66,6 +66,7 @@ Provides search, filtering, comparison and analysis of all AO items with optiona
         <AdvancedItemSearch
           :loading="searchLoading"
           :result-count="totalResults"
+          :initial-search="urlSearchTerm"
           @search="performAdvancedSearch"
           @clear="clearSearch"
         />
@@ -89,7 +90,7 @@ Provides search, filtering, comparison and analysis of all AO items with optiona
             </div>
 
             <!-- Sorting and Actions -->
-            <div class="flex items-center gap-2" v-if="hasLocalResults">
+            <div v-if="hasLocalResults" class="flex items-center gap-2">
               <Dropdown
                 v-model="sortOption"
                 :options="sortOptions"
@@ -101,13 +102,13 @@ Provides search, filtering, comparison and analysis of all AO items with optiona
               />
 
               <Button
+                v-tooltip.bottom="'Refresh Results'"
                 icon="pi pi-refresh"
                 severity="secondary"
                 outlined
                 size="small"
-                @click="refreshResults"
                 :loading="searchLoading"
-                v-tooltip.bottom="'Refresh Results'"
+                @click="refreshResults"
               />
             </div>
           </div>
@@ -158,9 +159,10 @@ Provides search, filtering, comparison and analysis of all AO items with optiona
             :show-compatibility="showCompatibility && profilesStore.hasActiveProfile"
             :loading="searchLoading"
             :pagination="pagination"
+            :change-counts="changeCounts"
             @item-click="onItemClick"
             @item-compare="onItemCompare"
-            @item-cast-buff="onItemCastBuff"
+            @cast-buff="onItemCastBuff"
             @page-change="onPageChange"
           />
         </div>
@@ -180,13 +182,15 @@ Provides search, filtering, comparison and analysis of all AO items with optiona
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useItems } from '@/composables/useItems';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
 import { useItemsStore } from '@/stores/items';
 import { useToast } from 'primevue/usetoast';
+import { apiClient } from '@/services/api-client';
 import type { Item, ItemSearchQuery } from '@/types/api';
+import { changedBuildCount } from '@/types/game-version';
 
 // Components
 import AdvancedItemSearch from '@/components/items/AdvancedItemSearch.vue';
@@ -209,26 +213,15 @@ const lastAdvancedSearchQuery = ref<ItemSearchQuery | null>(null);
 const sortOption = ref('relevance');
 const searchLoading = ref(false);
 const searchPerformed = ref(false);
+// AOID -> number of builds that changed the item, for the "changed" badge
+const changeCounts = ref<Record<number, number>>({});
 
 // Items composable with default options
-const {
-  performSearch: searchItems,
-  totalItems,
-  pagination,
-  hasResults,
-  clearSearch: resetSearch,
-  error: searchError,
-} = useItems({
-  autoSearch: false,
-  debounceMs: 300,
-  defaultQuery: { limit: 24, sort: 'name', sort_order: 'asc' },
-});
+const { performSearch: searchItems, totalItems, pagination, clearSearch: resetSearch } = useItems();
 
 // Computed Properties
 const compatibilityProfile = computed(() =>
-  showCompatibility.value && profilesStore.hasActiveProfile
-    ? (profilesStore.activeProfile as any)
-    : null
+  showCompatibility.value && profilesStore.hasActiveProfile ? profilesStore.activeProfile : null
 );
 
 // Note: activeFilterCount and hasActiveFilters removed - now handled by AdvancedItemSearch
@@ -245,9 +238,6 @@ const sortOptions = [
   { label: 'Quality Level (Low)', value: 'ql_asc' },
   { label: 'Item Type', value: 'type' },
 ];
-
-// Search options from ItemSearch component
-const searchOptions = ref({ query: '', exactMatch: true, searchFields: [] as string[] });
 
 // Methods
 async function performAdvancedSearch(query: ItemSearchQuery) {
@@ -271,10 +261,33 @@ async function performAdvancedSearch(query: ItemSearchQuery) {
 
     const results = await searchItems(searchQuery);
     searchResults.value = results;
+    // Fire and forget: the badge must never delay results.
+    void loadRevisionCounts(results);
   } catch (error) {
     console.error('Advanced search failed:', error);
   } finally {
     searchLoading.value = false;
+  }
+}
+
+/**
+ * One batch call per results page telling which rows later builds changed.
+ * A failure just means no badges.
+ */
+async function loadRevisionCounts(items: Item[]) {
+  changeCounts.value = {};
+  const aoids = items.map((item) => item.aoid).filter((aoid): aoid is number => !!aoid);
+  if (aoids.length === 0) return;
+
+  try {
+    const response = await apiClient.batchItemRevisions(aoids);
+    const counts: Record<number, number> = {};
+    for (const [aoid, entry] of Object.entries(response?.items || {})) {
+      counts[Number(aoid)] = changedBuildCount(entry);
+    }
+    changeCounts.value = counts;
+  } catch {
+    changeCounts.value = {};
   }
 }
 
@@ -306,24 +319,24 @@ function clearSearch() {
 
 // Note: onFiltersChanged, clearFilters, and clearAllFilters removed - now handled by AdvancedItemSearch
 
-function onSortChanged() {
+async function onSortChanged() {
   if (searchPerformed.value) {
     // If we have an advanced search query, use it; otherwise fall back to legacy search
     if (lastAdvancedSearchQuery.value) {
-      performAdvancedSearch(lastAdvancedSearchQuery.value);
+      await performAdvancedSearch(lastAdvancedSearchQuery.value);
     } else {
-      performSearch();
+      await performSearch();
     }
   }
 }
 
-function refreshResults() {
+async function refreshResults() {
   if (searchPerformed.value) {
     // If we have an advanced search query, use it; otherwise fall back to legacy search
     if (lastAdvancedSearchQuery.value) {
-      performAdvancedSearch(lastAdvancedSearchQuery.value);
+      await performAdvancedSearch(lastAdvancedSearchQuery.value);
     } else {
-      performSearch();
+      await performSearch();
     }
   }
 }
@@ -350,18 +363,21 @@ async function quickSearch(type: string) {
   await performAdvancedSearch(query);
 }
 
-function onItemClick(item: Item) {
-  router.push({ name: 'ItemDetail', params: { aoid: item.aoid!.toString() } });
+async function onItemClick(item: Item) {
+  await router.push({ name: 'ItemDetail', params: { aoid: item.aoid!.toString() } });
 }
 
 function onItemCompare(item: Item) {
-  if (comparisonItems.value.length < 3 && !comparisonItems.value.find((i) => i.id === item.id)) {
+  if (
+    comparisonItems.value.length < 3 &&
+    !comparisonItems.value.find((i) => i.aoid === item.aoid)
+  ) {
     comparisonItems.value.push(item);
   }
 }
 
-function removeFromComparison(itemId: number) {
-  comparisonItems.value = comparisonItems.value.filter((item) => item.id !== itemId);
+function removeFromComparison(aoid: number) {
+  comparisonItems.value = comparisonItems.value.filter((item) => item.aoid !== aoid);
 }
 
 function clearComparison() {
@@ -388,7 +404,7 @@ async function onItemCastBuff(item: Item) {
   }
 }
 
-function onPageChange(page: number, limit: number) {
+async function onPageChange(page: number, limit: number) {
   // Re-run the last advanced search with the new page and limit
   if (lastAdvancedSearchQuery.value) {
     // Create updated query with new page number and limit
@@ -397,26 +413,34 @@ function onPageChange(page: number, limit: number) {
       page: page,
       limit: limit,
     };
-    performAdvancedSearch(updatedQuery);
+    await performAdvancedSearch(updatedQuery);
   }
 }
 
 // Initialize
-onMounted(() => {
-  // Check for itemId and ql query parameters (from equipment navigation)
-  const itemIdParam = route.query.itemId;
-  const qlParam = route.query.ql;
+/** Term from the header search bar (?search=). */
+const urlSearchTerm = computed(() =>
+  typeof route.query.search === 'string' ? route.query.search : ''
+);
 
-  if (itemIdParam && qlParam) {
-    // Create a search query for the specific item and QL
-    const itemQuery: ItemSearchQuery = {
-      aoid: parseInt(itemIdParam as string),
-      min_ql: parseInt(qlParam as string),
-      max_ql: parseInt(qlParam as string),
-    };
+async function searchFromUrl(term: string): Promise<void> {
+  searchQuery.value = term;
+  await performAdvancedSearch({
+    search: term,
+    exact_match: false,
+    search_fields: ['name'],
+  });
+}
 
-    // Trigger the advanced search
-    performAdvancedSearch(itemQuery);
+// A new term from the header while already on this page (no remount).
+watch(urlSearchTerm, async (term, previous) => {
+  if (term && term !== previous) await searchFromUrl(term);
+});
+
+onMounted(async () => {
+  // Header search bar shortcut: /items?search=<term>
+  if (urlSearchTerm.value.trim()) {
+    await searchFromUrl(urlSearchTerm.value.trim());
     return;
   }
 
@@ -433,7 +457,7 @@ onMounted(() => {
     };
 
     // Trigger the advanced search
-    performAdvancedSearch(strainQuery);
+    await performAdvancedSearch(strainQuery);
     return;
   }
 
@@ -444,6 +468,7 @@ onMounted(() => {
     searchQuery.value = itemsStore.currentSearchQuery.search || '';
     searchPerformed.value = true;
     lastAdvancedSearchQuery.value = itemsStore.currentSearchQuery;
+    void loadRevisionCounts(searchResults.value);
     // Note: Filter restoration would need to be handled by AdvancedItemSearch component
     // when implementing state persistence
   }

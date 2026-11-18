@@ -11,15 +11,13 @@
         ({{ currentValue }})
       </span>
       <!-- OE Breakpoints for skills/attributes -->
-      <span v-if="showOEBreakpointsComputed" class="oe-breakpoints">
-        OE: {{ oeBreakpoints }}
-      </span>
+      <span v-if="showOEBreakpointsComputed" class="oe-breakpoints"> OE: {{ oeBreakpoints }} </span>
     </div>
 
     <!-- State Requirement -->
     <div v-else-if="isStateRequirement" class="state-requirement">
       <i class="pi pi-info-circle mr-1"></i>
-      <span>{{ criterion.description }}</span>
+      <CriterionReference :criterion="criterion" />
     </div>
 
     <!-- Logical Operator -->
@@ -31,15 +29,7 @@
     <!-- Function Operator (CheckNcu, RunningNano, RunningNanoLine, etc.) -->
     <div v-else-if="criterion.isFunctionOperator" class="function-requirement">
       <i class="pi pi-bolt mr-1"></i>
-      <span>
-        {{ functionPrefix }}
-        <RouterLink
-          v-if="criterion.referenceAoid"
-          :to="`/items/${criterion.referenceAoid}`"
-          class="function-link"
-        >{{ resolvedName || `Nano ${criterion.referenceAoid}` }}</RouterLink>
-        <template v-else>{{ nanoLineName }}</template>
-      </span>
+      <CriterionReference :criterion="criterion" />
     </div>
 
     <!-- Unknown -->
@@ -50,19 +40,17 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
-import { RouterLink } from 'vue-router';
+import { computed } from 'vue';
 import type { DisplayCriterion } from '../services/action-criteria';
 import type { CharacterStats } from '../composables/useActionCriteria';
 import {
-  getStatName,
   getProfessionName,
   getBreedName,
   getGenderName,
   getFlagNameFromValue,
   getNPCFamilyName,
 } from '../services/game-utils';
-import { useNanoNameResolver } from '../composables/useNanoNameResolver';
+import CriterionReference from './CriterionReference.vue';
 
 // ============================================================================
 // Props
@@ -81,62 +69,6 @@ const props = withDefaults(defineProps<Props>(), {
   size: 'normal',
   showStatus: true,
   showOeBreakpoints: false,
-});
-
-// ============================================================================
-// Function Operator Name Resolution
-// ============================================================================
-
-const { resolveNanoName } = useNanoNameResolver();
-const resolvedName = ref<string | null>(null);
-
-// Async resolve nano name when function operator is detected
-watch(
-  () => props.criterion.referenceAoid,
-  async (aoid) => {
-    if (aoid && props.criterion.isFunctionOperator) {
-      resolvedName.value = await resolveNanoName(aoid);
-    }
-  },
-  { immediate: true }
-);
-
-const functionDescription = computed(() => {
-  if (!props.criterion.isFunctionOperator) return '';
-
-  const name = resolvedName.value || `Nano ${props.criterion.referenceAoid}`;
-
-  switch (props.criterion.functionType) {
-    case 'CheckNcu':
-      return `Not running: ${name}`;
-    default:
-      return props.criterion.description;
-  }
-});
-
-const functionPrefix = computed(() => {
-  if (!props.criterion.isFunctionOperator) return '';
-
-  switch (props.criterion.functionType) {
-    case 'CheckNcu':
-    case 'NotRunningNano':
-    case 'NotRunningNanoLine':
-      return 'Not running: ';
-    case 'RunningNano':
-    case 'RunningNanoLine':
-      return 'Running: ';
-    default:
-      return '';
-  }
-});
-
-const nanoLineName = computed(() => {
-  if (!props.criterion.isFunctionOperator) return '';
-
-  // Extract line name from description (format: "Running: Line Name" or "Not running: Line Name")
-  const desc = props.criterion.description;
-  const colonIndex = desc.indexOf(': ');
-  return colonIndex >= 0 ? desc.substring(colonIndex + 2) : desc;
 });
 
 // ============================================================================
@@ -192,24 +124,19 @@ const formattedValue = computed(() => {
   // Special formatting for certain stats
   switch (props.criterion.stat) {
     case 60: // Profession
-      const professionName = getProfessionName(value);
-      return professionName || value.toString();
+      return getProfessionName(value) || value.toString();
 
     case 368: // VisualProfession
-      const visualProfessionName = getProfessionName(value);
-      return visualProfessionName || value.toString();
+      return getProfessionName(value) || value.toString();
 
     case 4: // Breed
-      const breedName = getBreedName(value);
-      return breedName || value.toString();
+      return getBreedName(value) || value.toString();
 
     case 59: // Gender
-      const genderName = getGenderName(value);
-      return genderName || value.toString();
+      return getGenderName(value) || value.toString();
 
     case 455: // NPCFamily
-      const npcFamilyName = getNPCFamilyName(value);
-      return npcFamilyName || value.toString();
+      return getNPCFamilyName(value) || value.toString();
 
     case 54: // Level
       return value.toString();
@@ -424,19 +351,19 @@ const oeBreakpoints = computed(() => {
   }
 }
 
-.function-requirement .function-link {
+.function-requirement :deep(.criterion-reference-link) {
   color: inherit;
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 
-.function-requirement .function-link:hover {
+.function-requirement :deep(.criterion-reference-link):hover {
   color: #fff;
   text-decoration-thickness: 2px;
 }
 
 @media (prefers-color-scheme: light) {
-  .function-requirement .function-link:hover {
+  .function-requirement :deep(.criterion-reference-link):hover {
     color: #78350f;
   }
 }

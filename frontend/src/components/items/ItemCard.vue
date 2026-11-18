@@ -9,8 +9,8 @@ Shows item info with compatibility status and quick actions
       'ring-2 ring-primary-500': isComparing,
       'border-green-500 dark:border-green-400': showCompatibility && isCompatible,
       'border-red-500 dark:border-red-400':
-        showCompatibility && !isCompatible && item.requirements?.length,
-      'opacity-75': showCompatibility && !isCompatible && item.requirements?.length,
+        showCompatibility && !isCompatible && requirements.length,
+      'opacity-75': showCompatibility && !isCompatible && requirements.length,
     }"
     @click="$emit('click', item)"
   >
@@ -41,22 +41,22 @@ Shows item info with compatibility status and quick actions
         <div v-if="showCompatibility" class="absolute top-2 right-2">
           <div
             v-if="isCompatible"
-            class="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center"
             v-tooltip.left="'You can use this item'"
+            class="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center"
           >
             <i class="pi pi-check text-white text-xs"></i>
           </div>
           <div
-            v-else-if="item.requirements?.length"
-            class="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center"
+            v-else-if="requirements.length"
             v-tooltip.left="'Requirements not met'"
+            class="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center"
           >
             <i class="pi pi-times text-white text-xs"></i>
           </div>
           <div
             v-else
-            class="w-6 h-6 bg-yellow-500 rounded-full flex items-center justify-center"
             v-tooltip.left="'No requirements'"
+            class="w-6 h-6 bg-yellow-500 rounded-full flex items-center justify-center"
           >
             <i class="pi pi-question text-white text-xs"></i>
           </div>
@@ -67,12 +67,12 @@ Shows item info with compatibility status and quick actions
           class="absolute bottom-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
         >
           <Button
+            v-tooltip.bottom="'Quick View'"
             icon="pi pi-eye"
             size="small"
             rounded
             severity="secondary"
             @click.stop="$emit('quick-view', item)"
-            v-tooltip.bottom="'Quick View'"
           />
         </div>
       </div>
@@ -119,7 +119,7 @@ Shows item info with compatibility status and quick actions
         </div>
 
         <!-- Requirements Preview -->
-        <div v-if="showCompatibility && item.requirements?.length" class="space-y-1">
+        <div v-if="showCompatibility && requirements.length" class="space-y-1">
           <div class="text-xs font-medium text-surface-700 dark:text-surface-300">
             Requirements:
           </div>
@@ -145,10 +145,10 @@ Shows item info with compatibility status and quick actions
               </span>
             </div>
             <div
-              v-if="item.requirements.length > 3"
+              v-if="requirements.length > 3"
               class="text-xs text-surface-500 dark:text-surface-400"
             >
-              +{{ item.requirements.length - 3 }} more requirements
+              +{{ requirements.length - 3 }} more requirements
             </div>
           </div>
         </div>
@@ -177,23 +177,23 @@ Shows item info with compatibility status and quick actions
         <div class="flex items-center gap-1">
           <!-- Compare Button -->
           <Button
+            v-tooltip.bottom="'Add to comparison'"
             icon="pi pi-clone"
             size="small"
             text
             :severity="isComparing ? 'primary' : 'secondary'"
             @click.stop="$emit('compare', item)"
-            v-tooltip.bottom="'Add to comparison'"
           />
 
           <!-- Cast Buff Button (for nanos only) -->
           <Button
             v-if="item.is_nano && profilesStore.hasActiveProfile"
+            v-tooltip.bottom="'Cast nano buff to active profile'"
             icon="pi pi-sparkles"
             size="small"
             text
             severity="primary"
             @click.stop="$emit('cast-buff', item)"
-            v-tooltip.bottom="'Cast nano buff to active profile'"
           />
         </div>
       </div>
@@ -203,14 +203,16 @@ Shows item info with compatibility status and quick actions
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import type { Item, TinkerProfile, ItemRequirement } from '@/types/api';
-import { getItemIconUrl } from '@/services/game-utils';
+import type { Item } from '@/types/api';
+import type { ReadonlyTinkerProfile } from '@/lib/tinkerprofiles/types';
+import { getItemClassName, getItemIconUrl } from '@/services/game-utils';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
 import { mapProfileToStats } from '@/utils/profile-stats-mapper';
+import { getItemRequirements, type ItemStatRequirement } from './item-requirements';
 
 const props = defineProps<{
   item: Item;
-  profile?: TinkerProfile | null;
+  profile?: ReadonlyTinkerProfile | null;
   showCompatibility?: boolean;
   isComparing?: boolean;
 }>();
@@ -246,22 +248,24 @@ const keyStats = computed(() => {
     }));
 });
 
-const displayedRequirements = computed(() => {
-  if (!props.item.requirements) return [];
-  return props.item.requirements.slice(0, 3);
-});
+const requirements = computed(() => getItemRequirements(props.item));
+
+const displayedRequirements = computed(() => requirements.value.slice(0, 3));
+
+// Profile stats keyed by stat ID, computed once rather than per requirement check
+const profileStats = computed(() => (props.profile ? mapProfileToStats(props.profile) : null));
 
 const isCompatible = computed(() => {
-  if (!props.showCompatibility || !props.profile || !props.item.requirements) {
+  if (!props.showCompatibility || !props.profile) {
     return true; // Unknown or no requirements
   }
 
-  return props.item.requirements.every((req) => canMeetRequirement(req));
+  return requirements.value.every((req) => canMeetRequirement(req));
 });
 
 const isRare = computed(() => {
   // Logic to determine if item is rare (high QL, special effects, etc.)
-  return props.item.ql >= 250 || props.item.stats?.some((s) => Math.abs(s.value) > 100);
+  return (props.item.ql ?? 0) >= 250 || props.item.stats?.some((s) => Math.abs(s.value) > 100);
 });
 
 const itemProperties = computed(() => {
@@ -299,35 +303,18 @@ const statNameMap: Record<number, string> = {
   161: 'Computer Literacy',
 };
 
-const itemClassMap: Record<number, string> = {
-  1: '1H Blunt',
-  2: '1H Edged',
-  3: '2H Blunt',
-  4: '2H Edged',
-  5: 'Ranged',
-  6: 'Body Armor',
-  7: 'Head Armor',
-  8: 'Arm Armor',
-  9: 'Leg Armor',
-  10: 'Foot Armor',
-  15: 'Implant',
-  20: 'Utility',
-};
-
 function getStatName(statId: number): string {
   return statNameMap[statId] || `Stat ${statId}`;
 }
 
-function getItemTypeLabel(itemClass: number): string {
-  return itemClassMap[itemClass] || `Type ${itemClass}`;
+function getItemTypeLabel(itemClass: number | undefined): string {
+  if (itemClass === undefined) return 'Unknown';
+  return getItemClassName(itemClass) || `Type ${itemClass}`;
 }
 
-function canMeetRequirement(requirement: ItemRequirement): boolean {
-  if (!props.profile) return false;
-
-  // Use the profile stats mapper to get all stats and skills correctly
-  const stats = mapProfileToStats(props.profile);
-  const characterValue = stats[requirement.stat] || 0;
+function canMeetRequirement(requirement: ItemStatRequirement): boolean {
+  if (!profileStats.value) return false;
+  const characterValue = profileStats.value[requirement.stat] || 0;
   return characterValue >= requirement.value;
 }
 

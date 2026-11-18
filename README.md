@@ -27,7 +27,7 @@ TinkerTools is a collection of six specialized tools designed to help Anarchy On
 
 - Node.js 18+
 - Python 3.11+
-- PostgreSQL 12+
+- PostgreSQL 13+
 
 ### Frontend Development
 
@@ -52,35 +52,43 @@ source backend/venv/bin/activate
 # Install dependencies
 pip install -r backend/requirements.txt
 
-# Copy environment config
-cp backend/.env.example backend/.env.local
+# Create backend/.env.local with DATABASE_URL (see backend/README.md)
 
 # Start API server (http://localhost:8000)
 cd backend
+set -a && . ./.env.local && set +a
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ### Database Setup
 
 ```bash
-# Initialize database
-cd database
-./setup.sh
-
-# Run schema tests
-psql -U tinkertools_user -d tinkertools -f tests/test_schema.sql
+# Load the game data from extracted client builds (see backend/IMPORT_README.md)
+cd backend
+python import_cli.py import-cas --extracts-dir ~/projects/AO/extracts --workers 8
 ```
+
+## Production
+
+```bash
+cp .env.example .env          # set POSTGRES_PASSWORD
+docker compose up -d --build  # db, api and web; the site is on http://localhost:8088
+scripts/deploy/stack.sh restore tinkertools-store.dump   # load the game data from a dump
+```
+
+Three containers (`docker-compose.yml`): PostgreSQL, the API under gunicorn, and Caddy serving the built frontend and proxying `/api`. The server's database is restored from a dump of the development store rather than imported. [DEPLOYMENT.md](DEPLOYMENT.md) is the guide: settings, the dump and restore procedure, and the steps to deploy with Coolify.
 
 ## Tech Stack
 
 - **Frontend**: Vue 3, TypeScript, Vite, TailwindCSS, PrimeVue (Aura theme)
-- **Backend**: FastAPI, SQLAlchemy (async), Pydantic, asyncpg
-- **Database**: PostgreSQL with 23 core tables for game data
+- **Backend**: FastAPI, SQLAlchemy Core, Pydantic, psycopg
+- **Database**: PostgreSQL, game data in a content-addressed store (schema `cas`)
 - **Testing**: Vitest (frontend), pytest (backend)
 
 ## Documentation
 
 - **[CLAUDE.md](CLAUDE.md)** - Detailed development guide and commands
+- **[DEPLOYMENT.md](DEPLOYMENT.md)** - The container stack, loading a server's data, Coolify
 - **[Requirements](docs/Requirements.md)** - Complete feature requirements (47 total)
 - **[Work Plan](docs/work_plan.md)** - Implementation tasks and roadmap
 - **[Database](DATABASE.md)** - Schema documentation and design
@@ -90,8 +98,7 @@ psql -U tinkertools_user -d tinkertools -f tests/test_schema.sql
 
 This is a monorepo containing:
 - `/frontend` - Vue 3 application with TypeScript
-- `/backend` - FastAPI REST API with async PostgreSQL
-- `/database` - Schema, migrations, and test scripts
+- `/backend` - FastAPI REST API, the importer and the store's schema (`backend/database/cas/`)
 - `/docs` - Architecture and design documentation
 
 For detailed architecture information, see the docs folder.

@@ -7,12 +7,15 @@
 
 import { mount, VueWrapper } from '@vue/test-utils';
 import { createPinia, setActivePinia, type Pinia } from 'pinia';
-import { vi, expect } from 'vitest';
+import { vi, expect, type Mocked } from 'vitest';
 import type { Component, App } from 'vue';
+import type { Router } from 'vue-router';
 import { createApp } from 'vue';
 import { mockPrimeVueComponents, createTestRouter } from './vue-test-utils';
 import PrimeVue from 'primevue/config';
 import ToastService from 'primevue/toastservice';
+import ConfirmationService from 'primevue/confirmationservice';
+import type { apiClient } from '@/services/api-client';
 
 // ============================================================================
 // API Client Mock Setup
@@ -22,11 +25,14 @@ import ToastService from 'primevue/toastservice';
  * Get the mock API client instance
  * When vi.mock('@/services/api-client') is used, this will return the mocked version
  */
-export async function getMockApiClient() {
-  // Import the apiClient - it will be mocked if vi.mock() was called
+export async function getMockApiClient(): Promise<MockApiClient> {
+  // Import the apiClient - it is automocked when vi.mock() was called
   const apiClientModule = await import('@/services/api-client');
-  return apiClientModule.apiClient || apiClientModule.default;
+  return vi.mocked(apiClientModule.apiClient, true);
 }
+
+/** The automocked API client: every method is a vi.fn() typed like the real one. */
+export type MockApiClient = Mocked<typeof apiClient>;
 
 // ============================================================================
 // Integration Test Setup
@@ -35,8 +41,28 @@ export async function getMockApiClient() {
 export interface IntegrationTestContext {
   app: App;
   pinia: Pinia;
-  mockApi: any; // Mock API client from __mocks__/api-client.ts
+  mockApi: MockApiClient;
   mockLocalStorage: ReturnType<typeof createMockLocalStorage>;
+}
+
+/**
+ * A fresh, active Pinia installed on an app that provides what stores inject
+ * (toasts, confirm dialogs), as main.ts does. Stores that call useToast()
+ * cannot be created on a bare `createPinia()`. Storage is left untouched.
+ */
+export function createAppPinia(): { app: App; pinia: Pinia } {
+  // Registration order matters: PrimeVue and its services first, then Pinia,
+  // so store setup can inject them.
+  const app = createApp({});
+  app.use(PrimeVue);
+  app.use(ToastService);
+  app.use(ConfirmationService);
+
+  const pinia = createPinia();
+  app.use(pinia);
+  setActivePinia(pinia);
+
+  return { app, pinia };
 }
 
 /**
@@ -64,22 +90,13 @@ export interface IntegrationTestContext {
  * });
  */
 export async function setupIntegrationTest(): Promise<IntegrationTestContext> {
-  // CRITICAL: Registration order matters!
-  // PrimeVue + ToastService FIRST, then Pinia
-  // This ensures components that use stores can also use PrimeVue components
-  const app = createApp({});
-  app.use(PrimeVue);        // ← FIRST: UI framework
-  app.use(ToastService);    // ← SECOND: Toast notifications
-
-  const pinia = createPinia();
-  app.use(pinia);           // ← THIRD: State management
-  setActivePinia(pinia);
+  const { app, pinia } = createAppPinia();
 
   const mockApi = await getMockApiClient();
   const mockLocalStorage = createMockLocalStorage();
 
   // Install localStorage mock globally
-  Object.defineProperty(global, 'localStorage', {
+  Object.defineProperty(globalThis, 'localStorage', {
     value: mockLocalStorage,
     writable: true,
   });
@@ -100,22 +117,23 @@ export function mountForIntegration(
   component: Component,
   options: {
     pinia: Pinia;
-    props?: Record<string, any>;
-    stubs?: Record<string, any>;
-    routeParams?: Record<string, any>;
+    props?: Record<string, unknown>;
+    stubs?: Record<string, boolean | Component>;
+    /**
+     * Router to install (default: a fresh createTestRouter()). Pass one that has
+     * already navigated (`await router.push(...)`) when the component renders
+     * named RouterLinks on mount: those need the `version` param in place.
+     */
+    router?: Router;
   }
 ): VueWrapper {
-  const router = createTestRouter();
-
-  // Set route params if provided
-  if (options.routeParams) {
-    router.push({ params: options.routeParams });
-  }
+  const router = options.router ?? createTestRouter();
 
   return mount(component, {
     props: options.props,
     global: {
-      plugins: [PrimeVue, ToastService, options.pinia, router],
+      // Same services main.ts installs: components may call useToast/useConfirm.
+      plugins: [PrimeVue, ToastService, ConfirmationService, options.pinia, router],
       components: mockPrimeVueComponents,
       stubs: {
         Toast: true,

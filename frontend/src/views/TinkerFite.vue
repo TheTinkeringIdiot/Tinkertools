@@ -11,7 +11,12 @@ import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
 import { analyzeWeaponsWithCache } from '@/services/weapon-service';
 import { clearWeaponCache, clearLegacyLocalStorageCache } from '@/services/indexed-db-weapon-cache';
 import type { FiteInputState, WeaponCandidate } from '@/types/weapon-analysis';
-import { WEAPON_SKILL_IDS, SPECIAL_ATTACK_IDS, INITIATIVE_IDS, DAMAGE_MODIFIER_IDS } from '@/types/weapon-analysis';
+import {
+  WEAPON_SKILL_IDS,
+  SPECIAL_ATTACK_IDS,
+  INITIATIVE_IDS,
+  DAMAGE_MODIFIER_IDS,
+} from '@/types/weapon-analysis';
 import { getEquipableWeapons } from '@/utils/weapon-filtering';
 import { accountTypeToExpansionBitflag } from '@/utils/expansion-utils';
 import FiteInputForm from '@/components/fite/FiteInputForm.vue';
@@ -150,7 +155,10 @@ async function fetchWeapons() {
       // item granting -4000 to a skill). The backend schema requires
       // `value >= 0`, and an effective negative skill can't meet any positive
       // weapon requirement, so 0 is the correct floor.
-      .map(([skill_id, value]) => ({ skill_id: Number(skill_id), value: Math.max(0, Math.round(value)) }));
+      .map(([skill_id, value]) => ({
+        skill_id: Number(skill_id),
+        value: Math.max(0, Math.round(value)),
+      }));
 
     if (top3.length === 0) {
       console.warn(
@@ -284,10 +292,11 @@ function onInputStateUpdate(newState: FiteInputState) {
 /**
  * Update weapons: clear cache and refetch
  */
-function handleUpdateWeapons() {
-  clearWeaponCache();
+async function handleUpdateWeapons() {
+  // Wait for the IndexedDB entries to go too, or the refetch can be served from them
+  await clearWeaponCache();
   console.log('[TinkerFite] Updating weapons: cache cleared, refetching weapons');
-  fetchWeapons();
+  await fetchWeapons();
 }
 
 // ============================================================================
@@ -297,7 +306,7 @@ function handleUpdateWeapons() {
 /**
  * On mount: Populate from profile and fetch weapons
  */
-onMounted(() => {
+onMounted(async () => {
   console.log('[TinkerFite] Component mounted');
 
   // One-time cleanup of legacy LocalStorage weapon cache
@@ -305,7 +314,7 @@ onMounted(() => {
 
   populateFromProfile();
   if (activeProfile.value) {
-    fetchWeapons();
+    await fetchWeapons();
   }
 });
 </script>
@@ -322,9 +331,9 @@ onMounted(() => {
           TinkerFite
         </h1>
         <Badge
+          v-if="filteredWeapons.length > 0"
           :value="filteredWeapons.length"
           severity="success"
-          v-if="filteredWeapons.length > 0"
           :aria-label="`${filteredWeapons.length} weapons found`"
         />
       </div>
@@ -353,12 +362,12 @@ onMounted(() => {
         Please select or create a profile in TinkerProfiles to analyze weapons. Your character stats
         will be automatically populated from your profile.
       </p>
-      <a
-        href="/profiles"
+      <router-link
+        :to="{ name: 'TinkerProfiles' }"
         class="px-4 py-2 bg-primary-500 text-white rounded hover:bg-primary-600 transition-colors"
       >
         Go to TinkerProfiles
-      </a>
+      </router-link>
     </div>
 
     <!-- Content (Profile Loaded) -->
@@ -390,11 +399,7 @@ onMounted(() => {
 
       <!-- Weapon Table -->
       <div class="p-4">
-        <FiteTable
-          :weapons="filteredWeapons"
-          :input-state="inputState"
-          :loading="loading"
-        />
+        <FiteTable :weapons="filteredWeapons" :input-state="inputState" :loading="loading" />
       </div>
     </div>
   </div>

@@ -18,13 +18,13 @@ Implements:
         Offensive Nano Parameters
       </h2>
       <Button
+        v-tooltip.bottom="'Clear manual edits and restore profile values'"
         label="Reset to Profile"
         icon="pi pi-refresh"
         severity="secondary"
         size="small"
         :disabled="!activeProfile"
         @click="resetToProfile"
-        v-tooltip.bottom="'Clear manual edits and restore profile values'"
       />
     </div>
 
@@ -76,13 +76,13 @@ import type {
   DamageModifiers,
   BuffPresets,
 } from '@/types/offensive-nano';
-import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
+import type { ReadonlyTinkerProfile } from '@/lib/tinkerprofiles/types';
 import { ENHANCE_NANO_DAMAGE, ANCIENT_MATRIX_DAMAGE } from '@/utils/nuke-regen-calculations';
 
 // Props
 interface Props {
   inputState: NukeInputState;
-  activeProfile?: Readonly<TinkerProfile> | TinkerProfile | null;
+  activeProfile?: ReadonlyTinkerProfile | null;
 }
 
 const props = defineProps<Props>();

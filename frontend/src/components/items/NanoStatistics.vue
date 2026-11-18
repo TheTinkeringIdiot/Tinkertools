@@ -30,7 +30,7 @@ Shows essential nano information in a dense, scannable table format
           <!-- Data Row -->
           <div class="stats-row data-row">
             <!-- Damage Column (only for damage-dealing nanos) -->
-            <div v-if="hasDamageRange" class="stat-group">
+            <div v-if="damageRange" class="stat-group">
               <div class="damage-display">
                 <div v-if="damageRange.minDamage" class="damage-stat">
                   <div class="damage-label">Min</div>
@@ -102,7 +102,7 @@ Shows essential nano information in a dense, scannable table format
               <div v-if="nanoStats.nanoSchool" class="stat-pair">
                 <span class="stat-name">School</span>
                 <span class="stat-val val-school">{{
-                  NANOSCHOOL[nanoStats.nanoSchool] || `School ${nanoStats.nanoSchool}`
+                  getNanoSchoolName(nanoStats.nanoSchool) || `School ${nanoStats.nanoSchool}`
                 }}</span>
               </div>
               <div v-if="nanoStats.nanoStrain" class="stat-pair">
@@ -114,7 +114,7 @@ Shows essential nano information in a dense, scannable table format
                   }"
                   class="stat-val val-strain clickable-link"
                 >
-                  {{ NANO_STRAIN[nanoStats.nanoStrain] || `Strain ${nanoStats.nanoStrain}` }}
+                  {{ getNanoStrainName(nanoStats.nanoStrain) || `Strain ${nanoStats.nanoStrain}` }}
                 </RouterLink>
               </div>
               <div v-if="nanoStats.stackingOrder" class="stat-pair">
@@ -232,13 +232,20 @@ Shows essential nano information in a dense, scannable table format
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { Item, TinkerProfile, ItemRequirement } from '@/types/api';
-import { getStatName, getNanoSchoolName, getNanoStrainName } from '@/services/game-utils';
-import { NANOSCHOOL, NANO_STRAIN, SPELL_FORMATS } from '@/services/game-data';
+import type { Item } from '@/types/api';
+import type { ReadonlyTinkerProfile } from '@/lib/tinkerprofiles/types';
+import {
+  formatCentisecondsToSeconds,
+  formatDuration,
+  getStatName,
+  getNanoSchoolName,
+  getNanoStrainName,
+} from '@/services/game-utils';
+import { SPELL_FORMATS } from '@/services/game-data';
 
 const props = defineProps<{
   item: Item;
-  profile?: TinkerProfile | null;
+  profile?: ReadonlyTinkerProfile | null;
   showCompatibility?: boolean;
   skillRequirements?: Array<{ stat: number; value: number }>;
   skillBonuses?: Array<{ stat: number; value: number }>;
@@ -248,8 +255,7 @@ const props = defineProps<{
 
 // Computed Properties
 const isNanoItem = computed(() => {
-  // Check if item is a nano using the same logic as the template badge
-  return props.item.is_nano === true || props.item.type_name === 'Nano';
+  return props.item.is_nano === true;
 });
 
 const nanoStats = computed(() => {
@@ -321,7 +327,7 @@ const damageRange = computed(() => {
     for (const spellData of props.item.spell_data) {
       if (spellData.spells && Array.isArray(spellData.spells)) {
         for (const spell of spellData.spells) {
-          if (damageSpellIds.includes(spell.spell_id)) {
+          if (spell.spell_id !== undefined && damageSpellIds.includes(spell.spell_id)) {
             // Extract damage values - some spells use MinValue/MaxValue, others use MinAmount/MaxAmount
             const minDamage = Math.abs(
               spell.spell_params?.MinValue || spell.spell_params?.MinAmount || 0
@@ -418,26 +424,6 @@ function formatRange(range: number | undefined): string {
   if (!range || range === 0) return 'Self';
   if (range === 1) return 'Touch';
   return `${range}m`;
-}
-
-function formatDuration(duration: number | undefined): string {
-  if (!duration || duration === 0) return 'Instant';
-  if (duration === -1) return 'Permanent';
-
-  // Duration is in centiseconds, convert to seconds
-  const seconds = duration / 100;
-
-  if (seconds < 60) return `${seconds.toFixed(2)}s`;
-  if (seconds < 3600) return `${(seconds / 60).toFixed(2)}m`;
-  return `${(seconds / 3600).toFixed(2)}h`;
-}
-
-function formatCentisecondsToSeconds(centiseconds: number | undefined): string {
-  if (!centiseconds || centiseconds === 0) return '0.00s';
-
-  // Convert centiseconds to seconds with 2 decimal places
-  const seconds = centiseconds / 100;
-  return `${seconds.toFixed(2)}s`;
 }
 
 function formatTicks(tickCount: number, tickInterval: number): string {

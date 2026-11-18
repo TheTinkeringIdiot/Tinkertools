@@ -12,7 +12,7 @@
  * - Type-safe skill access with error handling
  */
 
-import { computed, readonly, inject, unref, type ComputedRef } from 'vue';
+import { computed, readonly, inject, unref, type ComputedRef, type MaybeRef } from 'vue';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
 import { skillService } from '@/services/skill-service';
 import type { SkillId, SkillData } from '@/types/skills';
@@ -23,8 +23,8 @@ export interface UseSkillsOptions {
   category?: string;
   /** Whether to include skills with zero values (default: true) */
   includeZeroValues?: boolean;
-  /** Specific profile to use instead of active profile (optional) */
-  profile?: TinkerProfile | null;
+  /** Specific profile to use instead of active profile (optional; pass a ref to stay reactive) */
+  profile?: MaybeRef<TinkerProfile | null>;
 }
 
 export interface SkillTuple {
@@ -48,7 +48,10 @@ export function useSkills(options: UseSkillsOptions = {}) {
 
   // Try to inject profile from parent component (e.g., SkillsManager)
   // Support both direct profile injection and ComputedRef<TinkerProfile> injection
-  const injectedProfile = inject<TinkerProfile | ComputedRef<TinkerProfile> | null>('profile', null);
+  const injectedProfile = inject<TinkerProfile | ComputedRef<TinkerProfile> | null>(
+    'profile',
+    null
+  );
 
   // ============================================================================
   // Reactive Computed Properties
@@ -62,7 +65,7 @@ export function useSkills(options: UseSkillsOptions = {}) {
     // Use unref to safely unwrap refs/computed refs
     const injected = unref(injectedProfile);
 
-    const targetProfile = options.profile ?? injected ?? profilesStore.activeProfile;
+    const targetProfile = unref(options.profile) ?? injected ?? profilesStore.activeProfile;
     return targetProfile?.skills || {};
   });
 
@@ -218,7 +221,7 @@ export function useSkills(options: UseSkillsOptions = {}) {
         case 'short_value':
           return `${shortName}: ${skill.total}`;
 
-        case 'breakdown':
+        case 'breakdown': {
           const components = [];
           if (skill.base > 0) components.push(`Base: ${skill.base}`);
           if (skill.trickle > 0) components.push(`Trickle: ${skill.trickle}`);
@@ -231,6 +234,7 @@ export function useSkills(options: UseSkillsOptions = {}) {
             components.push(`Buffs: ${skill.buffBonus > 0 ? '+' : ''}${skill.buffBonus}`);
 
           return `${name}: ${skill.total} (${components.join(', ')})`;
+        }
 
         default:
           return `${name}: ${skill.total}`;

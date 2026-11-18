@@ -9,7 +9,7 @@ import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import Tag from 'primevue/tag';
 import Button from 'primevue/button';
-import type { Mob, SymbiantItem } from '@/types/api';
+import type { Mob, SymbiantItem, UserFriendlyError } from '@/types/api';
 
 const route = useRoute();
 const router = useRouter();
@@ -44,8 +44,8 @@ function formatLocation(): string {
   return parts.join(' - ') || 'Unknown Location';
 }
 
-function navigateToItem(aoid: number) {
-  router.push(`/items/${aoid}`);
+async function navigateToItem(aoid: number) {
+  await router.push({ name: 'ItemDetail', params: { aoid: aoid.toString() } });
 }
 
 function formatMinimumLevel(symbiant: SymbiantItem): string {
@@ -58,14 +58,13 @@ function formatMinimumLevel(symbiant: SymbiantItem): string {
   }
 }
 
-function goBack() {
+async function goBack() {
   // Return to the tab the user was on when they navigated here
   const returnTab = route.query.returnTab as string;
-  if (returnTab) {
-    router.push(`/pocket?tab=${returnTab}`);
-  } else {
-    router.push('/pocket');
-  }
+  await router.push({
+    name: 'TinkerPocket',
+    query: returnTab ? { tab: returnTab } : {},
+  });
 }
 
 async function shareLink() {
@@ -106,20 +105,17 @@ async function fetchBossData() {
 
     boss.value = bossResponse.data;
     drops.value = dropsResponse.data || [];
-  } catch (err: any) {
+  } catch (err) {
     console.error('Failed to fetch boss data:', err);
-    if (err.response?.status === 404) {
-      error.value = 'Boss not found';
-    } else {
-      error.value = err.message || 'Failed to load boss data';
-    }
+    // apiClient rethrows failures as UserFriendlyError objects, not Errors
+    error.value = (err as Partial<UserFriendlyError> | null)?.message || 'Failed to load boss data';
   } finally {
     loading.value = false;
   }
 }
 
-onMounted(() => {
-  fetchBossData();
+onMounted(async () => {
+  await fetchBossData();
 });
 </script>
 
@@ -136,8 +132,8 @@ onMounted(() => {
               icon="pi pi-arrow-left"
               text
               rounded
-              @click="goBack"
               class="text-surface-600 dark:text-surface-400"
+              @click="goBack"
             />
             <i class="pi pi-users text-2xl text-primary-500"></i>
             <h1 v-if="boss" class="text-3xl font-bold text-surface-900 dark:text-surface-50">
@@ -261,17 +257,17 @@ onMounted(() => {
               <div v-if="sortedDrops.length > 0">
                 <DataTable
                   :value="sortedDrops"
-                  stripedRows
+                  striped-rows
                   :paginator="sortedDrops.length > 10"
                   :rows="10"
-                  :rowsPerPageOptions="[10, 25, 50]"
+                  :rows-per-page-options="[10, 25, 50]"
                   class="p-datatable-sm"
                 >
                   <Column field="name" header="Symbiant Name">
                     <template #body="{ data }">
                       <a
-                        @click.prevent="navigateToItem(data.aoid)"
                         class="text-primary-500 hover:text-primary-600 cursor-pointer font-medium"
+                        @click.prevent="navigateToItem(data.aoid)"
                       >
                         {{ data.name }}
                       </a>

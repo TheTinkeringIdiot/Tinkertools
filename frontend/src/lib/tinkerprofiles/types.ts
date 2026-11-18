@@ -6,6 +6,7 @@
  * Version 4.0.0 - ID-based skill architecture
  */
 
+import type { DeepReadonly } from 'vue';
 import type { Item, SymbiantItem } from '@/types/api';
 import type { PerkSystem } from './perk-types';
 
@@ -52,6 +53,12 @@ export interface SkillData {
   buffBonus: number;
 
   /**
+   * Maximum reachable value including equipment/perk/buff bonuses.
+   * Set by ip-integrator for abilities and trainable skills.
+   */
+  cap?: number;
+
+  /**
    * Total skill value: base + trickle + pointsFromIp + equipmentBonus + perkBonus + buffBonus
    * Stored to prevent recalculation overhead and ensure consistency
    */
@@ -80,8 +87,18 @@ export interface ImplantCluster {
   value?: number; // Cluster value/bonus (if applicable)
 }
 
+/**
+ * An embedded item snapshot that may not exist in the profile's game version.
+ *
+ * Set by the cross-version copy flow: the old snapshot is kept so the profile
+ * still renders, but the flag marks it as unverified against this version.
+ */
+export type VersionFlaggedItem = Item & { missingInVersion?: boolean };
+
 /** Enhanced implant item with cluster information */
 export interface ImplantWithClusters extends Item {
+  /** True when this snapshot could not be re-resolved in the profile's game version. */
+  missingInVersion?: boolean;
   slot: number; // Numeric slot position from IMPLANT_SLOT_POSITION
   type: 'implant' | 'symbiant';
   clusters?: {
@@ -103,6 +120,16 @@ export interface TinkerProfile {
   version: '4.0.0'; // Fixed version for v4.0.0 profiles
   created: string;
   updated: string;
+
+  /**
+   * Slug of the game database (version) this profile was built against.
+   *
+   * NOT the schema version (see `version` above). Profiles saved before
+   * multi-version support have no tag; they are stamped with the current
+   * version on first load. Equipment snapshots, perk items and buffs in this
+   * profile came from this game version's database.
+   */
+  gameVersion?: string;
 
   // Character basic info (unchanged)
   Character: {
@@ -156,6 +183,12 @@ export interface TinkerProfile {
   buffs?: Item[];
 }
 
+/**
+ * A profile as the stores hand it out (Vue `readonly()`). Code that only reads a
+ * profile should accept this; a mutable TinkerProfile is assignable to it.
+ */
+export type ReadonlyTinkerProfile = DeepReadonly<TinkerProfile>;
+
 /** Simplified nano-compatible profile for TinkerNanos */
 export interface NanoCompatibleProfile {
   id: string;
@@ -180,6 +213,8 @@ export interface ProfileMetadata {
   created: string;
   updated: string;
   version: string;
+  /** Game database slug this profile was built against (see TinkerProfile.gameVersion). */
+  gameVersion?: string;
 }
 
 // ============================================================================
@@ -199,6 +234,10 @@ export interface ProfileImportResult {
     source: string;
     originalFormat?: string;
     migrated: boolean;
+    /** Game version the imported profile was tagged with and resolved against. */
+    gameVersion?: string;
+    /** Set when that version is not the obvious one for this import source. */
+    gameVersionWarning?: string;
   };
 }
 

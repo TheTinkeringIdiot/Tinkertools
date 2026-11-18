@@ -7,7 +7,7 @@
 
 import type { NukeInputState } from '@/types/offensive-nano';
 import type { Character } from './stat-calculations';
-import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
+import type { ReadonlyTinkerProfile } from '@/lib/tinkerprofiles/types';
 import { mapProfileToStats } from './profile-stats-mapper';
 import { specializationLevelToBitflag } from './expansion-utils';
 
@@ -41,7 +41,7 @@ import { specializationLevelToBitflag } from './expansion-utils';
  */
 export function convertInputStateToCharacter(
   inputState: NukeInputState,
-  profile: Readonly<TinkerProfile> | TinkerProfile | null
+  profile: ReadonlyTinkerProfile | null
 ): Character {
   const { characterStats } = inputState;
 

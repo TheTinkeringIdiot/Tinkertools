@@ -8,261 +8,331 @@ Tests critical functionality that affects all features:
 """
 
 import pytest
+import json
+import random
 import time
 import threading
 import asyncio
 import os
-from unittest.mock import Mock, patch, MagicMock
-from typing import Any
+from typing import List
+from unittest.mock import patch
+
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import JSONResponse
+from fastapi.testclient import TestClient
+from pydantic import BaseModel, Field
 
 from app.core.cache import (
+    CACHE_TTL,
+    ENTRY_OVERHEAD,
+    LARGEST_ENTRY_FRACTION,
     CacheService,
-    cache_service,
     cache_key_for_query,
-    get_cached_response,
     cache_response,
-    invalidate_cache_pattern,
-    get_cache_stats,
-    CACHE_TTL
+    cache_service,
+    get_cached_response,
 )
-from app.core.decorators import (
-    cached_response,
-    performance_monitor,
-    log_query_params
-)
+from app.core.decorators import cached_response, performance_monitor, log_query_params
 from app.core.config import Settings, settings
-
+from app.main import app
 
 # ============================================================================
 # Cache Module Tests
 # ============================================================================
 
+
+class Clock:
+    """A clock a test moves by hand."""
+
+    def __init__(self):
+        self.now = 1000.0
+
+    def __call__(self):
+        return self.now
+
+
+def room_for(entries, of_size):
+    """The byte budget that holds exactly ``entries`` values of ``of_size``."""
+    return entries * (of_size + ENTRY_OVERHEAD)
+
+
+def held(cache, keys):
+    """Which of ``keys`` the cache still holds, read without using them."""
+    return [key for key in keys if key in cache.cache]
+
+
 class TestCacheService:
     """Test suite for CacheService class."""
 
     @pytest.fixture
-    def cache(self):
+    def clock(self):
+        return Clock()
+
+    @pytest.fixture
+    def cache(self, clock):
         """Create a fresh cache instance for each test."""
-        return CacheService(default_ttl=10)
+        return CacheService(default_ttl=10, max_bytes=1024 * 1024, clock=clock)
 
-    def test_cache_initialization(self, cache):
-        """Test cache initializes with correct defaults."""
-        assert cache.default_ttl == 10
-        assert len(cache.cache) == 0
-        assert cache.stats['hits'] == 0
-        assert cache.stats['misses'] == 0
-        assert cache.stats['evictions'] == 0
-        assert cache.stats['sets'] == 0
+    def test_a_value_is_read_back_until_it_is_deleted(self, cache):
+        cache.set("key", "value")
 
-    def test_cache_set_and_get(self, cache):
-        """Test basic cache set and get operations."""
-        cache.set("test_key", "test_value")
+        assert cache.get("key") == "value"
+        assert cache.delete("key") is True
+        assert cache.get("key") is None
+        assert cache.delete("key") is False
+        assert (cache.stats["hits"], cache.stats["misses"]) == (1, 1)
 
-        result = cache.get("test_key")
-        assert result == "test_value"
-        assert cache.stats['hits'] == 1
-        assert cache.stats['sets'] == 1
+    def test_a_key_never_written_is_a_miss(self, cache):
+        assert cache.get("nonexistent_key") is None
+        assert (cache.stats["hits"], cache.stats["misses"]) == (0, 1)
 
-    def test_cache_miss(self, cache):
-        """Test cache miss behavior."""
-        result = cache.get("nonexistent_key")
+    def test_an_entry_expires_after_its_ttl(self, cache, clock):
+        cache.set("short", "value", ttl=1)
+        cache.set("default", "value")
 
-        assert result is None
-        assert cache.stats['misses'] == 1
-        assert cache.stats['hits'] == 0
+        clock.now += 0.9
+        assert cache.get("short") == "value"
+        clock.now += 0.2
+        assert cache.get("short") is None
+        assert cache.get("default") == "value"
+        clock.now += 10
+        assert cache.get("default") is None
+        assert cache.total_bytes == 0
 
-    def test_cache_ttl_expiration(self, cache):
-        """Test that cached values expire after TTL."""
-        cache.set("short_lived", "value", ttl=1)
+    def test_a_write_drops_every_entry_that_has_expired(self, cache, clock):
+        cache.set("short", b"x" * 100, ttl=5)
+        cache.set("long", b"x" * 100, ttl=50)
+        cache.set("short too", b"x" * 100, ttl=5)
+        clock.now += 6
 
-        # Value should be available immediately
-        assert cache.get("short_lived") == "value"
+        cache.set("new", b"x" * 100, ttl=5)
 
-        # Wait for expiration
-        time.sleep(1.1)
+        assert held(cache, ["short", "long", "short too", "new"]) == ["long", "new"]
+        assert cache.total_bytes == room_for(2, 100)
+        assert cache.stats["expirations"] == 2
 
-        # Value should be expired
-        result = cache.get("short_lived")
-        assert result is None
-        assert cache.stats['evictions'] == 1
+    def test_a_rewritten_entry_expires_by_its_last_write(self, cache, clock):
+        cache.set("key", "old", ttl=5)
+        clock.now += 4
+        cache.set("key", "new", ttl=5)
+        clock.now += 4
+        cache.set("other", "value")
 
-    def test_cache_custom_ttl(self, cache):
-        """Test setting custom TTL overrides default."""
-        cache.set("custom_ttl", "value", ttl=2)
-        cache.set("default_ttl", "value")
+        assert cache.get("key") == "new"
 
-        # Custom TTL should be 2 seconds
-        time.sleep(2.1)
-        assert cache.get("custom_ttl") is None
+    def test_the_least_recently_used_entry_goes_first(self, clock):
+        cache = CacheService(max_bytes=room_for(16, 100), clock=clock)
+        keys = [f"key {n}" for n in range(16)]
+        for key in keys:
+            cache.set(key, b"x" * 100)
 
-        # Default should still be valid (10 seconds)
-        assert cache.get("default_ttl") == "value"
+        assert cache.get("key 0") is not None
+        cache.set("new", b"x" * 100)
+        assert held(cache, keys) == ["key 0", *keys[2:]]
 
-    def test_cache_delete(self, cache):
-        """Test cache deletion."""
-        cache.set("to_delete", "value")
+        cache.set("key 2", b"y" * 100)
+        cache.set("newer", b"x" * 100)
+        assert held(cache, keys) == ["key 0", "key 2", *keys[4:]]
+        assert held(cache, ["new", "newer"]) == ["new", "newer"]
+        assert cache.stats["evictions"] == 2
 
-        # Verify it exists
-        assert cache.get("to_delete") == "value"
+    def test_a_larger_entry_evicts_as_many_as_it_needs(self, clock):
+        cache = CacheService(max_bytes=room_for(64, 100), clock=clock)
+        keys = [f"key {n}" for n in range(64)]
+        for key in keys:
+            cache.set(key, b"x" * 100)
 
-        # Delete and verify
-        result = cache.delete("to_delete")
-        assert result is True
-        assert cache.get("to_delete") is None
+        cache.set("large", b"x" * (3 * 100 + 2 * ENTRY_OVERHEAD))
 
-        # Try deleting non-existent key
-        result = cache.delete("nonexistent")
-        assert result is False
+        assert held(cache, keys) == keys[3:]
+        assert cache.get("large") is not None
+        assert cache.total_bytes == cache.max_bytes
 
-    def test_cache_clear(self, cache):
-        """Test clearing all cache entries."""
-        cache.set("key1", "value1")
-        cache.set("key2", "value2")
-        cache.set("key3", "value3")
+    def test_the_size_stays_within_its_bound_under_many_distinct_keys(self, clock):
+        cache = CacheService(max_bytes=200_000, clock=clock)
+        sizes = random.Random(7)
 
-        assert len(cache.cache) == 3
+        for n in range(5000):
+            cache.set(f"key {n}", b"x" * sizes.randrange(0, 20_000), ttl=60)
+            clock.now += 0.01
+            assert cache.total_bytes <= cache.max_bytes
+            assert cache.total_bytes == sum(e.size for e in cache.cache.values())
+
+        assert 0 < len(cache.cache) < 400
+        assert cache.get("key 4999") is not None or cache.stats["rejections"] > 0
+
+    def test_an_entry_too_large_for_the_cache_is_not_kept(self, clock):
+        cache = CacheService(max_bytes=160_000, clock=clock)
+        limit = 160_000 // LARGEST_ENTRY_FRACTION
+        cache.set("small", b"x" * 100)
+        cache.set("replaced", b"x" * 100)
+
+        assert cache.set("fits", b"x" * (limit - ENTRY_OVERHEAD)) is True
+        assert cache.set("too large", b"x" * (limit - ENTRY_OVERHEAD + 1)) is False
+        assert cache.set("replaced", b"x" * limit) is False
+
+        assert held(cache, ["small", "fits", "too large", "replaced"]) == [
+            "small",
+            "fits",
+        ]
+        assert cache.stats["rejections"] == 2
+
+    def test_a_cache_without_room_keeps_nothing(self, clock):
+        cache = CacheService(max_bytes=0, clock=clock)
+
+        assert cache.set("key", b"") is False
+        assert cache.get("key") is None
+
+    def test_an_entry_is_as_large_as_its_bytes_or_as_the_caller_says(self, cache):
+        cache.set("bytes", b"x" * 300)
+        cache.set("text", "x" * 200)
+        cache.set("response", JSONResponse({"a": 1}))
+        cache.set("sized", {"any": "object"}, size=1000)
+
+        sizes = {key: entry.size - ENTRY_OVERHEAD for key, entry in cache.cache.items()}
+        assert sizes == {
+            "bytes": 300,
+            "text": 200,
+            "response": len(b'{"a":1}'),
+            "sized": 1000,
+        }
+
+    def test_clear_empties_the_cache(self, cache):
+        for key in ("key1", "key2", "key3"):
+            cache.set(key, b"value")
 
         cache.clear()
 
-        assert len(cache.cache) == 0
         assert cache.get("key1") is None
+        assert (len(cache.cache), cache.total_bytes) == (0, 0)
+        cache.set("key1", b"value")
+        assert cache.get("key1") == b"value"
 
-    def test_cache_stats(self, cache):
-        """Test cache statistics tracking."""
-        # Generate some cache activity
-        cache.set("key1", "value1")
-        cache.set("key2", "value2")
-        cache.get("key1")  # hit
-        cache.get("key1")  # hit
-        cache.get("missing")  # miss
+    def test_a_key_depends_on_its_parameters_and_not_on_their_order(self, cache):
+        key = cache._generate_key("test", param1="value1", param2="value2")
 
-        stats = cache.get_stats()
+        assert key == cache._generate_key("test", param2="value2", param1="value1")
+        assert key != cache._generate_key("test", param1="value1", param2="value3")
+        assert key != cache._generate_key("other", param1="value1", param2="value2")
+        assert key.startswith("test:")
 
-        assert stats['hits'] == 2
-        assert stats['misses'] == 1
-        assert stats['sets'] == 2
-        assert stats['total_requests'] == 3
-        assert stats['hit_rate_percent'] == pytest.approx(66.67, rel=0.01)
-        assert stats['cache_size'] == 2
+    def test_a_key_takes_parameters_of_any_type(self, cache):
+        key = cache._generate_key(
+            "test", list_param=[1, 2, 3], dict_param={"a": "b"}, int_param=42
+        )
 
-    def test_cache_stats_no_requests(self, cache):
-        """Test cache statistics with no requests."""
-        stats = cache.get_stats()
+        assert key != cache._generate_key(
+            "test", list_param=[1, 2, 4], dict_param={"a": "b"}, int_param=42
+        )
 
-        assert stats['total_requests'] == 0
-        assert stats['hit_rate_percent'] == 0
-        assert stats['cache_size'] == 0
+    def test_requests_that_differ_in_one_parameter_never_share_a_key(self, cache):
+        # enough requests that a 32-bit key would give several of them the
+        # key of another
+        requests = 300_000
 
-    def test_cache_cleanup_expired(self, cache):
-        """Test manual cleanup of expired entries."""
-        cache.set("expired1", "value1", ttl=1)
-        cache.set("expired2", "value2", ttl=1)
-        cache.set("valid", "value3", ttl=10)
+        keys = {cache._generate_key("items", page=page) for page in range(requests)}
 
-        # Wait for expiration
-        time.sleep(1.1)
+        assert len(keys) == requests
 
-        # Cleanup expired entries
-        removed_count = cache.cleanup_expired()
-
-        assert removed_count == 2
-        assert cache.get("valid") == "value3"
-        assert cache.stats['evictions'] == 2
-
-    def test_generate_key_consistency(self, cache):
-        """Test that key generation is consistent for same parameters."""
-        key1 = cache._generate_key("test", param1="value1", param2="value2")
-        key2 = cache._generate_key("test", param1="value1", param2="value2")
-
-        assert key1 == key2
-
-    def test_generate_key_order_independence(self, cache):
-        """Test that key generation is order-independent."""
-        key1 = cache._generate_key("test", param1="value1", param2="value2")
-        key2 = cache._generate_key("test", param2="value2", param1="value1")
-
-        assert key1 == key2
-
-    def test_generate_key_different_params(self, cache):
-        """Test that different parameters generate different keys."""
-        key1 = cache._generate_key("test", param1="value1")
-        key2 = cache._generate_key("test", param1="value2")
-
-        assert key1 != key2
-
-    def test_generate_key_with_complex_types(self, cache):
-        """Test key generation with complex parameter types."""
-        key1 = cache._generate_key("test",
-                                   list_param=[1, 2, 3],
-                                   dict_param={"a": "b"},
-                                   int_param=42)
-
-        # Should not raise exception and should generate a key
-        assert key1.startswith("test:")
-        assert len(key1) > 5
-
-    def test_cache_thread_safety_basic(self, cache):
-        """Test basic thread safety of cache operations."""
+    def test_concurrent_writers_and_readers_see_their_own_values(self, cache):
         results = []
 
         def worker(value):
             cache.set(f"key_{value}", value)
             time.sleep(0.01)
-            result = cache.get(f"key_{value}")
-            results.append(result)
+            results.append(cache.get(f"key_{value}"))
 
-        threads = []
-        for i in range(10):
-            thread = threading.Thread(target=worker, args=(i,))
-            threads.append(thread)
+        threads = [threading.Thread(target=worker, args=(i,)) for i in range(10)]
+        for thread in threads:
             thread.start()
-
         for thread in threads:
             thread.join()
 
-        # All values should be retrieved correctly
-        assert len(results) == 10
-        assert set(results) == set(range(10))
+        assert sorted(results) == list(range(10))
 
-    def test_cache_thread_safety_concurrent_access(self, cache):
-        """Test thread safety with concurrent reads and writes."""
-        cache.set("shared_key", 0)
+    def test_concurrent_eviction_keeps_the_size_consistent(self, clock):
+        cache = CacheService(max_bytes=room_for(50, 100), clock=clock)
 
-        def incrementer():
-            for _ in range(100):
-                value = cache.get("shared_key")
-                cache.set("shared_key", value + 1)
+        def writer(worker):
+            for n in range(500):
+                cache.set(f"{worker}-{n}", b"x" * 100)
+                cache.get(f"{worker}-{n - 1}")
 
-        threads = []
-        for _ in range(5):
-            thread = threading.Thread(target=incrementer)
-            threads.append(thread)
+        threads = [threading.Thread(target=writer, args=(i,)) for i in range(5)]
+        for thread in threads:
             thread.start()
-
         for thread in threads:
             thread.join()
 
-        # Final value should be 500 (5 threads * 100 increments)
-        final_value = cache.get("shared_key")
-        assert final_value == 500
+        assert len(cache.cache) == 50
+        assert cache.total_bytes == cache.max_bytes
 
-    def test_cache_stores_different_types(self, cache):
-        """Test that cache can store different Python types."""
-        test_data = {
-            "string": "test",
-            "int": 42,
-            "float": 3.14,
-            "list": [1, 2, 3],
-            "dict": {"key": "value"},
-            "none": None,
-            "bool": True
-        }
+    def test_callers_that_miss_a_key_together_compute_its_value_once(self, cache):
+        computing = threading.Event()
+        calls = []
 
-        for key, value in test_data.items():
-            cache.set(key, value)
+        def compute():
+            calls.append(threading.current_thread().name)
+            computing.wait(timeout=5)
+            return b"x" * 100
 
-        for key, expected_value in test_data.items():
-            assert cache.get(key) == expected_value
+        results = []
+        threads = [
+            threading.Thread(
+                target=lambda: results.append(cache.get_or_compute("pair", compute))
+            )
+            for _ in range(8)
+        ]
+        for thread in threads:
+            thread.start()
+        while not calls:
+            time.sleep(0.001)
+        time.sleep(0.05)
+        computing.set()
+        for thread in threads:
+            thread.join()
+
+        assert len(calls) == 1
+        assert results == [b"x" * 100] * 8
+        assert cache.get_or_compute("pair", compute) == b"x" * 100
+        assert len(calls) == 1
+
+    def test_a_computed_value_counts_against_the_byte_budget_by_its_own_size(self):
+        cache = CacheService(max_bytes=room_for(LARGEST_ENTRY_FRACTION, of_size=1000))
+        keys = [f"pair {n}" for n in range(LARGEST_ENTRY_FRACTION)]
+
+        for key in keys:
+            cache.get_or_compute(key, lambda: [key], size_of=lambda value: 1000)
+        assert cache.total_bytes == cache.max_bytes
+        assert cache.get_or_compute(keys[0], lambda: ["never"]) == [keys[0]]
+        cache.get_or_compute("one more", lambda: [], size_of=lambda value: 1000)
+
+        assert held(cache, [*keys, "one more"]) == [keys[0], *keys[2:], "one more"]
+        assert cache.total_bytes == cache.max_bytes
+
+    def test_a_value_too_large_to_keep_is_returned_and_computed_again(self):
+        cache = CacheService(max_bytes=room_for(1, of_size=1000))
+        calls = []
+
+        def compute():
+            calls.append(1)
+            return ["large"]
+
+        for _ in range(2):
+            found = cache.get_or_compute("large", compute, size_of=lambda value: 10**6)
+            assert found == ["large"]
+
+        assert len(calls) == 2
+        assert cache.total_bytes == 0
+
+    def test_a_computation_that_fails_is_tried_again_by_the_next_caller(self, cache):
+        def fail():
+            raise RuntimeError("no database")
+
+        with pytest.raises(RuntimeError):
+            cache.get_or_compute("pair", fail)
+
+        assert cache.get_or_compute("pair", lambda: "value") == "value"
 
 
 class TestCacheModuleFunctions:
@@ -280,7 +350,7 @@ class TestCacheModuleFunctions:
         key = cache_key_for_query("items", page=1, limit=10)
 
         assert key.startswith("items:")
-        assert isinstance(key, str)
+        assert key != cache_key_for_query("items", page=2, limit=10)
 
     def test_get_cached_response_miss(self):
         """Test getting non-existent cached response."""
@@ -295,62 +365,46 @@ class TestCacheModuleFunctions:
         result = get_cached_response("test_key")
         assert result == data
 
-    def test_invalidate_cache_pattern(self):
-        """Test pattern-based cache invalidation."""
-        cache_response("items:list:1", {"data": "list1"})
-        cache_response("items:list:2", {"data": "list2"})
-        cache_response("items:detail:1", {"data": "detail1"})
-        cache_response("spells:list:1", {"data": "spells"})
+    def test_the_shared_cache_is_bounded_by_the_setting(self):
+        assert cache_service.max_bytes == settings.RESPONSE_CACHE_MAX_BYTES
+        assert Settings().RESPONSE_CACHE_MAX_BYTES == 256 * 1024 * 1024
 
-        # Invalidate all items:list patterns
-        removed = invalidate_cache_pattern("items:list:")
-
-        assert removed == 2
-        assert get_cached_response("items:list:1") is None
-        assert get_cached_response("items:list:2") is None
-        assert get_cached_response("items:detail:1") is not None
-        assert get_cached_response("spells:list:1") is not None
-
-    def test_invalidate_cache_pattern_no_matches(self):
-        """Test pattern invalidation with no matches."""
-        cache_response("test:key", {"data": "test"})
-
-        removed = invalidate_cache_pattern("nonexistent:")
-
-        assert removed == 0
-        assert get_cached_response("test:key") is not None
-
-    def test_get_cache_stats_function(self):
-        """Test getting cache statistics via module function."""
-        cache_response("key1", "value1")
-        get_cached_response("key1")
-
-        stats = get_cache_stats()
-
-        assert 'hits' in stats
-        assert 'misses' in stats
-        assert 'cache_size' in stats
-        assert stats['cache_size'] > 0
-
-    def test_cache_ttl_constants(self):
-        """Test that CACHE_TTL constants are defined."""
-        assert 'items_list' in CACHE_TTL
-        assert 'item_detail' in CACHE_TTL
-        assert 'spells_list' in CACHE_TTL
-        assert 'pocket_bosses' in CACHE_TTL
-        assert 'symbiants' in CACHE_TTL
-        assert 'search_results' in CACHE_TTL
-        assert 'stats' in CACHE_TTL
-
-        # Verify they're all positive integers
+    def test_every_cache_type_has_a_positive_ttl(self):
         for ttl_value in CACHE_TTL.values():
             assert isinstance(ttl_value, int)
             assert ttl_value > 0
+
+    def test_clearing_over_the_api_empties_the_shared_cache(self):
+        cache_response("test_key", b"value", ttl=60)
+
+        with TestClient(app) as client:
+            response = client.post("/api/v1/cache/clear")
+
+        assert response.status_code == 200
+        assert get_cached_response("test_key") is None
+        assert cache_service.total_bytes == 0
 
 
 # ============================================================================
 # Decorators Module Tests
 # ============================================================================
+
+
+class Row(BaseModel):
+    id: int
+    name: str = Field(serialization_alias="label")
+    note: str | None = None
+
+
+class Listing(BaseModel):
+    items: List[Row]
+    page: int
+
+
+def body(response):
+    """The JSON a cached endpoint's response carries."""
+    return json.loads(response.body)
+
 
 class TestCachedResponseDecorator:
     """Test suite for cached_response decorator."""
@@ -367,111 +421,204 @@ class TestCachedResponseDecorator:
         """Test that async functions are cached correctly."""
         call_count = 0
 
-        @cached_response("items_list")
+        @cached_response("item_detail")
         async def get_items(page: int = 1):
             nonlocal call_count
             call_count += 1
             await asyncio.sleep(0.01)
             return {"items": [], "page": page}
 
-        # First call should execute function
-        result1 = await get_items(page=1)
+        first = await get_items(page=1)
+        second = await get_items(page=1)
+
         assert call_count == 1
-        assert result1["page"] == 1
-
-        # Second call should use cache
-        result2 = await get_items(page=1)
-        assert call_count == 1  # Not incremented
-        assert result2 == result1
-
-    @pytest.mark.asyncio
-    async def test_async_function_different_params(self):
-        """Test that different parameters create different cache entries."""
-        call_count = 0
-
-        @cached_response("items_list")
-        async def get_items(page: int = 1):
-            nonlocal call_count
-            call_count += 1
-            return {"items": [], "page": page}
-
-        result1 = await get_items(page=1)
-        result2 = await get_items(page=2)
-
-        assert call_count == 2
-        assert result1["page"] == 1
-        assert result2["page"] == 2
+        assert body(first) == body(second) == {"items": [], "page": 1}
 
     def test_sync_function_caching(self):
         """Test that sync functions are cached correctly."""
         call_count = 0
 
-        @cached_response("items_list")
+        @cached_response("item_detail")
         def get_items(page: int = 1):
             nonlocal call_count
             call_count += 1
             return {"items": [], "page": page}
 
-        # First call should execute function
-        result1 = get_items(page=1)
+        first = get_items(page=1)
+        second = get_items(page=1)
+
         assert call_count == 1
+        assert body(first) == body(second) == {"items": [], "page": 1}
 
-        # Second call should use cache
-        result2 = get_items(page=1)
-        assert call_count == 1
-        assert result2 == result1
+    def test_requests_that_differ_in_one_parameter_get_their_own_response(self):
+        calls = []
 
-    @pytest.mark.asyncio
-    async def test_custom_ttl(self):
-        """Test that custom TTL is respected."""
-        @cached_response("items_list", ttl=1)
-        async def get_items():
-            return {"items": []}
+        @cached_response("item_detail")
+        def get_items(page: int = 1, page_size: int = 50, q: str = ""):
+            calls.append((page, page_size, q))
+            return {"page": page, "page_size": page_size, "q": q}
 
-        await get_items()
+        requests = [
+            {"page": 1, "page_size": 50, "q": "a"},
+            {"page": 2, "page_size": 50, "q": "a"},
+            {"page": 1, "page_size": 51, "q": "a"},
+            {"page": 1, "page_size": 50, "q": "b"},
+        ]
+        first = [body(get_items(**request)) for request in requests]
+        again = [body(get_items(**request)) for request in requests]
 
-        # Immediately should be cached
-        stats_before = get_cache_stats()
-        await get_items()
-        stats_after = get_cache_stats()
+        assert first == again == requests
+        assert len(calls) == len(requests)
 
-        assert stats_after['hits'] > stats_before['hits']
+    def test_an_entry_is_cached_for_the_ttl_of_its_type_or_its_own(self, monkeypatch):
+        clock = Clock()
+        monkeypatch.setattr(cache_service, "_clock", clock)
+        calls = []
 
-        # After TTL should not be cached
-        time.sleep(1.1)
-        cache_service.cleanup_expired()
+        @cached_response("item_detail")
+        def by_type():
+            calls.append("type")
+            return {}
 
-        await get_items()
-        # Would be a miss (hard to test directly due to re-caching)
+        @cached_response("item_detail", ttl=1)
+        def by_ttl():
+            calls.append("ttl")
+            return {}
+
+        by_type(), by_ttl()
+        clock.now += 2
+        by_type(), by_ttl()
+        clock.now += CACHE_TTL["item_detail"]
+        by_type()
+
+        assert calls == ["type", "ttl", "ttl", "type"]
+
+    def test_a_cache_type_without_a_ttl_is_refused(self):
+        with pytest.raises(ValueError, match="no_such_type"):
+            cached_response("no_such_type")
 
     @pytest.mark.asyncio
     async def test_db_param_excluded_from_cache_key(self):
         """Test that 'db' parameter is excluded from cache key."""
         call_count = 0
 
-        @cached_response("items_list")
+        @cached_response("item_detail")
         async def get_items(page: int = 1, db=None):
             nonlocal call_count
             call_count += 1
             return {"items": [], "page": page}
 
-        # These should use the same cache despite different db sessions
         await get_items(page=1, db="session1")
         await get_items(page=1, db="session2")
 
-        assert call_count == 1  # Only called once
+        assert call_count == 1
 
-    def test_default_ttl_from_cache_type(self):
-        """Test that default TTL is used from CACHE_TTL when not specified."""
-        @cached_response("items_list")
+    def test_the_cache_holds_the_serialised_body_at_its_size(self):
+        @cached_response("item_detail")
         def get_items():
-            return {"items": []}
+            return Listing(items=[Row(id=1, name="Wrench")], page=1)
 
-        get_items()
+        response = get_items()
 
-        # Check that cache was set (can't easily verify TTL, but check it cached)
-        stats = get_cache_stats()
-        assert stats['sets'] > 0
+        (entry,) = cache_service.cache.values()
+        assert entry.value.body == response.body
+        assert entry.size == len(response.body) + ENTRY_OVERHEAD
+        assert cache_service.total_bytes == entry.size
+
+    def test_an_endpoint_answers_the_same_with_and_without_the_cache(self):
+        api = FastAPI()
+        calls = []
+
+        def listing(page: int = 1):
+            calls.append(page)
+            return Listing(items=[Row(id=1, name="Wrénch"), Row(id=2, name="")], page=1)
+
+        api.get("/plain", response_model=Listing)(listing)
+        api.get("/cached", response_model=Listing)(
+            cached_response("item_detail")(listing)
+        )
+        api.get("/cached-rows", response_model=List[Row])(
+            cached_response("item_detail")(lambda: listing().items)
+        )
+
+        with TestClient(api) as client:
+            plain = client.get("/plain")
+            miss = client.get("/cached")
+            hit = client.get("/cached")
+            rows = client.get("/cached-rows")
+
+        assert calls == [1, 1, 1]
+        assert plain.json()["items"][0] == {"id": 1, "label": "Wrénch", "note": None}
+        assert miss.content == hit.content == plain.content
+        assert miss.headers["content-type"] == plain.headers["content-type"]
+        assert hit.headers["content-type"] == plain.headers["content-type"]
+        assert rows.json() == plain.json()["items"]
+
+    def test_a_response_the_endpoint_built_is_cached_by_its_body(self):
+        calls = []
+
+        @cached_response("weapons_analyze")
+        def analyze(skill: int = 1):
+            calls.append(skill)
+            return JSONResponse([{"aoid": skill}])
+
+        first, second = analyze(skill=5), analyze(skill=5)
+
+        assert calls == [5]
+        assert body(first) == body(second) == [{"aoid": 5}]
+        assert second.media_type == "application/json"
+
+    def test_an_error_is_not_cached(self):
+        calls = []
+
+        @cached_response("item_detail")
+        def get_item(aoid: int):
+            calls.append(aoid)
+            if len(calls) == 1:
+                raise HTTPException(status_code=404, detail="Item not found")
+            return {"aoid": aoid}
+
+        @cached_response("item_detail")
+        def unavailable():
+            calls.append("unavailable")
+            return JSONResponse({"detail": "later"}, status_code=503)
+
+        with pytest.raises(HTTPException):
+            get_item(aoid=1)
+        assert body(get_item(aoid=1)) == {"aoid": 1}
+        assert unavailable().status_code == unavailable().status_code == 503
+        assert calls == [1, 1, "unavailable", "unavailable"]
+
+    def test_a_body_too_large_for_the_cache_is_served_and_not_kept(self, monkeypatch):
+        monkeypatch.setattr(cache_service, "max_bytes", 64 * 1024)
+        calls = []
+
+        @cached_response("item_detail")
+        def get_items(size: int):
+            calls.append(size)
+            return {"text": "x" * size}
+
+        large = [get_items(size=8 * 1024), get_items(size=8 * 1024)]
+        small = [get_items(size=100), get_items(size=100)]
+
+        assert [len(body(response)["text"]) for response in large] == [8192, 8192]
+        assert [len(body(response)["text"]) for response in small] == [100, 100]
+        assert calls == [8192, 8192, 100]
+        assert cache_service.total_bytes <= 64 * 1024
+
+    def test_many_distinct_requests_stay_within_the_bound(self, monkeypatch):
+        monkeypatch.setattr(cache_service, "max_bytes", 256 * 1024)
+
+        @cached_response("item_detail")
+        def get_items(page: int):
+            return {"page": page, "text": "x" * 4000}
+
+        for page in range(2000):
+            get_items(page=page)
+            assert cache_service.total_bytes <= 256 * 1024
+
+        assert 0 < len(cache_service.cache) < 64
+        assert body(get_items(page=1999))["page"] == 1999
 
 
 class TestPerformanceMonitorDecorator:
@@ -480,6 +627,7 @@ class TestPerformanceMonitorDecorator:
     @pytest.mark.asyncio
     async def test_async_function_normal_execution(self):
         """Test performance monitor with normal async function execution."""
+
         @performance_monitor
         async def fast_function():
             await asyncio.sleep(0.01)
@@ -491,6 +639,7 @@ class TestPerformanceMonitorDecorator:
     @pytest.mark.asyncio
     async def test_async_function_slow_query_logging(self, caplog):
         """Test that slow queries are logged for async functions."""
+
         @performance_monitor
         async def slow_function():
             await asyncio.sleep(0.6)
@@ -505,6 +654,7 @@ class TestPerformanceMonitorDecorator:
     @pytest.mark.asyncio
     async def test_async_function_moderate_query_logging(self, caplog):
         """Test that moderate queries are logged for async functions."""
+
         @performance_monitor
         async def moderate_function():
             await asyncio.sleep(0.3)
@@ -518,6 +668,7 @@ class TestPerformanceMonitorDecorator:
 
     def test_sync_function_normal_execution(self):
         """Test performance monitor with normal sync function execution."""
+
         @performance_monitor
         def fast_function():
             time.sleep(0.01)
@@ -528,6 +679,7 @@ class TestPerformanceMonitorDecorator:
 
     def test_sync_function_slow_query_logging(self, caplog):
         """Test that slow queries are logged for sync functions."""
+
         @performance_monitor
         def slow_function():
             time.sleep(0.6)
@@ -541,6 +693,7 @@ class TestPerformanceMonitorDecorator:
     @pytest.mark.asyncio
     async def test_async_function_error_handling(self, caplog):
         """Test that errors are logged with execution time for async functions."""
+
         @performance_monitor
         async def error_function():
             await asyncio.sleep(0.01)
@@ -551,10 +704,13 @@ class TestPerformanceMonitorDecorator:
                 await error_function()
 
         # Check that error was logged with timing
-        assert any("Error in error_function" in record.message for record in caplog.records)
+        assert any(
+            "Error in error_function" in record.message for record in caplog.records
+        )
 
     def test_sync_function_error_handling(self, caplog):
         """Test that errors are logged with execution time for sync functions."""
+
         @performance_monitor
         def error_function():
             time.sleep(0.01)
@@ -564,7 +720,9 @@ class TestPerformanceMonitorDecorator:
             with pytest.raises(ValueError, match="Test error"):
                 error_function()
 
-        assert any("Error in error_function" in record.message for record in caplog.records)
+        assert any(
+            "Error in error_function" in record.message for record in caplog.records
+        )
 
 
 class TestLogQueryParamsDecorator:
@@ -572,6 +730,7 @@ class TestLogQueryParamsDecorator:
 
     def test_logs_query_parameters(self, caplog):
         """Test that query parameters are logged."""
+
         @log_query_params
         def query_function(page: int = 1, limit: int = 10):
             return {"page": page, "limit": limit}
@@ -584,6 +743,7 @@ class TestLogQueryParamsDecorator:
 
     def test_excludes_sensitive_params(self, caplog):
         """Test that sensitive parameters are excluded from logs."""
+
         @log_query_params
         def query_function(page: int = 1, db=None, request=None):
             return {"page": page}
@@ -598,6 +758,7 @@ class TestLogQueryParamsDecorator:
 
     def test_returns_function_result(self):
         """Test that decorator returns function result correctly."""
+
         @log_query_params
         def query_function(value: int):
             return value * 2
@@ -622,7 +783,7 @@ class TestDecoratorComposition:
         call_count = 0
 
         @performance_monitor
-        @cached_response("items_list")
+        @cached_response("item_detail")
         async def get_items(page: int = 1):
             nonlocal call_count
             call_count += 1
@@ -643,6 +804,7 @@ class TestDecoratorComposition:
 # Config Module Tests
 # ============================================================================
 
+
 class TestSettingsClass:
     """Test suite for Settings configuration class."""
 
@@ -657,41 +819,51 @@ class TestSettingsClass:
 
     def test_settings_from_environment(self):
         """Test that Settings loads from environment variables."""
-        with patch.dict(os.environ, {
-            'DATABASE_URL': 'postgresql://test:test@localhost/testdb',
-            'APP_ENV': 'production',
-            'LOG_LEVEL': 'DEBUG'
-        }):
+        with patch.dict(
+            os.environ,
+            {
+                "DATABASE_URL": "postgresql://test:test@localhost/testdb",
+                "APP_ENV": "production",
+                "LOG_LEVEL": "DEBUG",
+            },
+        ):
             test_settings = Settings()
 
-            assert test_settings.DATABASE_URL == 'postgresql://test:test@localhost/testdb'
-            assert test_settings.APP_ENV == 'production'
-            assert test_settings.LOG_LEVEL == 'DEBUG'
+            assert (
+                test_settings.DATABASE_URL == "postgresql://test:test@localhost/testdb"
+            )
+            assert test_settings.APP_ENV == "production"
+            assert test_settings.LOG_LEVEL == "DEBUG"
 
     def test_database_url_can_be_set(self):
         """Test that DATABASE_URL can be set from environment."""
-        test_db_url = 'postgresql://testuser:testpass@testhost:5432/testdb'
-        with patch.dict(os.environ, {'DATABASE_URL': test_db_url}):
+        test_db_url = "postgresql://testuser:testpass@testhost:5432/testdb"
+        with patch.dict(os.environ, {"DATABASE_URL": test_db_url}):
             test_settings = Settings()
             assert test_settings.DATABASE_URL == test_db_url
 
     def test_cors_origins_custom(self):
         """Test setting custom CORS origins."""
-        with patch.dict(os.environ, {
-            'CORS_ORIGINS': 'http://example.com,http://localhost:3000'
-        }):
+        with patch.dict(
+            os.environ, {"CORS_ORIGINS": "http://example.com,http://localhost:3000"}
+        ):
             test_settings = Settings()
-            assert test_settings.CORS_ORIGINS == 'http://example.com,http://localhost:3000'
+            assert (
+                test_settings.CORS_ORIGINS == "http://example.com,http://localhost:3000"
+            )
 
     def test_settings_validation_types(self):
         """Test that Settings validates types correctly."""
-        with patch.dict(os.environ, {
-            'DATABASE_URL': 'postgresql://localhost/db',
-            'CORS_ORIGINS': 'http://localhost:5173',
-            'APP_ENV': 'development',
-            'LOG_LEVEL': 'INFO',
-            'REDIS_URL': 'redis://localhost:6379'
-        }):
+        with patch.dict(
+            os.environ,
+            {
+                "DATABASE_URL": "postgresql://localhost/db",
+                "CORS_ORIGINS": "http://localhost:5173",
+                "APP_ENV": "development",
+                "LOG_LEVEL": "INFO",
+                "REDIS_URL": "redis://localhost:6379",
+            },
+        ):
             test_settings = Settings()
 
             assert isinstance(test_settings.DATABASE_URL, str)
@@ -702,8 +874,8 @@ class TestSettingsClass:
 
     def test_settings_model_config(self):
         """Test that Settings has correct model configuration."""
-        assert Settings.model_config['env_file'] == '.env'
-        assert Settings.model_config['env_file_encoding'] == 'utf-8'
+        assert Settings.model_config["env_file"] == ".env"
+        assert Settings.model_config["env_file_encoding"] == "utf-8"
 
 
 class TestGlobalSettingsInstance:
@@ -711,20 +883,18 @@ class TestGlobalSettingsInstance:
 
     def test_settings_instance_exists(self):
         """Test that global settings instance is created."""
-        from app.core.config import settings
 
         assert settings is not None
         assert isinstance(settings, Settings)
 
     def test_settings_instance_has_attributes(self):
         """Test that global settings instance has all required attributes."""
-        from app.core.config import settings
 
-        assert hasattr(settings, 'DATABASE_URL')
-        assert hasattr(settings, 'CORS_ORIGINS')
-        assert hasattr(settings, 'APP_ENV')
-        assert hasattr(settings, 'LOG_LEVEL')
-        assert hasattr(settings, 'REDIS_URL')
+        assert hasattr(settings, "DATABASE_URL")
+        assert hasattr(settings, "CORS_ORIGINS")
+        assert hasattr(settings, "APP_ENV")
+        assert hasattr(settings, "LOG_LEVEL")
+        assert hasattr(settings, "REDIS_URL")
 
     def test_settings_singleton_behavior(self):
         """Test that importing settings returns the same instance."""
@@ -739,53 +909,51 @@ class TestConfigurationEdgeCases:
 
     def test_empty_environment_variables(self):
         """Test handling of empty string environment variables."""
-        with patch.dict(os.environ, {
-            'CORS_ORIGINS': '',
-            'APP_ENV': '',
-            'LOG_LEVEL': ''
-        }):
+        with patch.dict(
+            os.environ, {"CORS_ORIGINS": "", "APP_ENV": "", "LOG_LEVEL": ""}
+        ):
             test_settings = Settings()
 
             # Empty strings should be used as-is
-            assert test_settings.CORS_ORIGINS == ''
-            assert test_settings.APP_ENV == ''
-            assert test_settings.LOG_LEVEL == ''
+            assert test_settings.CORS_ORIGINS == ""
+            assert test_settings.APP_ENV == ""
+            assert test_settings.LOG_LEVEL == ""
 
     def test_database_url_parsing_format(self):
         """Test various DATABASE_URL formats are accepted."""
         test_urls = [
-            'postgresql://user:pass@localhost:5432/dbname',
-            'postgresql://user@localhost/dbname',
-            'postgresql+asyncpg://user:pass@localhost/dbname',
+            "postgresql://user:pass@localhost:5432/dbname",
+            "postgresql://user@localhost/dbname",
+            "postgresql+asyncpg://user:pass@localhost/dbname",
         ]
 
         for url in test_urls:
-            with patch.dict(os.environ, {'DATABASE_URL': url}):
+            with patch.dict(os.environ, {"DATABASE_URL": url}):
                 test_settings = Settings()
                 assert test_settings.DATABASE_URL == url
 
     def test_log_level_case_sensitivity(self):
         """Test that log levels work regardless of case."""
-        for level in ['DEBUG', 'debug', 'Debug', 'INFO', 'info']:
-            with patch.dict(os.environ, {'LOG_LEVEL': level}):
+        for level in ["DEBUG", "debug", "Debug", "INFO", "info"]:
+            with patch.dict(os.environ, {"LOG_LEVEL": level}):
                 test_settings = Settings()
                 assert test_settings.LOG_LEVEL == level
 
     def test_redis_url_with_password(self):
         """Test REDIS_URL with authentication."""
-        redis_url = 'redis://:password@localhost:6379/0'
-        with patch.dict(os.environ, {'REDIS_URL': redis_url}):
+        redis_url = "redis://:password@localhost:6379/0"
+        with patch.dict(os.environ, {"REDIS_URL": redis_url}):
             test_settings = Settings()
             assert test_settings.REDIS_URL == redis_url
 
     def test_multiple_cors_origins(self):
         """Test handling multiple CORS origins."""
-        origins = 'http://localhost:5173,http://localhost:3000,https://example.com'
-        with patch.dict(os.environ, {'CORS_ORIGINS': origins}):
+        origins = "http://localhost:5173,http://localhost:3000,https://example.com"
+        with patch.dict(os.environ, {"CORS_ORIGINS": origins}):
             test_settings = Settings()
             assert test_settings.CORS_ORIGINS == origins
 
             # Verify it can be split
-            origin_list = test_settings.CORS_ORIGINS.split(',')
+            origin_list = test_settings.CORS_ORIGINS.split(",")
             assert len(origin_list) == 3
-            assert 'http://localhost:5173' in origin_list
+            assert "http://localhost:5173" in origin_list

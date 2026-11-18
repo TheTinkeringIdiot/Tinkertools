@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
-import { useRouter, useRoute } from 'vue-router';
+import { useRouter, useRoute, type LocationQueryRaw } from 'vue-router';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
+import { useGameVersion } from '@/composables/useGameVersion';
 import { useSymbiantsStore } from '@/stores/symbiants';
 import { usePocketBossStore } from '@/stores/pocketBossStore';
 import { mapProfileToStats } from '@/utils/profile-stats-mapper';
@@ -60,9 +61,6 @@ const maxLevel = ref<number>(220);
 const bossLevelRange = ref<[number, number]>([1, 220]); // Local state for slider
 const bossViewMode = ref<'grid' | 'list'>('list');
 
-// Loading State
-const loading = ref<boolean>(false);
-
 // Debounce timer for search
 let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -94,12 +92,19 @@ const FAMILY_OPTIONS = [
 ];
 
 // Computed Properties
+const { current: gameVersion } = useGameVersion();
+const versionName = computed(() => gameVersion.value?.display_name || 'This game version');
+
+const versionHasNoBosses = computed(
+  () =>
+    pocketBossStore.pocketBosses.length === 0 && !pocketBossStore.loading && !pocketBossStore.error
+);
+
 const activeProfile = computed(() => profileStore.activeProfile);
 
 const characterStats = computed(() => {
   if (!activeProfile.value) return null;
-  // Convert to plain object to satisfy type requirements
-  return mapProfileToStats(activeProfile.value as any);
+  return mapProfileToStats(activeProfile.value);
 });
 
 const filteredSymbiants = computed(() => {
@@ -154,10 +159,6 @@ const filteredSymbiants = computed(() => {
   return result;
 });
 
-const displayedSymbiantCount = computed(() => {
-  return filteredSymbiants.value.length;
-});
-
 const filteredBosses = computed(() => pocketBossStore.filteredPocketBosses);
 const playfields = computed(() => pocketBossStore.playfields);
 const levelRange = computed(() => pocketBossStore.levelRange);
@@ -167,63 +168,9 @@ const comparisonCount = computed(() => symbiantsStore.getComparisonCount());
 const hasComparisons = computed(() => comparisonCount.value > 0);
 
 // Methods
-let debugCount = 0;
-function checkSymbiantRequirements(symbiant: SymbiantItem): boolean {
-  const shouldLog = debugCount === 0;
-
-  if (shouldLog) {
-    console.log('🔍 Checking symbiant:', symbiant.name, 'ID:', symbiant.id);
-  }
-
-  if (!characterStats.value) {
-    if (shouldLog) console.log('❌ No character stats');
-    return true;
-  }
-
-  if (shouldLog) {
-    console.log('📊 Character stats:', characterStats.value);
-    console.log('📊 Profession stat (60):', characterStats.value[60]);
-  }
-
-  if (!symbiant.actions || symbiant.actions.length === 0) {
-    if (shouldLog) console.log('✅ No actions, returning true');
-    return true;
-  }
-
-  const action = symbiant.actions[0];
-  if (shouldLog) {
-    console.log('📋 Action criteria count:', action.criteria?.length);
-  }
-
-  const parsedAction = parseAction(action);
-  if (shouldLog) {
-    console.log('🔨 Parsed action:', parsedAction);
-  }
-
-  const result = checkActionRequirements(parsedAction, characterStats.value);
-  if (shouldLog) {
-    console.log('✅ Can perform?', result.canPerform, 'Unmet:', result.unmetRequirements.length);
-
-    if (!result.canPerform && result.unmetRequirements.length > 0) {
-      console.log('❌ Unmet requirements:');
-      result.unmetRequirements.forEach((req) => {
-        console.log(`  - Stat ${req.stat}: need ${req.required}, have ${req.current}`);
-      });
-    }
-  }
-
-  debugCount++;
-  return result.canPerform;
-}
-
-async function fetchSymbiants() {
-  await symbiantsStore.loadAllSymbiants();
-  // Computed property (filteredSymbiants) handles filtering
-}
-
-function updateFilters() {
+async function updateFilters() {
   // No page reset needed
-  updateURL();
+  await updateURL();
 }
 
 function onSearchInput() {
@@ -232,11 +179,11 @@ function onSearchInput() {
   }
 
   searchDebounceTimer = setTimeout(() => {
-    updateFilters();
+    updateFilters().catch((error) => console.error('[FindGear] Failed to update URL:', error));
   }, 300);
 }
 
-function clearFilters() {
+async function clearFilters() {
   familyFilter.value = null;
   slotFilter.value = null;
   minQL.value = 1;
@@ -247,23 +194,23 @@ function clearFilters() {
   symbiantLevelRange.value = [1, 220];
   searchText.value = '';
   profileToggle.value = false;
-  updateFilters();
+  await updateFilters();
 }
 
-function applyQlFilter() {
+async function applyQlFilter() {
   minQL.value = qlRange.value[0];
   maxQL.value = qlRange.value[1];
-  updateFilters();
+  await updateFilters();
 }
 
-function applyLevelFilter() {
+async function applyLevelFilter() {
   symbiantMinLevel.value = symbiantLevelRange.value[0];
   symbiantMaxLevel.value = symbiantLevelRange.value[1];
-  updateFilters();
+  await updateFilters();
 }
 
-function updateURL() {
-  const query: any = {};
+async function updateURL() {
+  const query: LocationQueryRaw = {};
 
   if (familyFilter.value) query.family = familyFilter.value;
   if (slotFilter.value) query.slot = slotFilter.value.toString();
@@ -274,7 +221,8 @@ function updateURL() {
   if (searchText.value.trim()) query.search = searchText.value.trim();
   if (profileToggle.value) query.profile = 'true';
 
-  router.push({ path: '/pocket', query });
+  // Named route: the version param is inherited from the current route.
+  await router.push({ name: 'TinkerPocket', query });
 }
 
 function readURLParams() {
@@ -332,8 +280,8 @@ function readURLParams() {
   }
 }
 
-function navigateToItem(aoid: number) {
-  router.push(`/items/${aoid}`);
+async function navigateToItem(aoid: number) {
+  await router.push({ name: 'ItemDetail', params: { aoid: aoid.toString() } });
 }
 
 function handleAddToComparison(symbiant: SymbiantItem) {
@@ -352,8 +300,8 @@ function handleClearComparison() {
   symbiantsStore.clearComparison();
 }
 
-function isSymbiantInComparison(symbiantId: number): boolean {
-  return symbiantsStore.isInComparison(symbiantId) !== null;
+function isSymbiantInComparison(aoid: number): boolean {
+  return symbiantsStore.isInComparison(aoid) !== null;
 }
 
 function handleAddToFarmList(symbiant: SymbiantItem) {
@@ -405,9 +353,13 @@ function clearBossFilters() {
   pocketBossStore.clearFilters();
 }
 
-function navigateToBoss(bossId: number) {
+async function navigateToBoss(bossId: number) {
   // Pass current tab to preserve it when returning from boss detail
-  router.push(`/pocket/bosses/${bossId}?returnTab=${props.view}`);
+  await router.push({
+    name: 'BossDetail',
+    params: { id: bossId.toString() },
+    query: { returnTab: props.view },
+  });
 }
 
 function formatLocation(boss: Mob): string {
@@ -448,7 +400,8 @@ onMounted(async () => {
 
   if (props.view === 'symbiants') {
     if (symbiantsStore.isDataStale || symbiantsStore.symbiantsCount === 0) {
-      await symbiantsStore.loadAllSymbiants();
+      // A failure is kept by the store and shown below with a Retry button
+      await symbiantsStore.loadAllSymbiants().catch(() => {});
     }
   } else if (props.view === 'bosses') {
     await loadBosses();
@@ -459,7 +412,8 @@ onMounted(async () => {
 watch(
   () => route.query,
   () => {
-    if (route.path === '/pocket') {
+    // Match on the route name: the path now carries a game version segment.
+    if (route.name === 'TinkerPocket') {
       readURLParams();
     }
   }
@@ -468,7 +422,7 @@ watch(
 // Watch for profile changes to auto-set max level
 watch(
   () => activeProfile.value,
-  (newProfile, oldProfile) => {
+  async (newProfile, oldProfile) => {
     if (props.view !== 'symbiants') return;
 
     // Only update if profile actually changed (not just a reference change)
@@ -480,12 +434,12 @@ watch(
       symbiantMaxLevel.value = newLevel;
       symbiantLevelRange.value[1] = newLevel;
       // Trigger update
-      applyLevelFilter();
+      await applyLevelFilter();
     } else if (!newProfile && oldProfile) {
       // Profile was cleared, reset to max
       symbiantMaxLevel.value = 220;
       symbiantLevelRange.value[1] = 220;
-      applyLevelFilter();
+      await applyLevelFilter();
     }
   },
   { immediate: false }
@@ -506,10 +460,10 @@ watch(
               <Dropdown
                 v-model="familyFilter"
                 :options="FAMILY_OPTIONS"
-                optionLabel="label"
-                optionValue="value"
+                option-label="label"
+                option-value="value"
                 placeholder="All Families"
-                showClear
+                show-clear
                 class="w-full border border-surface-300 dark:border-surface-600"
                 @change="updateFilters"
               />
@@ -521,10 +475,10 @@ watch(
               <Dropdown
                 v-model="slotFilter"
                 :options="SLOT_OPTIONS"
-                optionLabel="label"
-                optionValue="value"
+                option-label="label"
+                option-value="value"
                 placeholder="All Slots"
-                showClear
+                show-clear
                 class="w-full border border-surface-300 dark:border-surface-600"
                 @change="updateFilters"
               />
@@ -575,8 +529,8 @@ watch(
                 :range="true"
                 :min="1"
                 :max="300"
-                @slideend="applyQlFilter"
                 class="flex-1"
+                @slideend="applyQlFilter"
               />
               <span
                 class="text-sm text-surface-600 dark:text-surface-400 min-w-[2rem] text-center"
@@ -598,8 +552,8 @@ watch(
                 :range="true"
                 :min="1"
                 :max="220"
-                @slideend="applyLevelFilter"
                 class="flex-1"
+                @slideend="applyLevelFilter"
               />
               <span
                 class="text-sm text-surface-600 dark:text-surface-400 min-w-[2rem] text-center"
@@ -607,8 +561,8 @@ watch(
               >
               <i
                 v-if="activeProfile && symbiantMaxLevel === activeProfile.Character.Level"
-                class="pi pi-user text-primary-500"
                 v-tooltip="'Max level set from active profile'"
+                class="pi pi-user text-primary-500"
               ></i>
             </div>
           </div>
@@ -661,9 +615,13 @@ watch(
       <div v-else-if="symbiantsStore.error" class="flex flex-col justify-center items-center py-12">
         <i class="pi pi-exclamation-circle text-4xl text-red-500 mb-3"></i>
         <p class="text-lg text-red-600 dark:text-red-400 mb-4">
-          {{ symbiantsStore.error }}
+          {{ symbiantsStore.error.message }}
         </p>
-        <Button label="Retry" icon="pi pi-refresh" @click="symbiantsStore.loadAllSymbiants(true)" />
+        <Button
+          label="Retry"
+          icon="pi pi-refresh"
+          @click="symbiantsStore.loadAllSymbiants(true).catch(() => {})"
+        />
       </div>
 
       <!-- Results -->
@@ -682,9 +640,9 @@ watch(
         <div v-if="filteredSymbiants.length > 0" class="space-y-2">
           <div
             v-for="symbiant in filteredSymbiants"
-            :key="symbiant.id"
-            @click="navigateToItem(symbiant.aoid)"
+            :key="symbiant.aoid"
             class="symbiant-card flex items-center gap-4 p-4 bg-surface-0 dark:bg-surface-800 border border-surface-200 dark:border-surface-700 rounded-lg cursor-pointer transition-all duration-200"
+            @click="navigateToItem(symbiant.aoid)"
           >
             <!-- Info -->
             <div class="flex-1 min-w-0">
@@ -708,24 +666,37 @@ watch(
             <div class="flex gap-1">
               <!-- Compare Button -->
               <Button
-                @click.stop="handleAddToComparison(symbiant)"
-                :icon="isSymbiantInComparison(symbiant.id) ? 'pi pi-check' : 'pi pi-clone'"
-                :severity="isSymbiantInComparison(symbiant.id) ? 'success' : 'secondary'"
+                v-tooltip="
+                  isSymbiantInComparison(symbiant.aoid) ? 'In comparison' : 'Add to compare'
+                "
+                :icon="isSymbiantInComparison(symbiant.aoid) ? 'pi pi-check' : 'pi pi-clone'"
+                :severity="isSymbiantInComparison(symbiant.aoid) ? 'success' : 'secondary'"
                 size="small"
                 outlined
-                v-tooltip="isSymbiantInComparison(symbiant.id) ? 'In comparison' : 'Add to compare'"
+                @click.stop="handleAddToComparison(symbiant)"
               />
               <!-- Farm List Button -->
               <Button
-                @click.stop="handleAddToFarmList(symbiant)"
+                v-tooltip="isSymbiantInFarmList(symbiant.aoid) ? 'In farm list' : 'Add to farm'"
                 :icon="isSymbiantInFarmList(symbiant.aoid) ? 'pi pi-check' : 'pi pi-list'"
                 :severity="isSymbiantInFarmList(symbiant.aoid) ? 'success' : 'secondary'"
                 size="small"
                 outlined
-                v-tooltip="isSymbiantInFarmList(symbiant.aoid) ? 'In farm list' : 'Add to farm'"
+                @click.stop="handleAddToFarmList(symbiant)"
               />
             </div>
           </div>
+        </div>
+
+        <!-- Nothing in this game version -->
+        <div v-else-if="symbiantsStore.symbiantsCount === 0" class="text-center py-12">
+          <i class="pi pi-inbox text-4xl text-surface-400 mb-4"></i>
+          <p class="text-lg text-surface-600 dark:text-surface-400">
+            {{ versionName }} has no symbiants
+          </p>
+          <p class="text-sm text-surface-500 dark:text-surface-500">
+            Pick another game version to browse them
+          </p>
         </div>
 
         <!-- Empty State -->
@@ -766,7 +737,7 @@ watch(
                 v-model="playfieldFilter"
                 :options="playfields"
                 placeholder="All Playfields"
-                showClear
+                show-clear
                 class="w-full border border-surface-300 dark:border-surface-600"
                 @change="updateBossFilters"
               />
@@ -785,8 +756,8 @@ watch(
                   :range="true"
                   :min="levelRange.min"
                   :max="levelRange.max"
-                  @slideend="applyBossLevelFilter"
                   class="flex-1"
+                  @slideend="applyBossLevelFilter"
                 />
                 <span
                   class="text-sm text-surface-600 dark:text-surface-400 min-w-[2rem] text-center"
@@ -815,16 +786,16 @@ watch(
 
             <div class="flex items-center gap-2">
               <Button
-                @click="bossViewMode = 'grid'"
                 :outlined="bossViewMode !== 'grid'"
                 icon="pi pi-th-large"
                 size="small"
+                @click="bossViewMode = 'grid'"
               />
               <Button
-                @click="bossViewMode = 'list'"
                 :outlined="bossViewMode !== 'list'"
                 icon="pi pi-list"
                 size="small"
+                @click="bossViewMode = 'list'"
               />
             </div>
           </div>
@@ -833,14 +804,24 @@ watch(
 
       <!-- Boss List/Grid -->
       <DataView
-        :value="filteredBosses as any"
-        :layout="bossViewMode as any"
+        :value="filteredBosses"
+        :layout="bossViewMode"
+        data-key="id"
         :paginator="true"
         :rows="20"
-        :rowsPerPageOptions="[10, 20, 50]"
+        :rows-per-page-options="[10, 20, 50]"
       >
         <template #empty>
-          <div class="text-center py-12">
+          <div v-if="versionHasNoBosses" class="text-center py-12">
+            <i class="pi pi-inbox text-4xl text-surface-400 mb-4"></i>
+            <p class="text-lg text-surface-600 dark:text-surface-400">
+              {{ versionName }} has no pocket bosses
+            </p>
+            <p class="text-sm text-surface-500 dark:text-surface-500">
+              Pick another game version to browse them
+            </p>
+          </div>
+          <div v-else class="text-center py-12">
             <i class="pi pi-search text-4xl text-surface-400 mb-4"></i>
             <p class="text-lg text-surface-600 dark:text-surface-400">No pocket bosses found</p>
             <p class="text-sm text-surface-500 dark:text-surface-500">Try adjusting your filters</p>

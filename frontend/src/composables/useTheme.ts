@@ -48,16 +48,6 @@ function applyTheme(theme: ThemeMode): void {
 }
 
 /**
- * Get system preferred theme
- */
-function getSystemTheme(): ThemeMode {
-  if (typeof window === 'undefined') return 'light';
-
-  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  return prefersDark ? 'dark' : 'light';
-}
-
-/**
  * Get saved theme preference or dark default
  */
 function getInitialTheme(): ThemeMode {

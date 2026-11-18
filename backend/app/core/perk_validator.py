@@ -69,7 +69,9 @@ def map_profession_to_id(profession_name: str) -> int:
 
     profession_id = PROFESSION_NAME_TO_ID.get(profession_name.strip())
     if profession_id is None:
-        raise ValueError(f"Unknown profession name: '{profession_name}'. Valid names: {list(PROFESSION_NAME_TO_ID.keys())}")
+        raise ValueError(
+            f"Unknown profession name: '{profession_name}'. Valid names: {list(PROFESSION_NAME_TO_ID.keys())}"
+        )
 
     return profession_id
 
@@ -92,7 +94,9 @@ def map_breed_to_id(breed_name: str) -> int:
 
     breed_id = BREED_NAME_TO_ID.get(breed_name.strip())
     if breed_id is None:
-        raise ValueError(f"Unknown breed name: '{breed_name}'. Valid names: {list(BREED_NAME_TO_ID.keys())}")
+        raise ValueError(
+            f"Unknown breed name: '{breed_name}'. Valid names: {list(BREED_NAME_TO_ID.keys())}"
+        )
 
     return breed_id
 
@@ -115,7 +119,9 @@ def validate_perk_type(perk_type: str) -> str:
 
     perk_type = perk_type.strip().upper()
     if perk_type not in VALID_PERK_TYPES:
-        raise ValueError(f"Invalid perk type: '{perk_type}'. Valid types: {sorted(VALID_PERK_TYPES)}")
+        raise ValueError(
+            f"Invalid perk type: '{perk_type}'. Valid types: {sorted(VALID_PERK_TYPES)}"
+        )
 
     return perk_type
 
@@ -137,7 +143,9 @@ def validate_counter(counter: int) -> int:
         raise ValueError(f"Counter must be an integer, got: {type(counter).__name__}")
 
     if counter < MIN_COUNTER or counter > MAX_COUNTER:
-        raise ValueError(f"Counter must be between {MIN_COUNTER} and {MAX_COUNTER}, got: {counter}")
+        raise ValueError(
+            f"Counter must be between {MIN_COUNTER} and {MAX_COUNTER}, got: {counter}"
+        )
 
     return counter
 
@@ -165,12 +173,14 @@ def parse_level_requirement(level: Any) -> int:
 
     if isinstance(level, str):
         level = level.strip()
-        if not level or level.lower() in ('null', 'none', ''):
+        if not level or level.lower() in ("null", "none", ""):
             return 0
         try:
             parsed_level = int(level)
             if parsed_level < 0:
-                raise ValueError(f"Level requirement cannot be negative: {parsed_level}")
+                raise ValueError(
+                    f"Level requirement cannot be negative: {parsed_level}"
+                )
             return parsed_level
         except ValueError:
             raise ValueError(f"Cannot parse level requirement to integer: '{level}'")
@@ -182,7 +192,9 @@ def parse_level_requirement(level: Any) -> int:
             raise ValueError(f"Level requirement cannot be negative: {parsed_level}")
         return parsed_level
     except (ValueError, TypeError):
-        raise ValueError(f"Cannot parse level requirement to integer: {level} (type: {type(level).__name__})")
+        raise ValueError(
+            f"Cannot parse level requirement to integer: {level} (type: {type(level).__name__})"
+        )
 
 
 def map_professions_list(professions: List[str]) -> List[int]:
@@ -199,7 +211,9 @@ def map_professions_list(professions: List[str]) -> List[int]:
         ValueError: If any profession name is not recognized
     """
     if not isinstance(professions, list):
-        raise ValueError(f"Professions must be a list, got: {type(professions).__name__}")
+        raise ValueError(
+            f"Professions must be a list, got: {type(professions).__name__}"
+        )
 
     profession_ids = []
     for profession in professions:

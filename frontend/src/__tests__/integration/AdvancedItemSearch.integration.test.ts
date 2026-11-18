@@ -1,329 +1,271 @@
 /**
- * AdvancedItemSearch Component Unit Tests
+ * AdvancedItemSearch Integration Tests
  *
- * UNIT TEST - Component behavior tests, no real API calls
- * Strategy: Tests component logic in isolation
- *
- * Tests the AdvancedItemSearch component query building and validation
- * without making real backend calls. Component emits search queries
- * which are validated for correct structure.
- *
- * Note: This file is named "integration" but tests component behavior
- * in isolation, not real backend integration.
+ * The TinkerItems search sidebar, driven through its real PrimeVue widgets
+ * with the real items store (API client mocked). Checks the search query the
+ * form emits for what the user entered, and what the form shows back.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mount } from '@vue/test-utils';
-import { createPinia, setActivePinia } from 'pinia';
-import { nextTick } from 'vue';
-import PrimeVue from 'primevue/config';
-import Button from 'primevue/button';
-import InputText from 'primevue/inputtext';
-import InputNumber from 'primevue/inputnumber';
-import Dropdown from 'primevue/dropdown';
-import Checkbox from 'primevue/checkbox';
-import AdvancedItemSearch from '../../components/items/AdvancedItemSearch.vue';
-import { useItemsStore } from '../../stores/items';
-import type { ItemSearchQuery } from '../../types/api';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
-describe('AdvancedItemSearch Component Unit Tests', () => {
-  let wrapper: any;
-  let itemsStore: any;
+// CRITICAL: Mock API BEFORE store imports
+vi.mock('@/services/api-client');
+
+import { mount, type VueWrapper } from '@vue/test-utils';
+import { createPinia, setActivePinia, type Pinia } from 'pinia';
+import AdvancedItemSearch from '@/components/items/AdvancedItemSearch.vue';
+import { apiClient } from '@/services/api-client';
+import { useItemsStore } from '@/stores/items';
+import type { ItemSearchQuery } from '@/types/api';
+import { appGlobals } from '../helpers/app-globals';
+import { itemSearchForm, shownOption } from '../helpers/item-search-page';
+import { SKILL_ID } from '../helpers/skill-fixtures';
+
+describe('AdvancedItemSearch', () => {
+  let pinia: Pinia;
+  let wrapper: VueWrapper;
+
+  function mountSearch(props: { loading?: boolean; resultCount?: number } = {}) {
+    wrapper = mount(AdvancedItemSearch, {
+      props,
+      global: appGlobals(pinia),
+      attachTo: document.body,
+    });
+    return itemSearchForm(wrapper);
+  }
+
+  function emittedQueries(): ItemSearchQuery[] {
+    return (wrapper.emitted('search') ?? []).map(([query]) => query as ItemSearchQuery);
+  }
+
+  function lastQuery(): ItemSearchQuery {
+    const queries = emittedQueries();
+    expect(queries.length).toBeGreaterThan(0);
+    return queries[queries.length - 1];
+  }
 
   beforeEach(() => {
-    setActivePinia(createPinia());
-    itemsStore = useItemsStore();
+    pinia = createPinia();
+    setActivePinia(pinia);
   });
 
   afterEach(() => {
-    if (wrapper) {
-      wrapper.unmount();
-    }
+    wrapper.unmount();
   });
 
-  const createWrapper = (props = {}) => {
-    return mount(AdvancedItemSearch, {
-      props: {
-        loading: false,
-        resultCount: 0,
-        ...props,
-      },
-      global: {
-        plugins: [PrimeVue],
-        components: {
-          Button,
-          InputText,
-          InputNumber,
-          Dropdown,
-          Checkbox,
-        },
-      },
-    });
-  };
+  describe('building the search query', () => {
+    it('combines name, quality level and stat bonus criteria', async () => {
+      const form = mountSearch();
 
-  describe('API Integration', () => {
-    it('should emit properly formatted search queries', async () => {
-      wrapper = createWrapper();
+      await form.typeName('implant');
+      await form.setMinQL(100);
+      await form.tick('Strength');
+      await form.search();
 
-      // Set up complex search criteria
-      const searchInput = wrapper.find('input[placeholder*="Search for items"]');
-      await searchInput.setValue('implant');
-      await nextTick();
-
-      // Set min QL directly on component data since PrimeVue InputNumber is complex
-      wrapper.vm.searchForm.min_ql = 100;
-      await nextTick();
-
-      // Check a stat bonus
-      const checkboxes = wrapper.findAll('input[type="checkbox"]');
-      if (checkboxes.length > 0) {
-        await checkboxes[0].setValue(true);
-        await nextTick();
-      }
-
-      // Trigger search
-      const buttons = wrapper.findAll('button');
-      const searchButton = buttons.find((btn: any) => btn.text() === 'Search');
-      await searchButton.trigger('click');
-
-      // Verify search event was emitted with correct structure
-      const searchEvents = wrapper.emitted('search');
-      expect(searchEvents).toBeTruthy();
-      expect(searchEvents[0]).toBeTruthy();
-
-      const query = searchEvents[0][0] as ItemSearchQuery;
-
-      // Verify query structure matches API expectations
-      expect(query).toHaveProperty('search');
-      expect(query.search).toBe('implant');
-      expect(query).toHaveProperty('exact_match');
-      expect(query).toHaveProperty('search_fields');
-      expect(query).toHaveProperty('min_ql');
-      expect(query.min_ql).toBe(100);
+      expect(lastQuery()).toEqual({
+        search: 'implant',
+        exact_match: false,
+        search_fields: ['name'],
+        min_ql: 100,
+        stat_bonuses: [SKILL_ID.STRENGTH],
+      });
     });
 
-    it('should handle empty search criteria correctly', async () => {
-      wrapper = createWrapper();
+    it('searches when the user presses Enter in the name box', async () => {
+      const form = mountSearch();
 
-      // Try to search without any criteria
-      const buttons = wrapper.findAll('button');
-      const searchButton = buttons.find((btn: any) => btn.text() === 'Search');
+      await form.typeName('Cell Scanner');
+      await form.pressEnter();
 
-      // Should be disabled initially
-      expect(searchButton.attributes('disabled')).toBeDefined();
-
-      // Add minimal criteria
-      const searchInput = wrapper.find('input[placeholder*="Search for items"]');
-      await searchInput.setValue('test');
-      await nextTick();
-
-      // Should now be enabled
-      expect(searchButton.attributes('disabled')).toBeUndefined();
+      expect(lastQuery().search).toBe('Cell Scanner');
     });
 
-    it('should properly clear all form data', async () => {
-      wrapper = createWrapper();
+    it('trims surrounding whitespace from the name', async () => {
+      const form = mountSearch();
 
-      // Set various form values
-      const searchInput = wrapper.find('input[placeholder*="Search for items"]');
-      await searchInput.setValue('test search');
+      await form.typeName('  rifle  ');
+      await form.search();
 
-      const checkboxes = wrapper.findAll('input[type="checkbox"]');
-      if (checkboxes.length > 0) {
-        await checkboxes[0].setValue(true);
-      }
-
-      await nextTick();
-
-      // Verify search criteria exists
-      expect(wrapper.vm.hasSearchCriteria).toBe(true);
-
-      // Clear the form
-      const buttons = wrapper.findAll('button');
-      const clearButton = buttons.find((btn: any) => btn.text() === 'Clear');
-      await clearButton.trigger('click');
-
-      // Verify clear event was emitted
-      expect(wrapper.emitted('clear')).toBeTruthy();
-
-      // Verify form was reset
-      expect(wrapper.vm.searchForm.search).toBe('');
-      expect(wrapper.vm.selectedStatBonuses).toEqual([]);
-      expect(wrapper.vm.hasSearchCriteria).toBe(false);
+      expect(lastQuery().search).toBe('rifle');
     });
 
-    it('should validate QL range constraints', async () => {
-      wrapper = createWrapper();
+    it('sends a typed quality level range', async () => {
+      const form = mountSearch();
 
-      // Set QL values directly on component data
-      wrapper.vm.searchForm.min_ql = 50;
-      wrapper.vm.searchForm.max_ql = 200;
-      wrapper.vm.searchForm.search = 'test'; // Add basic search criteria
-      await nextTick();
+      await form.setMinQL(50);
+      await form.setMaxQL(200);
+      await form.search();
 
-      const buttons = wrapper.findAll('button');
-      const searchButton = buttons.find((btn: any) => btn.text() === 'Search');
-      await searchButton.trigger('click');
-
-      const searchEvents = wrapper.emitted('search');
-      expect(searchEvents).toBeTruthy();
-      expect(searchEvents[0]).toBeTruthy();
-
-      const query = searchEvents[0][0] as ItemSearchQuery;
-      expect(query.min_ql).toBe(50);
-      expect(query.max_ql).toBe(200);
-      expect(query.search).toBe('test');
+      expect(lastQuery()).toEqual({ min_ql: 50, max_ql: 200 });
     });
 
-    it('should handle stat bonus selections correctly', async () => {
-      wrapper = createWrapper();
+    it('fills the quality level range from a quick range button', async () => {
+      const form = mountSearch();
 
-      // Select multiple stat bonuses
-      const checkboxes = wrapper.findAll('input[type="checkbox"]');
+      await form.quickQL('101-200');
 
-      // Select first few checkboxes (assuming they are stat bonuses)
-      if (checkboxes.length >= 3) {
-        await checkboxes[2].setValue(true); // Skip special filters, go to stats
-        await checkboxes[3].setValue(true);
-        await nextTick();
+      expect(form.qlInputs().map((input) => input.element.value)).toEqual(['101', '200']);
 
-        const searchInput = wrapper.find('input[placeholder*="Search for items"]');
-        await searchInput.setValue('stats test');
-
-        const buttons = wrapper.findAll('button');
-        const searchButton = buttons.find((btn: any) => btn.text() === 'Search');
-        await searchButton.trigger('click');
-
-        const query = wrapper.emitted('search')[0][0] as ItemSearchQuery;
-        expect(query).toHaveProperty('stat_bonuses');
-        expect(Array.isArray(query.stat_bonuses)).toBe(true);
-        expect(query.stat_bonuses.length).toBeGreaterThan(0);
-      }
+      await form.search();
+      expect(lastQuery()).toEqual({ min_ql: 101, max_ql: 200 });
     });
 
-    it('should handle special filter combinations', async () => {
-      wrapper = createWrapper();
+    it('sends every ticked stat bonus, and drops one when unticked', async () => {
+      const form = mountSearch();
 
-      // Find and check special filters
-      const checkboxes = wrapper.findAll('input[type="checkbox"]');
+      await form.tick('Strength');
+      await form.tick('Agility');
+      await form.search();
+      expect(lastQuery().stat_bonuses).toEqual([SKILL_ID.STRENGTH, SKILL_ID.AGILITY]);
 
-      // Look for Froob Friendly checkbox
-      const froobCheckbox = checkboxes.find((cb: any) => cb.attributes('id') === 'froob-friendly');
-
-      if (froobCheckbox) {
-        await froobCheckbox.setValue(true);
-
-        const searchInput = wrapper.find('input[placeholder*="Search for items"]');
-        await searchInput.setValue('froob items');
-        await nextTick();
-
-        const buttons = wrapper.findAll('button');
-        const searchButton = buttons.find((btn: any) => btn.text() === 'Search');
-        await searchButton.trigger('click');
-
-        const query = wrapper.emitted('search')[0][0] as ItemSearchQuery;
-        expect(query.froob_friendly).toBe(true);
-      }
+      await form.tick('Strength', false);
+      await form.search();
+      expect(lastQuery().stat_bonuses).toEqual([SKILL_ID.AGILITY]);
     });
 
-    it('should handle match type and search field selections', async () => {
-      wrapper = createWrapper();
+    it('sends the special filters', async () => {
+      const form = mountSearch();
 
-      const searchInput = wrapper.find('input[placeholder*="Search for items"]');
-      await searchInput.setValue('exact search term');
+      await form.tick('Froob Friendly');
+      await form.tick('NoDrop');
+      await form.search();
 
-      // Find dropdowns and set match type to exact
-      const dropdowns = wrapper.findAll('.p-dropdown, select');
-      if (dropdowns.length >= 2) {
-        // First dropdown should be match type
-        const matchTypeDropdown = dropdowns[0];
-        if (matchTypeDropdown.element.tagName.toLowerCase() === 'select') {
-          await matchTypeDropdown.setValue('exact');
-        }
+      expect(lastQuery()).toEqual({ froob_friendly: true, nodrop: true });
+    });
 
-        // Second dropdown should be search fields
-        const searchFieldsDropdown = dropdowns[1];
-        if (searchFieldsDropdown.element.tagName.toLowerCase() === 'select') {
-          await searchFieldsDropdown.setValue('name');
-        }
-      }
+    it('sends the chosen match type and search fields', async () => {
+      const form = mountSearch();
 
-      await nextTick();
+      await form.typeName('exact search term');
+      await form.matchType('Exact Match');
+      await form.searchIn('Description');
+      await form.search();
+      expect(lastQuery()).toMatchObject({
+        search: 'exact search term',
+        exact_match: true,
+        search_fields: ['description'],
+      });
 
-      const buttons = wrapper.findAll('button');
-      const searchButton = buttons.find((btn: any) => btn.text() === 'Search');
-      await searchButton.trigger('click');
+      await form.searchIn('Both');
+      await form.search();
+      expect(lastQuery().search_fields).toEqual(['name', 'description']);
+    });
 
-      const query = wrapper.emitted('search')[0][0] as ItemSearchQuery;
-      expect(query.search).toBe('exact search term');
-      expect(query.exact_match).toBe(true);
-      expect(query.search_fields).toContain('name');
+    it('sends requirement filters as ids', async () => {
+      const form = mountSearch();
+
+      await form.choose('Profession', 'Engineer');
+      await form.search();
+
+      expect(lastQuery()).toEqual({ profession: 3 });
     });
   });
 
-  describe('Component State Management', () => {
-    it('should properly manage hasSearched state', async () => {
-      wrapper = createWrapper();
+  describe('item class and slot', () => {
+    it('offers equipment slots once an item class is chosen', async () => {
+      const form = mountSearch();
 
-      // Initially should not have searched
-      expect(wrapper.vm.hasSearched).toBe(false);
+      expect(wrapper.text()).not.toContain('Equipment Slot');
 
-      // Add criteria and search
-      const searchInput = wrapper.find('input[placeholder*="Search for items"]');
-      await searchInput.setValue('test');
+      await form.choose('Item Class', 'Weapon');
+      await form.choose('Equipment Slot', 'Hud1');
+      await form.search();
 
-      const buttons = wrapper.findAll('button');
-      const searchButton = buttons.find((btn: any) => btn.text() === 'Search');
-      await searchButton.trigger('click');
-
-      // Should now have searched
-      expect(wrapper.vm.hasSearched).toBe(true);
+      expect(lastQuery()).toEqual({ item_class: 1, slot: 1 });
     });
 
-    it('should reset hasSearched when clearing', async () => {
-      wrapper = createWrapper();
+    it('forgets the slot when the item class changes', async () => {
+      const form = mountSearch();
 
-      // Set up and perform search
-      const searchInput = wrapper.find('input[placeholder*="Search for items"]');
-      await searchInput.setValue('test');
+      await form.choose('Item Class', 'Weapon');
+      await form.choose('Equipment Slot', 'Hud1');
+      await form.choose('Item Class', 'Implant');
+      await form.search();
 
-      const buttons = wrapper.findAll('button');
-      const searchButton = buttons.find((btn: any) => btn.text() === 'Search');
-      await searchButton.trigger('click');
+      expect(lastQuery()).toEqual({ item_class: 3 });
+    });
+  });
 
-      expect(wrapper.vm.hasSearched).toBe(true);
+  describe('search and clear buttons', () => {
+    it('are disabled until the user enters some criteria', async () => {
+      const form = mountSearch();
 
-      // Clear the form
-      const clearButton = buttons.find((btn: any) => btn.text() === 'Clear');
-      await clearButton.trigger('click');
+      expect(form.searchButton().attributes('disabled')).toBeDefined();
+      expect(form.clearButton().attributes('disabled')).toBeDefined();
 
-      // Should reset hasSearched
-      expect(wrapper.vm.hasSearched).toBe(false);
+      await form.typeName('test');
+
+      expect(form.searchButton().attributes('disabled')).toBeUndefined();
+      expect(form.clearButton().attributes('disabled')).toBeUndefined();
     });
 
-    it('should maintain selectedStatBonuses array correctly', async () => {
-      wrapper = createWrapper();
+    it('clear empties the form and tells the page', async () => {
+      const form = mountSearch();
 
-      // Initially empty
-      expect(wrapper.vm.selectedStatBonuses).toEqual([]);
+      await form.typeName('test search');
+      await form.tick('Strength');
+      await form.setMinQL(100);
+      await form.clear();
 
-      // Select some stat bonuses
-      const checkboxes = wrapper.findAll('input[type="checkbox"]');
-      if (checkboxes.length >= 3) {
-        // Skip special filters (first 2), select stat bonuses
-        await checkboxes[2].setValue(true);
-        await checkboxes[3].setValue(true);
-        await nextTick();
+      expect(wrapper.emitted('clear')).toHaveLength(1);
+      expect(form.nameInput().element.value).toBe('');
+      expect(form.qlInputs()[0].element.value).toBe('');
+      expect(form.checkbox('Strength').element.checked).toBe(false);
+      expect(form.searchButton().attributes('disabled')).toBeDefined();
+    });
+  });
 
-        expect(wrapper.vm.selectedStatBonuses.length).toBeGreaterThan(0);
+  describe('results summary', () => {
+    it('appears after a search and goes away on clear', async () => {
+      const form = mountSearch({ resultCount: 42 });
 
-        // Uncheck one
-        await checkboxes[2].setValue(false);
-        await nextTick();
+      expect(wrapper.text()).not.toContain('items found');
 
-        expect(wrapper.vm.selectedStatBonuses.length).toBeGreaterThan(0);
-        expect(wrapper.vm.selectedStatBonuses.length).toBeLessThan(2);
-      }
+      await form.typeName('test');
+      await form.search();
+      expect(wrapper.text()).toContain('42 items found');
+
+      await form.clear();
+      expect(wrapper.text()).not.toContain('items found');
+    });
+  });
+
+  describe('returning to the page', () => {
+    it('shows the criteria of the last search again', async () => {
+      vi.mocked(apiClient.searchItems).mockResolvedValue({
+        items: [],
+        total: 0,
+        page: 1,
+        page_size: 24,
+        pages: 0,
+        has_next: false,
+        has_prev: false,
+      });
+      await useItemsStore().searchItems({
+        search: 'armor',
+        exact_match: true,
+        search_fields: ['name'],
+        min_ql: 150,
+        item_class: 2,
+        stat_bonuses: [SKILL_ID.AGILITY],
+      });
+
+      const form = mountSearch();
+      await vi.waitFor(() => expect(form.nameInput().element.value).toBe('armor'));
+
+      expect(shownOption(form.dropdown('Item Class'))).toBe('Armor');
+      expect(form.qlInputs()[0].element.value).toBe('150');
+      expect(form.checkbox('Agility').element.checked).toBe(true);
+
+      await form.search();
+      expect(lastQuery()).toEqual({
+        search: 'armor',
+        exact_match: true,
+        search_fields: ['name'],
+        min_ql: 150,
+        item_class: 2,
+        stat_bonuses: [SKILL_ID.AGILITY],
+      });
     });
   });
 });

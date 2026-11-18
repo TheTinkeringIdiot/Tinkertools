@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { apiClient } from '@/services/api-client';
-import type { Mob, SymbiantItem } from '@/types/api';
+import type { Mob } from '@/types/api';
 
 export interface PocketBossFilters {
   search?: string;
@@ -87,6 +87,15 @@ export const usePocketBossStore = defineStore('pocketBoss', () => {
     }
   }
 
+  /**
+   * Drop the in-memory boss list. Pocket bosses and their drops are server
+   * data, so nothing survives a game version switch.
+   */
+  function clearCache() {
+    pocketBosses.value = [];
+    error.value = null;
+  }
+
   function updateFilters(newFilters: Partial<PocketBossFilters>) {
     filters.value = { ...filters.value, ...newFilters };
   }
@@ -99,6 +108,7 @@ export const usePocketBossStore = defineStore('pocketBoss', () => {
     return pocketBosses.value.find((boss) => boss.id === id);
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- deprecated stub; components still call it with an ID
   function getPocketBossesBySymbiant(symbiantId: number): Mob[] {
     // Note: This functionality will need to be implemented via the new API endpoint
     // /symbiants/{symbiantId}/dropped-by instead of relying on embedded data
@@ -135,6 +145,7 @@ export const usePocketBossStore = defineStore('pocketBoss', () => {
 
     // Actions
     fetchPocketBosses,
+    clearCache,
     updateFilters,
     clearFilters,
     getPocketBossById,

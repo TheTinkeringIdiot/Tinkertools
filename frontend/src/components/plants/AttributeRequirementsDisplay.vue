@@ -40,7 +40,12 @@
       <!-- Right: Status tag -->
       <div>
         <Tag v-if="req.sufficient === true" severity="success" :value="`✓ Met`" rounded />
-        <Tag v-else-if="req.sufficient === false" severity="danger" :value="`Need +${req.delta!.toLocaleString()}`" rounded />
+        <Tag
+          v-else-if="req.sufficient === false"
+          severity="danger"
+          :value="`Need +${req.delta!.toLocaleString()}`"
+          rounded
+        />
         <Tag v-else severity="secondary" value="Required" rounded />
       </div>
     </div>
@@ -68,7 +73,7 @@ interface Props {
   requirements: AttributeRequirementInfo[];
 }
 
-const props = defineProps<Props>();
+defineProps<Props>();
 </script>
 
 <style scoped>

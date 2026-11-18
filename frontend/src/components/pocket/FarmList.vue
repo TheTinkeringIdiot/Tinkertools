@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { useRoute } from 'vue-router';
 import { useSymbiantsStore } from '@/stores/symbiants';
 import Card from 'primevue/card';
 import Button from 'primevue/button';
@@ -15,7 +15,6 @@ import { useConfirm } from 'primevue/useconfirm';
 
 const symbiantsStore = useSymbiantsStore();
 const route = useRoute();
-const router = useRouter();
 const toast = useToast();
 const confirm = useConfirm();
 
@@ -97,7 +96,7 @@ async function handleCopyShareUrl() {
       detail: 'Farm list URL copied to clipboard',
       life: 2000,
     });
-  } catch (error) {
+  } catch {
     toast.add({
       severity: 'error',
       summary: 'Error',
@@ -213,7 +212,7 @@ watch(
                 {{ farmProgress.percentage }}%
               </span>
             </div>
-            <ProgressBar :value="farmProgress.percentage" :showValue="false" class="h-2" />
+            <ProgressBar :value="farmProgress.percentage" :show-value="false" class="h-2" />
           </div>
 
           <!-- Selected Symbiants Summary -->
@@ -224,7 +223,7 @@ watch(
             <div class="flex flex-wrap gap-2">
               <Tag
                 v-for="symbiant in farmListSymbiants"
-                :key="symbiant!.id"
+                :key="symbiant!.aoid"
                 severity="info"
                 class="cursor-pointer hover:opacity-80 transition-opacity"
                 @click="handleRemoveSymbiant(symbiant!.aoid!)"
@@ -238,10 +237,7 @@ watch(
       </Card>
 
       <!-- Loading State -->
-      <div
-        v-if="symbiantsStore.farmListLoading"
-        class="flex justify-center items-center py-12"
-      >
+      <div v-if="symbiantsStore.farmListLoading" class="flex justify-center items-center py-12">
         <i class="pi pi-spin pi-spinner text-4xl text-primary-500"></i>
       </div>
 
@@ -267,9 +263,9 @@ watch(
                 <!-- Farmed Checkbox -->
                 <div class="pt-1">
                   <Checkbox
-                    :modelValue="entry.farmed"
-                    @update:modelValue="handleToggleBossFarmed(entry.boss.id)"
+                    :model-value="entry.farmed"
                     binary
+                    @update:model-value="handleToggleBossFarmed(entry.boss.id)"
                   />
                 </div>
 
@@ -312,7 +308,7 @@ watch(
                   <div class="flex flex-wrap gap-1">
                     <Tag
                       v-for="symbiant in entry.symbiants"
-                      :key="symbiant.id"
+                      :key="symbiant.aoid"
                       :value="symbiant.name"
                       size="small"
                       severity="secondary"
@@ -351,12 +347,7 @@ watch(
         </p>
         <InputText v-model="shareUrl" readonly class="w-full" />
         <div class="flex justify-end gap-2">
-          <Button
-            label="Close"
-            severity="secondary"
-            outlined
-            @click="showShareDialog = false"
-          />
+          <Button label="Close" severity="secondary" outlined @click="showShareDialog = false" />
           <Button label="Copy to Clipboard" icon="pi pi-copy" @click="handleCopyShareUrl" />
         </div>
       </div>

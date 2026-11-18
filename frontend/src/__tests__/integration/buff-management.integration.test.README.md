@@ -41,27 +41,14 @@ Comprehensive integration tests for buff management functionality covering NCU t
    - ✅ Equal stacking priority
    - ✅ LocalStorage persistence
 
-## Known Issues
+## MaxNCU in Tests
 
-### MaxNCU Calculation in Tests
-
-The tests currently have an issue with MaxNCU calculation. The IP integrator recalculates skill values (including MaxNCU, skill ID 181) based on the profile's level, abilities, and other factors.
-
-**Current Behavior:**
-
-- Test profiles are created with a specified MaxNCU value
-- The IP integrator runs during `setActiveProfile()` and recalculates MaxNCU to 0
-- This causes tests that depend on a specific MaxNCU value to fail
-
-**Workaround Options:**
-
-1. Set up complete ability/skill structures that result in desired MaxNCU after IP calculation
-2. Mock the IP integrator during tests (not recommended for integration tests)
-3. Test with dynamically calculated MaxNCU values (current approach)
-4. Add a test-only bypass for IP recalculation
-
-**Current Implementation:**
-Tests use `const actualMaxNCU = store.maxNCU` to get the calculated value and test relative to that, rather than assuming a specific value.
+MaxNCU (skill ID 181) has no base value in Anarchy Online: the IP integrator
+computes it purely from equipment, perk and buff bonuses. Each test character
+therefore wears an NCU memory (a `Weapons.NCU1` item whose Wear effect is
+spell 53045, "Modify MaxNCU") that sets its capacity exactly, e.g. 2400 for the
+default character. Tests that need a smaller capacity swap the memory for a
+smaller one (`equipNcuMemory(1200)`).
 
 ## Running the Tests
 
@@ -93,9 +80,9 @@ Tests use the following buff items:
 Test profiles are created with:
 
 - Level 200 Adventurer (Solitus)
-- MaxNCU calculated by IP integrator
+- A 2400 NCU memory in the NCU1 slot (its only MaxNCU source)
 - Empty buff list initially
-- No equipment or perks
+- No other equipment or perks
 
 ## Architecture Notes
 
@@ -127,8 +114,7 @@ These tests use:
 2. Test buff duration/expiration (if implemented)
 3. Test buff icons and tooltips
 4. Test buff sorting/filtering in UI
-5. Resolve MaxNCU calculation issue for more precise testing
-6. Add component-level tests for BuffTable.vue
+5. Add component-level tests for BuffTable.vue
 
 ## Related Files
 

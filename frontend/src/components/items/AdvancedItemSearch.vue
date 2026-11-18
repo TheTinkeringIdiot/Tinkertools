@@ -17,17 +17,17 @@ Provides all advanced search capabilities including item class, slot, requiremen
           label="Search"
           icon="pi pi-search"
           size="small"
-          @click="performSearch"
           :loading="loading"
           :disabled="!hasSearchCriteria"
+          @click="performSearch"
         />
         <Button
           label="Clear"
           icon="pi pi-times"
           size="small"
           outlined
-          @click="clearAll"
           :disabled="!hasSearchCriteria"
+          @click="clearAll"
         />
       </div>
     </div>
@@ -306,8 +306,8 @@ Provides all advanced search capabilities including item class, slot, requiremen
           icon="pi pi-bookmark"
           size="small"
           text
-          @click="saveSearch"
           class="ml-2"
+          @click="saveSearch"
         />
       </div>
     </div>
@@ -353,6 +353,8 @@ interface SearchFormData {
 const props = defineProps<{
   loading?: boolean;
   resultCount?: number;
+  /** Search term arriving via the URL (?search=); mirrored into the form without re-emitting. */
+  initialSearch?: string;
 }>();
 
 const emit = defineEmits<{
@@ -370,6 +372,16 @@ const searchForm = ref<SearchFormData>({
 const selectedStatBonuses = ref<number[]>([]);
 const statFilters = ref<StatFilter[]>([]);
 const hasSearched = ref(false);
+
+watch(
+  () => props.initialSearch,
+  (value) => {
+    if (typeof value !== 'string') return;
+    searchForm.value.search = value;
+    if (value.trim()) hasSearched.value = true;
+  },
+  { immediate: true }
+);
 const checkboxKey = ref(0); // Used to force checkbox re-render
 const showStatFilterModal = ref(false);
 
@@ -622,7 +634,12 @@ async function restoreSearchState() {
   if (storedQuery.max_ql) searchForm.value.max_ql = storedQuery.max_ql;
 
   // Restore item class and slot
-  if (storedQuery.item_class) searchForm.value.item_class = storedQuery.item_class;
+  // The query type allows an array of classes; this form only ever sets a single one
+  if (storedQuery.item_class) {
+    searchForm.value.item_class = Array.isArray(storedQuery.item_class)
+      ? storedQuery.item_class[0]
+      : storedQuery.item_class;
+  }
   if (storedQuery.slot) searchForm.value.slot = storedQuery.slot;
 
   // Restore requirements
@@ -670,14 +687,14 @@ async function restoreSearchState() {
   // Additional DOM sync for checkboxes after component re-render
   await nextTick();
   if (storedQuery.froob_friendly) {
-    const froobCheckbox = document.querySelector('#froob-friendly');
+    const froobCheckbox = document.querySelector<HTMLInputElement>('#froob-friendly');
     if (froobCheckbox && !froobCheckbox.checked) {
       froobCheckbox.checked = true;
       console.log('Manually synced froob checkbox to DOM');
     }
   }
   if (storedQuery.nodrop) {
-    const nodropCheckbox = document.querySelector('#nodrop');
+    const nodropCheckbox = document.querySelector<HTMLInputElement>('#nodrop');
     if (nodropCheckbox && !nodropCheckbox.checked) {
       nodropCheckbox.checked = true;
       console.log('Manually synced nodrop checkbox to DOM');

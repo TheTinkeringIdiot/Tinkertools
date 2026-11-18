@@ -52,7 +52,7 @@ Modal for importing profiles from various formats
           mode="basic"
           name="profileFile"
           accept=".json,.txt"
-          :maxFileSize="1000000"
+          :max-file-size="1000000"
           :auto="false"
           choose-label="Choose File"
           class="w-full"
@@ -163,7 +163,9 @@ Modal for importing profiles from various formats
                 v-model="updateTargetId"
                 :options="duplicateMatches"
                 option-value="id"
-                :option-label="(p: ProfileMetadata) => `${p.name} (Level ${p.level} ${p.profession})`"
+                :option-label="
+                  (p: ProfileMetadata) => `${p.name} (Level ${p.level} ${p.profession})`
+                "
                 class="w-full"
               />
             </div>
@@ -229,9 +231,11 @@ Modal for importing profiles from various formats
 
       <!-- Import Progress -->
       <div v-if="importing && importProgress" class="field">
-        <div class="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+        <div
+          class="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg"
+        >
           <div class="flex items-center gap-3">
-            <ProgressSpinner style="width: 24px; height: 24px" strokeWidth="4" />
+            <ProgressSpinner style="width: 24px; height: 24px" stroke-width="4" />
             <div class="flex-1">
               <div class="text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">
                 {{ importProgress.message }}
@@ -239,11 +243,14 @@ Modal for importing profiles from various formats
               <ProgressBar
                 v-if="importProgress.total > 1"
                 :value="Math.round((importProgress.current / importProgress.total) * 100)"
-                :showValue="false"
+                :show-value="false"
                 style="height: 6px"
                 class="mt-2"
               />
-              <div v-if="importProgress.total > 1" class="text-xs text-blue-600 dark:text-blue-400 mt-1">
+              <div
+                v-if="importProgress.total > 1"
+                class="text-xs text-blue-600 dark:text-blue-400 mt-1"
+              >
                 {{ importProgress.current }} / {{ importProgress.total }}
               </div>
             </div>
@@ -424,9 +431,7 @@ Modal for importing profiles from various formats
         <Button
           :label="isBulkImport ? 'Import Profiles' : 'Import Profile'"
           icon="pi pi-upload"
-          :disabled="
-            !hasData || importing || (detectedFormat && detectedFormat.includes('Unsupported'))
-          "
+          :disabled="!hasData || importing || !!detectedFormat?.includes('Unsupported')"
           :loading="importing"
           @click="onImportClick"
         />
@@ -440,7 +445,7 @@ import { ref, reactive, computed, watch } from 'vue';
 import Button from 'primevue/button';
 import Checkbox from 'primevue/checkbox';
 import Dialog from 'primevue/dialog';
-import FileUpload from 'primevue/fileupload';
+import FileUpload, { type FileUploadSelectEvent } from 'primevue/fileupload';
 import InputText from 'primevue/inputtext';
 import ProgressBar from 'primevue/progressbar';
 import ProgressSpinner from 'primevue/progressspinner';
@@ -448,6 +453,7 @@ import RadioButton from 'primevue/radiobutton';
 import Textarea from 'primevue/textarea';
 import Dropdown from 'primevue/dropdown';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
+import { API_ROOT } from '@/services/api-config';
 import type { ProfileImportResult, BulkImportResult, ProfileMetadata } from '@/lib/tinkerprofiles';
 
 interface ImportProgress {
@@ -456,8 +462,6 @@ interface ImportProgress {
   total: number;
   message: string;
 }
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
 
 // Props & Emits
 const props = defineProps<{
@@ -513,13 +517,6 @@ const hasData = computed(() => {
   );
 });
 
-const currentData = computed(() => {
-  if (importMethod.value === 'file' && selectedFile.value) {
-    return selectedFile.value;
-  }
-  return importText.value.trim();
-});
-
 // Methods
 function extractAOSetupsId(url: string): string | null {
   // Extract profile ID from AOSetups URL
@@ -546,8 +543,9 @@ function validateAOSetupsUrl(url: string): void {
   }
 }
 
-function onFileSelect(event: any) {
-  const file = event.files[0];
+function onFileSelect(event: FileUploadSelectEvent) {
+  const files: File[] = event.files;
+  const file = files[0];
   if (file) {
     clearDuplicatePrompt();
     selectedFile.value = file;
@@ -587,7 +585,6 @@ function detectFormat(data: string): string {
       parsed.profiles &&
       Array.isArray(parsed.profiles)
     ) {
-      const profileCount = parsed.profileCount;
       const actualCount = parsed.profiles.length;
       return `TinkerProfiles Bulk Export (${actualCount} profile${actualCount !== 1 ? 's' : ''})`;
     }
@@ -654,7 +651,7 @@ async function importProfile() {
     phase: 'parsing',
     current: 0,
     total: 1,
-    message: 'Parsing profile data...'
+    message: 'Parsing profile data...',
   };
 
   try {
@@ -682,7 +679,10 @@ async function importProfile() {
       console.log('[AOSetups Import] Extracted profile ID:', profileId);
       console.log('[AOSetups Import] Fetching from backend proxy...');
 
-      const response = await fetch(`${API_BASE_URL}/aosetups/profile/${profileId}`);
+      // The AOSetups proxy is version-independent (it fetches an external site),
+      // so it lives at the API root rather than under a version segment. Build
+      // the URL from the shared config instead of hardcoding a base.
+      const response = await fetch(`${API_ROOT}/aosetups/profile/${profileId}`);
       if (!response.ok) {
         const error = `Failed to fetch profile: ${response.status} ${response.statusText}`;
         console.error('[AOSetups Import] Fetch error:', error);
@@ -728,7 +728,6 @@ async function importProfile() {
         if (firstSuccess && firstSuccess.profileId) {
           emit('imported', {
             success: true,
-            profile: { id: firstSuccess.profileId } as any,
             errors: [],
             warnings: [],
             metadata: { source: result.metadata.source, migrated: false },

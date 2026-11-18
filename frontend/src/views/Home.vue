@@ -30,8 +30,8 @@ Welcomes users and provides navigation to all six tools with AO-themed descripti
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <router-link
           v-for="tool in tools"
-          :key="tool.route"
-          :to="tool.route"
+          :key="tool.routeName"
+          :to="{ name: tool.routeName }"
           class="tool-card-link"
         >
           <Card class="tool-card h-full">
@@ -67,9 +67,7 @@ Welcomes users and provides navigation to all six tools with AO-themed descripti
     </section>
 
     <!-- Footer Section -->
-    <section
-      class="footer-section border-t border-surface-200 dark:border-surface-700 py-8 mt-12"
-    >
+    <section class="footer-section border-t border-surface-200 dark:border-surface-700 py-8 mt-12">
       <div class="max-w-7xl mx-auto px-6">
         <!-- Community Links -->
         <div class="flex justify-center items-center gap-8 mb-6">
@@ -106,7 +104,8 @@ Welcomes users and provides navigation to all six tools with AO-themed descripti
         <div class="text-center text-sm text-surface-600 dark:text-surface-400">
           <p class="mb-2">Made by TinkeringIdiot with ❤️ for the Anarchy Online community</p>
           <p class="text-xs">
-            Anarchy Online © Funcom • TinkerTools is a fan-made project and is not affiliated or supported by Funcom or Project Rubi-Ka.
+            Anarchy Online © Funcom • TinkerTools is a fan-made project and is not affiliated or
+            supported by Funcom or Project Rubi-Ka.
           </p>
         </div>
       </div>
@@ -125,7 +124,7 @@ const tools = [
     description:
       'Manage character profiles across all dimensions. Create, import, and track your characters with comprehensive stat tracking.',
     icon: 'pi pi-users',
-    route: '/profiles',
+    routeName: 'TinkerProfiles',
   },
   {
     name: 'TinkerItems',
@@ -133,7 +132,7 @@ const tools = [
     description:
       'Search 120,000+ items from across Rubi-Ka. Advanced filtering, compatibility checking, and item comparison tools.',
     icon: 'pi pi-database',
-    route: '/items',
+    routeName: 'TinkerItems',
   },
   {
     name: 'TinkerNanos',
@@ -141,15 +140,15 @@ const tools = [
     description:
       'Browse and analyze nano programs by profession and school. Check strain compatibility and requirements.',
     icon: 'pi pi-bolt',
-    route: '/nanos',
+    routeName: 'TinkerNanos',
   },
   {
     name: 'TinkerFite',
     subtitle: 'Weapon Analytics',
     description:
-      'Compare DPS and optimize your combat loadout. Analyze weapon performance with your character\'s stats and skills.',
+      "Compare DPS and optimize your combat loadout. Analyze weapon performance with your character's stats and skills.",
     icon: 'pi pi-shield',
-    route: '/fite',
+    routeName: 'TinkerFite',
   },
   {
     name: 'TinkerPlants',
@@ -157,7 +156,7 @@ const tools = [
     description:
       'Design implant and symbiant configurations. Plan your augmentations and optimize stat distribution for your build.',
     icon: 'pi pi-cog',
-    route: '/plants',
+    routeName: 'TinkerPlants',
   },
   {
     name: 'TinkerPocket',
@@ -165,7 +164,7 @@ const tools = [
     description:
       'Track pocket bosses and manage your collections. Browse symbiants and plan your hunting strategy across dimensions.',
     icon: 'pi pi-map',
-    route: '/pocket',
+    routeName: 'TinkerPocket',
   },
 ];
 </script>
@@ -179,7 +178,9 @@ const tools = [
 }
 
 .tool-card {
-  transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+  transition:
+    transform 0.2s ease-in-out,
+    box-shadow 0.2s ease-in-out;
 }
 
 .tool-card:hover {

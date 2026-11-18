@@ -28,19 +28,21 @@ function makeTemplate(
   attackDelay = 100
 ): WeaponCandidate {
   return {
-    id: aoid,
     aoid,
     name: 'Martial Arts Item',
     ql,
     is_nano: false,
     stats: [
-      { id: 1, stat: WEAPON_STAT_MIN_DAMAGE, value: minDamage },
-      { id: 2, stat: WEAPON_STAT_MAX_DAMAGE, value: maxDamage },
-      { id: 3, stat: WEAPON_STAT_ATTACK_DELAY, value: attackDelay },
+      { stat: WEAPON_STAT_MIN_DAMAGE, value: minDamage },
+      { stat: WEAPON_STAT_MAX_DAMAGE, value: maxDamage },
+      { stat: WEAPON_STAT_ATTACK_DELAY, value: attackDelay },
     ],
+    spell_data: [],
     actions: [],
+    attack_stats: [],
+    defense_stats: [],
     equipable: false,
-  } as WeaponCandidate;
+  };
 }
 
 function makeState(profession: number, maSkill: number): FiteInputState {

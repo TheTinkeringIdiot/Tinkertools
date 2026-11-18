@@ -6,15 +6,15 @@
  */
 
 import { TEMPLATE_EVENT, TARGET, SPELL_FORMATS } from './game-data';
-import { getStatName, getFlagNameFromBit } from './game-utils';
+import { getStatName, getFlagNameFromBit, getNanoStrainName } from './game-utils';
 import type { SpellData, Spell, Criterion } from '@/types/api';
+import { versionedPath } from '@/composables/useGameVersion';
 
 // ============================================================================
 // Type Definitions
 // ============================================================================
 
 export interface FormattedSpell {
-  id: number;
   target?: number;
   targetName?: string;
   tickCount?: number;
@@ -27,7 +27,6 @@ export interface FormattedSpell {
 }
 
 export interface FormattedSpellData {
-  id: number;
   event?: number;
   eventName?: string;
   spells: FormattedSpell[];
@@ -36,7 +35,7 @@ export interface FormattedSpellData {
 
 export interface FormattedParameter {
   key: string;
-  value: any;
+  value: unknown;
   displayValue: string;
   type: 'link' | 'percentage' | 'stat' | 'number' | 'text';
   linkUrl?: string;
@@ -92,7 +91,7 @@ export function getSpellFormat(spellId: number): string | undefined {
 /**
  * Format a spell parameter based on its type and key
  */
-export function formatSpellParameter(key: string, value: any): FormattedParameter {
+export function formatSpellParameter(key: string, value: unknown): FormattedParameter {
   const lowerKey = key.toLowerCase();
 
   // Handle NanoId, ItemId, and Proc parameters - create links
@@ -102,7 +101,8 @@ export function formatSpellParameter(key: string, value: any): FormattedParamete
       value,
       displayValue: `Item ${value}`, // Will be replaced with actual item name in component
       type: 'link',
-      linkUrl: `/items/${value}`,
+      // AOID link, so it is only meaningful inside the current game version.
+      linkUrl: versionedPath(`/items/${value}`),
       color: 'text-blue-600',
     };
   }
@@ -155,11 +155,11 @@ export function formatSpellParameter(key: string, value: any): FormattedParamete
 /**
  * Format all parameters for a spell
  */
-export function formatSpellParameters(spellParams: Record<string, any>): FormattedParameter[] {
+export function formatSpellParameters(spellParams: Record<string, unknown>): FormattedParameter[] {
   if (!spellParams) return [];
 
   return Object.entries(spellParams)
-    .filter(([key, value]) => value !== null && value !== undefined)
+    .filter(([, value]) => value !== null && value !== undefined)
     .map(([key, value]) => formatSpellParameter(key, value))
     .sort((a, b) => {
       // Sort by type priority: links first, then percentages, then stats, then others
@@ -178,7 +178,7 @@ export function formatSpellParameters(spellParams: Record<string, any>): Formatt
  * Interpolate spell format string with parameters
  * Handles {param} style placeholders and special formatting
  */
-export function interpolateSpellText(format: string, params: Record<string, any>): string {
+export function interpolateSpellText(format: string, params: Record<string, unknown>): string {
   if (!format) return '';
 
   let result = format;
@@ -201,27 +201,38 @@ export function interpolateSpellText(format: string, params: Record<string, any>
       ) {
         // For NanoID/ItemID/Proc, we'll return a placeholder that will be replaced with a link in the component
         return `[LINK:${value}]`;
-      } else if (paramName.toLowerCase() === 'item' && typeof value === 'object' && value?.Text) {
+      } else if (
+        paramName.toLowerCase() === 'item' &&
+        typeof value === 'object' &&
+        'Text' in value &&
+        value.Text
+      ) {
         // For Item objects, extract the Text field
         return String(value.Text);
       } else if (paramName.toLowerCase().includes('chance')) {
         // For Chance, add % symbol after the value
         // The value is stored as the final percentage (0.25 means 0.25%, not 25%)
         return `${value}%`;
-      } else if (paramName.toLowerCase().includes('stat') && typeof value === 'number') {
-        // For Stat, display as stat name
+      } else if (
+        (paramName.toLowerCase().includes('stat') || paramName.toLowerCase() === 'skill') &&
+        typeof value === 'number'
+      ) {
+        // For Stat and Skill, display as stat name
         const statName = getStatName(value);
         return statName || `Stat ${value}`;
+      } else if (paramName.toLowerCase() === 'nanostrain' && typeof value === 'number') {
+        // For NanoStrain, display the strain's name as the nano page does
+        return getNanoStrainName(value) || String(value);
       } else if (paramName.toLowerCase().includes('bitnum') && typeof value === 'number') {
         // For BitNum, resolve to flag name using the Stat parameter
         const statId = params.Stat || params.stat;
         if (statId !== undefined && statId !== null) {
-          return getFlagNameFromBit(statId, value);
+          return getFlagNameFromBit(Number(statId), value);
         }
         return `Bit ${value}`;
       } else if (paramName.toLowerCase() === 'value' && typeof value === 'number') {
         // For Value, check if Stat is a ProcNano stat (552-554) - if so, Value is a nano AOID
-        const statId = params.Stat || params.stat;
+        const statId = Number(params.Stat || params.stat);
         if (statId >= 552 && statId <= 554) {
           return `[LINK:${value}]`;
         }
@@ -233,11 +244,12 @@ export function interpolateSpellText(format: string, params: Record<string, any>
   });
 
   // Handle %s, %d, %f style placeholders with parameter array
-  if (params.params && Array.isArray(params.params)) {
+  const positionalParams = params.params;
+  if (Array.isArray(positionalParams)) {
     let paramIndex = 0;
     result = result.replace(/%[sdf]/g, () => {
-      if (paramIndex < params.params.length) {
-        return String(params.params[paramIndex++]);
+      if (paramIndex < positionalParams.length) {
+        return String(positionalParams[paramIndex++]);
       }
       return '%?';
     });
@@ -302,7 +314,6 @@ export function formatSpell(spell: Spell): FormattedSpell {
   // Fallback if interpolation didn't work or no format string found
   if (!formattedText || formattedText === formatString) {
     formattedText = generateFallbackSpellText({
-      id: spell.id,
       target: spell.target,
       targetName,
       tickCount: spell.tick_count,
@@ -316,7 +327,6 @@ export function formatSpell(spell: Spell): FormattedSpell {
   }
 
   return {
-    id: spell.id,
     target: spell.target,
     targetName,
     tickCount: spell.tick_count,
@@ -339,7 +349,6 @@ export function formatSpellData(spellData: SpellData): FormattedSpellData {
   const formattedSpells = spellData.spells.map(formatSpell);
 
   return {
-    id: spellData.id,
     event: spellData.event,
     eventName,
     spells: formattedSpells,
@@ -394,6 +403,7 @@ export function getEventColor(eventId: number): string {
 /**
  * Determine if spell data should be displayed in compact mode
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- kept for SpellDataDisplay.vue, which passes the list
 export function shouldUseCompactMode(spellDataList: FormattedSpellData[]): boolean {
   // Always use table mode for consistency
   return false;

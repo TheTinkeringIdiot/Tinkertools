@@ -17,8 +17,12 @@ import type { StatValue } from '@/types/api';
 describe('Equipment Slot Position Functions', () => {
   describe('getWeaponSlotPosition', () => {
     it('should return correct positions for valid weapon slots', () => {
-      expect(getWeaponSlotPosition('RightHand')).toEqual({ row: 3, col: 3 });
-      expect(getWeaponSlotPosition('LeftHand')).toEqual({ row: 3, col: 1 });
+      // The item slot grid mirrors the character: right hand on the left (2801544)
+      expect(getWeaponSlotPosition('RightHand')).toEqual({ row: 3, col: 1 });
+      expect(getWeaponSlotPosition('LeftHand')).toEqual({ row: 3, col: 3 });
+      // Profiles store the hands as RHand/LHand; they must land on the same cells.
+      expect(getWeaponSlotPosition('RHand')).toEqual({ row: 3, col: 1 });
+      expect(getWeaponSlotPosition('LHand')).toEqual({ row: 3, col: 3 });
       expect(getWeaponSlotPosition('Hud1')).toEqual({ row: 1, col: 1 });
     });
 
@@ -29,7 +33,7 @@ describe('Equipment Slot Position Functions', () => {
 
     it('should handle case sensitivity', () => {
       expect(getWeaponSlotPosition('righthand')).toEqual({ row: 1, col: 1 }); // Case sensitive
-      expect(getWeaponSlotPosition('RightHand')).toEqual({ row: 3, col: 3 });
+      expect(getWeaponSlotPosition('RightHand')).toEqual({ row: 3, col: 1 });
     });
   });
 
@@ -50,19 +54,21 @@ describe('Equipment Slot Position Functions', () => {
       expect(bodyPosition).toEqual({ row: 2, col: 2 });
     });
 
+    // The grid overlays the in-game armor window (armor_slots.png), which shows
+    // the character facing you: right-side slots in column 1, left-side in column 3.
     it('should return correct positions for shoulder and arm slots', () => {
-      expect(getArmorSlotPosition('LeftShoulder')).toEqual({ row: 2, col: 1 });
-      expect(getArmorSlotPosition('RightShoulder')).toEqual({ row: 2, col: 3 });
-      expect(getArmorSlotPosition('LeftArm')).toEqual({ row: 3, col: 1 });
-      expect(getArmorSlotPosition('RightArm')).toEqual({ row: 3, col: 3 });
+      expect(getArmorSlotPosition('RightShoulder')).toEqual({ row: 2, col: 1 });
+      expect(getArmorSlotPosition('LeftShoulder')).toEqual({ row: 2, col: 3 });
+      expect(getArmorSlotPosition('RightArm')).toEqual({ row: 3, col: 1 });
+      expect(getArmorSlotPosition('LeftArm')).toEqual({ row: 3, col: 3 });
     });
 
     it('should return correct positions for hand and finger slots', () => {
       expect(getArmorSlotPosition('Hands')).toEqual({ row: 3, col: 2 });
-      expect(getArmorSlotPosition('LeftWrist')).toEqual({ row: 4, col: 1 });
-      expect(getArmorSlotPosition('RightWrist')).toEqual({ row: 4, col: 3 });
-      expect(getArmorSlotPosition('LeftFinger')).toEqual({ row: 5, col: 1 });
-      expect(getArmorSlotPosition('RightFinger')).toEqual({ row: 5, col: 3 });
+      expect(getArmorSlotPosition('RightWrist')).toEqual({ row: 4, col: 1 });
+      expect(getArmorSlotPosition('LeftWrist')).toEqual({ row: 4, col: 3 });
+      expect(getArmorSlotPosition('RightFinger')).toEqual({ row: 5, col: 1 });
+      expect(getArmorSlotPosition('LeftFinger')).toEqual({ row: 5, col: 3 });
     });
 
     it('should return default position for invalid slots', () => {
@@ -199,9 +205,9 @@ describe('Equipment Slot Position Functions', () => {
 describe('getItemIconUrl', () => {
   it('should extract icon ID from stat 79 and return correct URL', () => {
     const stats: StatValue[] = [
-      { id: 1, stat: 12, value: 100 },
-      { id: 2, stat: 79, value: 123456 },
-      { id: 3, stat: 85, value: 200 },
+      { stat: 12, value: 100 },
+      { stat: 79, value: 123456 },
+      { stat: 85, value: 200 },
     ];
 
     const iconUrl = getItemIconUrl(stats);
@@ -210,8 +216,8 @@ describe('getItemIconUrl', () => {
 
   it('should return null when stat 79 is not found', () => {
     const stats: StatValue[] = [
-      { id: 1, stat: 12, value: 100 },
-      { id: 2, stat: 85, value: 200 },
+      { stat: 12, value: 100 },
+      { stat: 85, value: 200 },
     ];
 
     const iconUrl = getItemIconUrl(stats);
@@ -224,7 +230,7 @@ describe('getItemIconUrl', () => {
   });
 
   it('should handle stat 79 with zero value', () => {
-    const stats: StatValue[] = [{ id: 1, stat: 79, value: 0 }];
+    const stats: StatValue[] = [{ stat: 79, value: 0 }];
 
     // Zero is considered falsy, so should return null
     const iconUrl = getItemIconUrl(stats);
@@ -233,9 +239,9 @@ describe('getItemIconUrl', () => {
 
   it('should handle multiple stat 79 entries and use the first one', () => {
     const stats: StatValue[] = [
-      { id: 1, stat: 79, value: 111 },
-      { id: 2, stat: 79, value: 222 },
-      { id: 3, stat: 12, value: 100 },
+      { stat: 79, value: 111 },
+      { stat: 79, value: 222 },
+      { stat: 12, value: 100 },
     ];
 
     const iconUrl = getItemIconUrl(stats);
@@ -243,7 +249,7 @@ describe('getItemIconUrl', () => {
   });
 
   it('should handle negative icon values', () => {
-    const stats: StatValue[] = [{ id: 1, stat: 79, value: -123 }];
+    const stats: StatValue[] = [{ stat: 79, value: -123 }];
 
     const iconUrl = getItemIconUrl(stats);
     expect(iconUrl).toBe('https://cdn.tinkeringidiot.com/aoicons/-123.png');

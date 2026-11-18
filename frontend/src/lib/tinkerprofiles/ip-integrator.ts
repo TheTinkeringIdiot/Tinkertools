@@ -6,13 +6,12 @@
  */
 
 import type { TinkerProfile, IPTracker, SkillData } from './types';
+import type { Item } from '@/types/api';
 import {
   accountTypeToExpansionBitflag,
   specializationLevelToBitflag,
 } from '@/utils/expansion-utils';
 import {
-  calcIP,
-  calcTitleLevel,
   calcTotalAbilityCost,
   calcTotalSkillCost,
   calcAllTrickleDown,
@@ -27,24 +26,16 @@ import {
   type IPCalculationResult,
 } from './ip-calculator';
 
-import { getSkillId, getSkillName } from './skill-mappings';
 import { recalculateHealthAndNano } from '@/services/profile-update-service';
 import { calculateEquipmentBonuses } from '../../services/equipment-bonus-calculator';
 import { calculatePerkBonuses as calculatePerkBonusesService } from '../../services/perk-bonus-calculator';
 import { calculateNanoBonuses } from '../../services/nano-bonus-calculator';
-import { SKILL_PATTERNS } from '../../utils/skill-patterns';
 import { skillService } from '../../services/skill-service';
 import { SKILL_COST_FACTORS } from '../../services/game-data';
-import type { AnyPerkEntry } from './perk-types';
 
 // ============================================================================
 // Skill Classification Constants
 // ============================================================================
-
-/**
- * Attribute stat IDs (have breed base values, can be improved with IP)
- */
-const ATTRIBUTE_IDS = new Set([16, 17, 18, 19, 20, 21]);
 
 /**
  * Trainable skill IDs (have IP costs defined in game data)
@@ -227,7 +218,7 @@ function calculatePerkBonuses(profile: TinkerProfile): Record<number, number> {
 
   try {
     // Collect all equipped perks (both SL/AI perks and LE research)
-    const allPerkItems: any[] = [];
+    const allPerkItems: Item[] = [];
 
     // Add SL/AI perks that have item data
     if (profile.PerksAndResearch.perks && Array.isArray(profile.PerksAndResearch.perks)) {
@@ -315,18 +306,20 @@ export function calculateProfileIP(profile: TinkerProfile): IPTracker {
 
   // Calculate breakdown by abilities using skill IDs
   const abilityBreakdown: Record<string, number> = {};
-  const abilityStatIds = [16, 17, 18, 19, 20, 21]; // Strength, Stamina, Agility, Sense, Intelligence, Psychic
-  const abilityNames = ['Strength', 'Stamina', 'Agility', 'Sense', 'Intelligence', 'Psychic'];
 
-  abilityStatIds.forEach((abilityStatId, index) => {
+  ABILITY_INDEX_TO_STAT_ID.forEach((abilityStatId, index) => {
     const breed = profile.Character.Breed;
     const skillData = profile.skills[abilityStatId];
     const improvements = skillData?.pointsFromIp || 0;
-    const abilityName = abilityNames[index];
-    abilityBreakdown[abilityName] = calcTotalAbilityCost(improvements, breed, abilityStatId);
+    abilityBreakdown[ABILITY_NAMES[index]] = calcTotalAbilityCost(
+      improvements,
+      breed,
+      abilityStatId
+    );
   });
 
-  // Calculate breakdown by skill categories using SkillService
+  // Calculate breakdown by skill categories using SkillService, pricing each
+  // skill from pointsFromIp exactly as calcIPAnalysis does for skillIP
   const skillCategoryBreakdown: Record<string, number> = {};
   const categories = skillService.getAllCategories();
 
@@ -336,8 +329,12 @@ export function calculateProfileIP(profile: TinkerProfile): IPTracker {
 
     skillIds.forEach((skillId) => {
       const skillData = profile.skills[skillId];
-      if (skillData && skillData.ipSpent) {
-        skillCategoryBreakdown[category] += skillData.ipSpent;
+      if (TRAINABLE_SKILL_IDS.has(skillId) && skillData?.pointsFromIp) {
+        skillCategoryBreakdown[category] += calcTotalSkillCost(
+          skillData.pointsFromIp,
+          characterStats.profession,
+          skillId
+        );
       }
     });
   });
@@ -430,9 +427,8 @@ export function updateProfileSkillInfo(
 
   // Update abilities (skill IDs 16-21)
   const abilityStatIds = [16, 17, 18, 19, 20, 21]; // Strength, Stamina, Agility, Sense, Intelligence, Psychic
-  const abilityIndexToStatId = [16, 18, 17, 20, 19, 21]; // Maps ABILITY_INDEX_TO_STAT_ID order
 
-  abilityStatIds.forEach((abilityStatId, index) => {
+  abilityStatIds.forEach((abilityStatId) => {
     const skillData = profile.skills[abilityStatId];
     if (skillData) {
       const breedInitValue = getBreedInitValue(characterStats.breed, abilityStatId);
@@ -462,6 +458,11 @@ export function updateProfileSkillInfo(
       // Store computed values in unified SkillData structure
       skillData.base = breedInitValue;
       skillData.trickle = 0; // Abilities don't have trickle-down
+      skillData.ipSpent = calcTotalAbilityCost(
+        skillData.pointsFromIp,
+        characterStats.breed,
+        abilityStatId
+      );
       skillData.equipmentBonus = equipmentBonus;
       skillData.perkBonus = perkBonus;
       skillData.buffBonus = buffBonus;
@@ -518,6 +519,11 @@ export function updateProfileSkillInfo(
 
       // Store computed values in unified SkillData structure
       skillData.base = 5; // Regular skills have base of 5
+      skillData.ipSpent = calcTotalSkillCost(
+        skillData.pointsFromIp,
+        characterStats.profession,
+        skillId
+      );
       skillData.equipmentBonus = equipmentBonus;
       skillData.perkBonus = perkBonus;
       skillData.buffBonus = buffBonus;
@@ -780,7 +786,7 @@ export function validateProfileIP(profile: TinkerProfile): {
             `${skillName} is near its natural cap (${skillData.total}/${baseSkillCap})`
           );
         }
-      } catch (error) {
+      } catch {
         // Skip invalid skill IDs
       }
     }
@@ -866,7 +872,7 @@ export function modifySkill(
   let skillName: string;
   try {
     skillName = skillService.getName(skillId);
-  } catch (error) {
+  } catch {
     return {
       success: false,
       error: `Invalid skill ID: ${skillId}`,
@@ -901,17 +907,11 @@ export function modifySkill(
   if (TRAINABLE_SKILL_IDS.has(skillId)) {
     const profession = profile.Character.Profession;
 
-    if (improvementDiff > 0) {
-      // Calculate cost to raise skill
-      for (let i = oldImprovements; i < newImprovements; i++) {
-        ipCost += calcTotalSkillCost(1, profession, skillId);
-      }
-    } else {
-      // Calculate IP refund for lowering skill
-      for (let i = newImprovements; i < oldImprovements; i++) {
-        ipCost -= calcTotalSkillCost(1, profession, skillId);
-      }
-    }
+    // Cost per point rises with the skill value, so price the whole range
+    // (negative when lowering the skill, i.e. a refund)
+    ipCost =
+      calcTotalSkillCost(newImprovements, profession, skillId) -
+      calcTotalSkillCost(oldImprovements, profession, skillId);
 
     // Check IP availability
     const currentIP = profile.IPTracker?.remaining || 0;
@@ -927,8 +927,8 @@ export function modifySkill(
   const updatedProfile = JSON.parse(JSON.stringify(profile)) as TinkerProfile;
   const updatedSkill = updatedProfile.skills[skillId];
 
+  // ipSpent is derived from pointsFromIp by the recalculation below
   updatedSkill.pointsFromIp = newImprovements;
-  updatedSkill.ipSpent = (updatedSkill.ipSpent || 0) + ipCost;
 
   // Recalculate all IP information (includes perk bonuses)
   return {
@@ -978,17 +978,10 @@ export function modifyAbility(
     return { success: true, updatedProfile: profile };
   }
 
-  // Calculate IP cost
-  let ipCost = 0;
-  if (improvementDiff > 0) {
-    for (let i = oldImprovements; i < newImprovements; i++) {
-      ipCost += calcTotalAbilityCost(1, breed, abilityId);
-    }
-  } else {
-    for (let i = newImprovements; i < oldImprovements; i++) {
-      ipCost -= calcTotalAbilityCost(1, breed, abilityId);
-    }
-  }
+  // Calculate IP cost over the whole range (negative when lowering, i.e. a refund)
+  const ipCost =
+    calcTotalAbilityCost(newImprovements, breed, abilityId) -
+    calcTotalAbilityCost(oldImprovements, breed, abilityId);
 
   // Check IP availability
   const currentIP = profile.IPTracker?.remaining || 0;
@@ -1014,8 +1007,8 @@ export function modifyAbility(
   const updatedProfile = JSON.parse(JSON.stringify(profile)) as TinkerProfile;
   const updatedAbility = updatedProfile.skills[abilityId];
 
+  // ipSpent is derived from pointsFromIp by the recalculation below
   updatedAbility.pointsFromIp = newImprovements;
-  updatedAbility.ipSpent = (updatedAbility.ipSpent || 0) + ipCost;
 
   // Recalculate ability total before trickle-down calculation
   // This is critical: updateProfileTrickleDown reads ability.total values,
@@ -1064,9 +1057,7 @@ export function modifyAbility(
  * Recalculate profile with updated perk bonuses
  * Use this when perks change to ensure all skill/ability values are updated
  */
-export function recalculateProfileWithPerkChanges(
-  profile: TinkerProfile
-): TinkerProfile {
+export function recalculateProfileWithPerkChanges(profile: TinkerProfile): TinkerProfile {
   return recalculateProfileIP(profile);
 }
 

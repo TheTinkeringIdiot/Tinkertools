@@ -5,11 +5,11 @@
  * with reactive components and providing a clean interface for UI.
  */
 
-import { computed, watch, ref } from 'vue';
+import { computed, watch, ref, readonly } from 'vue';
+import type { Ref } from 'vue';
 import { constructionPlannerService } from '../services/construction-planner';
 import type { ImpSlotName } from '../services/game-data';
 import type { SkillSet, ConstructionPlan } from '../utils/construction-analysis';
-import { skillService } from '../services/skill-service';
 
 // ============================================================================
 // Composable Interface
@@ -24,6 +24,15 @@ export interface ImplantConfig {
 
 export interface ImplantsData {
   [slotName: string]: ImplantConfig;
+}
+
+/** Cluster names as the construction service expects them; an empty socket is 'Empty'. */
+function clusterNames(config: ImplantConfig) {
+  return {
+    shinyName: config.shiny || 'Empty',
+    brightName: config.bright || 'Empty',
+    fadedName: config.faded || 'Empty',
+  };
 }
 
 /**
@@ -95,22 +104,7 @@ export function useConstructionPlanner(implantData?: Ref<ImplantsData>) {
       return { feasible: false, reason: 'No implant configuration selected' };
     }
 
-    // Convert stat IDs to cluster names for getConstructionFeasibility
-    const shinyName = config.shiny
-      ? typeof config.shiny === 'number'
-        ? skillService.getName(config.shiny)
-        : config.shiny
-      : 'Empty';
-    const brightName = config.bright
-      ? typeof config.bright === 'number'
-        ? skillService.getName(config.bright)
-        : config.bright
-      : 'Empty';
-    const fadedName = config.faded
-      ? typeof config.faded === 'number'
-        ? skillService.getName(config.faded)
-        : config.faded
-      : 'Empty';
+    const { shinyName, brightName, fadedName } = clusterNames(config);
 
     return getConstructionFeasibility(shinyName, brightName, fadedName, config.ql);
   });
@@ -122,22 +116,7 @@ export function useConstructionPlanner(implantData?: Ref<ImplantsData>) {
     const config = selectedImplantConfig.value;
     if (!config) return [];
 
-    // Convert stat IDs to names (same pattern as analyzeSelectedImplant)
-    const shinyName = config.shiny
-      ? typeof config.shiny === 'number'
-        ? skillService.getName(config.shiny)
-        : config.shiny
-      : 'Empty';
-    const brightName = config.bright
-      ? typeof config.bright === 'number'
-        ? skillService.getName(config.bright)
-        : config.bright
-      : 'Empty';
-    const fadedName = config.faded
-      ? typeof config.faded === 'number'
-        ? skillService.getName(config.faded)
-        : config.faded
-      : 'Empty';
+    const { shinyName, brightName, fadedName } = clusterNames(config);
 
     return getSkillRecommendations(config.ql, shinyName, brightName, fadedName);
   });
@@ -169,22 +148,7 @@ export function useConstructionPlanner(implantData?: Ref<ImplantsData>) {
       return null;
     }
 
-    // Convert stat IDs to cluster names for analyzeConstruction
-    const shinyName = config.shiny
-      ? typeof config.shiny === 'number'
-        ? skillService.getName(config.shiny)
-        : config.shiny
-      : 'Empty';
-    const brightName = config.bright
-      ? typeof config.bright === 'number'
-        ? skillService.getName(config.bright)
-        : config.bright
-      : 'Empty';
-    const fadedName = config.faded
-      ? typeof config.faded === 'number'
-        ? skillService.getName(config.faded)
-        : config.faded
-      : 'Empty';
+    const { shinyName, brightName, fadedName } = clusterNames(config);
 
     return await analyzeConstruction(slot, shinyName, brightName, fadedName, config.ql);
   }
@@ -221,11 +185,8 @@ export function useConstructionPlanner(implantData?: Ref<ImplantsData>) {
    * Toggle auto-analysis mode
    */
   function setAutoAnalysis(enabled: boolean) {
+    // The auto-analysis watcher runs the analysis once shouldAutoAnalyze turns true
     isAutoAnalyzing.value = enabled;
-
-    if (enabled && shouldAutoAnalyze.value) {
-      analyzeSelectedImplant();
-    }
   }
 
   /**
@@ -235,22 +196,7 @@ export function useConstructionPlanner(implantData?: Ref<ImplantsData>) {
     slot: ImpSlotName,
     config: ImplantConfig
   ): Promise<ConstructionPlan | null> {
-    // Convert stat IDs to cluster names for analyzeConstruction
-    const shinyName = config.shiny
-      ? typeof config.shiny === 'number'
-        ? skillService.getName(config.shiny)
-        : config.shiny
-      : 'Empty';
-    const brightName = config.bright
-      ? typeof config.bright === 'number'
-        ? skillService.getName(config.bright)
-        : config.bright
-      : 'Empty';
-    const fadedName = config.faded
-      ? typeof config.faded === 'number'
-        ? skillService.getName(config.faded)
-        : config.faded
-      : 'Empty';
+    const { shinyName, brightName, fadedName } = clusterNames(config);
 
     return await analyzeConstruction(slot, shinyName, brightName, fadedName, config.ql);
   }
@@ -276,22 +222,22 @@ export function useConstructionPlanner(implantData?: Ref<ImplantsData>) {
 
   return {
     // State
-    currentSkills: readonly(currentSkills),
-    currentPlan: readonly(currentPlan),
-    selectedSlot: readonly(selectedSlot),
-    selectedImplantConfig: readonly(selectedImplantConfig),
-    isAnalyzing: readonly(isAnalyzing),
-    lastError: readonly(lastError),
+    currentSkills,
+    currentPlan,
+    selectedSlot,
+    selectedImplantConfig,
+    isAnalyzing,
+    lastError,
     isAutoAnalyzing: readonly(isAutoAnalyzing),
 
     // Computed
-    availableSlots: readonly(availableSlots),
-    hasValidSkills: readonly(hasValidSkills),
-    hasValidImplantConfig: readonly(hasValidImplantConfig),
-    canAnalyze: readonly(canAnalyze),
-    constructionFeasibility: readonly(constructionFeasibility),
-    skillRecommendations: readonly(skillRecommendations),
-    shouldAutoAnalyze: readonly(shouldAutoAnalyze),
+    availableSlots,
+    hasValidSkills,
+    hasValidImplantConfig,
+    canAnalyze,
+    constructionFeasibility,
+    skillRecommendations,
+    shouldAutoAnalyze,
 
     // Methods
     setSkills,
@@ -308,8 +254,8 @@ export function useConstructionPlanner(implantData?: Ref<ImplantsData>) {
  * Construction summary composable for displaying results
  */
 export function useConstructionSummary(plan: Ref<ConstructionPlan | null>) {
-  const hasBasicSteps = computed(() => plan.value?.basic_steps?.length > 0);
-  const hasFTSteps = computed(() => plan.value?.ft_steps?.length > 0);
+  const hasBasicSteps = computed(() => (plan.value?.basic_steps?.length ?? 0) > 0);
+  const hasFTSteps = computed(() => (plan.value?.ft_steps?.length ?? 0) > 0);
   const isSuccessful = computed(() => plan.value?.success === true);
   const hasError = computed(() => Boolean(plan.value?.error));
 
@@ -331,24 +277,13 @@ export function useConstructionSummary(plan: Ref<ConstructionPlan | null>) {
   });
 
   return {
-    hasBasicSteps: readonly(hasBasicSteps),
-    hasFTSteps: readonly(hasFTSteps),
-    isSuccessful: readonly(isSuccessful),
-    hasError: readonly(hasError),
-    basicStepsCount: readonly(basicStepsCount),
-    ftStepsCount: readonly(ftStepsCount),
-    stepsDifference: readonly(stepsDifference),
-    recommendedPath: readonly(recommendedPath),
+    hasBasicSteps,
+    hasFTSteps,
+    isSuccessful,
+    hasError,
+    basicStepsCount,
+    ftStepsCount,
+    stepsDifference,
+    recommendedPath,
   };
 }
-
-// Utility types for export
-export type { ImplantConfig, ImplantsData };
-
-// Helper for readonly refs
-function readonly<T>(ref: any): Readonly<Ref<T>> {
-  return ref;
-}
-
-// Type imports for Ref
-import type { Ref } from 'vue';

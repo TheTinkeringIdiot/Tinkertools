@@ -9,10 +9,10 @@ Shows owned perks with their levels, points used, and stat bonuses
       v-if="perks.length > 0"
       :value="perks"
       :scrollable="true"
-      scrollHeight="flex"
+      scroll-height="flex"
       class="perk-data-table"
-      :rowHover="true"
-      :stripedRows="true"
+      :row-hover="true"
+      :striped-rows="true"
     >
       <!-- Perk Name Column -->
       <Column field="name" header="Perk Name" :sortable="true" class="min-w-48">
@@ -57,25 +57,25 @@ Shows owned perks with their levels, points used, and stat bonuses
         <template #body="{ data }">
           <div class="flex gap-2 justify-center">
             <Button
+              v-tooltip.top="'Upgrade'"
               icon="pi pi-arrow-up"
               size="small"
               severity="secondary"
               rounded
               text
               :disabled="data.level >= 10"
-              @click="$emit('upgrade', data)"
-              v-tooltip.top="'Upgrade'"
               :aria-label="`Upgrade ${data.name}`"
+              @click="$emit('upgrade', data)"
             />
             <Button
+              v-tooltip.top="'Remove'"
               icon="pi pi-times"
               size="small"
               severity="danger"
               rounded
               text
-              @click="$emit('remove', data)"
-              v-tooltip.top="'Remove'"
               :aria-label="`Remove ${data.name}`"
+              @click="$emit('remove', data)"
             />
           </div>
         </template>
@@ -98,32 +98,31 @@ Shows owned perks with their levels, points used, and stat bonuses
         label="Add Perks"
         icon="pi pi-plus"
         severity="primary"
-        @click="$emit('add-perks')"
         :aria-label="`Add ${getPerkTypeName(perkType)} perks`"
+        @click="$emit('add-perks')"
       />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import Button from 'primevue/button';
-import type { PerkEntry, ResearchEntry, PerkEffect } from '@/lib/tinkerprofiles/perk-types';
+import type { PerkEntry, ResearchEntry } from '@/lib/tinkerprofiles/perk-types';
 import { parseItemForStatBonuses } from '@/services/perk-bonus-calculator';
 import type { Item } from '@/types/api';
 import { skillService } from '@/services/skill-service';
 
 // Props
-const props = defineProps<{
+defineProps<{
   perks: (PerkEntry | ResearchEntry)[];
   perkType: 'SL' | 'AI' | 'LE';
   editable?: boolean;
 }>();
 
 // Emits
-const emit = defineEmits<{
+defineEmits<{
   'add-perks': [];
   upgrade: [perk: PerkEntry | ResearchEntry];
   remove: [perk: PerkEntry | ResearchEntry];

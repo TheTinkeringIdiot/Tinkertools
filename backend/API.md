@@ -2,7 +2,7 @@
 
 ## Overview
 
-The TinkerTools API provides access to Anarchy Online game data including items, spells, symbiants, and pocket bosses. The API follows RESTful conventions and returns JSON responses.
+The TinkerTools API provides access to Anarchy Online game data including items, nano programs, weapons, implants, perks, symbiants, and mobs (including pocket bosses). The API follows RESTful conventions and returns JSON responses.
 
 ## Base URL
 
@@ -24,16 +24,18 @@ Interactive API documentation is available at:
 ### Health Check
 
 #### GET /health
-Check the health status of the API and database connection.
+Check that the API process is up.
 
 **Response:**
 ```json
 {
-  "status": "ok",
-  "database": "healthy",
-  "table_count": 21
+  "status": "ok"
 }
 ```
+
+### Game versions
+
+Every route under `/api/v1` also exists under `/api/v1/<version>`, where `<version>` is a build slug from `GET /api/v1/versions` (`ao-18-8-62-ep1`) or a family alias (`ao`, `prk`). Without the segment the default build is served. An unknown slug is a 404 (`{"detail": "Unknown game version '<slug>'"}`). While the database cannot be reached, requests keep resolving their version and `GET /api/v1/versions` keeps answering from the list read last; an API that has read no list yet answers 503 (`{"detail": "The game versions cannot be read: the database is unavailable"}`). Every response under `/api/v1` names the build it was served from in the `X-Game-Version` header.
 
 ### Items
 
@@ -42,11 +44,14 @@ Get a paginated list of items with optional filters.
 
 **Query Parameters:**
 - `page` (int): Page number (default: 1)
-- `page_size` (int): Items per page (default: 50, max: 200)
-- `item_class` (string): Filter by item class
+- `page_size` (int): Items per page (default: 50, max: 1000)
+- `item_class` (int): Filter by item class
 - `min_ql` (int): Minimum quality level
 - `max_ql` (int): Maximum quality level
 - `is_nano` (bool): Filter nano programs
+- `slot`, `profession`, `breed`, `gender`, `faction`, `froob_friendly`, `nodrop`, `stat_bonuses`, `stat_filters`, `strain`: advanced filters, described at `/docs`
+
+Items are ordered by AOID.
 
 **Response:**
 ```json
@@ -60,14 +65,23 @@ Get a paginated list of items with optional filters.
   "has_prev": false
 }
 ```
+A `page` beyond `pages` is not an error, here or on any other paginated route: `items` is empty and `has_next` is false.
 
 #### GET /api/v1/items/search
-Search items by name or description.
+Search items by name or description. The response has the shape of `GET /api/v1/items`.
 
 **Query Parameters:**
-- `q` (string, required): Search query
-- `page` (int): Page number
-- `page_size` (int): Items per page
+- `q` (string, required): Search query, at least one character
+- `page` (int): Page number (default: 1)
+- `page_size` (int): Items per page (default: 50, max: 1000)
+- `exact_match` (bool): `true` (default) finds `q` as a substring, whatever the case; `%` and `_` in `q` are wildcards. `false` is a stemmed full-text search in which bare words are ANDed and `"a phrase"`, `OR` and `-word` are understood
+- `search_fields` (string): Comma-separated fields to search, of `name` and `description` (default: both). `effects` and `stats` are accepted and hold no text: named alone they search the name. Unknown names are ignored
+- `weapons` (bool): Only items with attack/defense data (default: false)
+- `min_ql`, `max_ql` (int, 1-999): Quality level range
+- `item_class` (int): Filter by item class
+- `slot`, `profession`, `breed`, `gender`, `faction`, `froob_friendly`, `nodrop`, `stat_bonuses`, `stat_filters`, `strain`: the advanced filters of `GET /api/v1/items`, described at `/docs`
+
+Substring matches are ordered by name. Full-text matches are ordered by rank, best first, or by name when `weapons` is true. Ties end on the AOID.
 
 #### GET /api/v1/items/{aoid}
 Get detailed information about a specific item by its Anarchy Online ID (AOID).
@@ -78,36 +92,27 @@ Get detailed information about a specific item by its Anarchy Online ID (AOID).
 **Response:**
 ```json
 {
-  "id": 1,
   "aoid": 12345,
   "name": "Enhanced Leather Vest",
   "ql": 25,
   "item_class": 4,
   "description": "A sturdy leather vest...",
   "is_nano": false,
+  "id": 12345,
   "stats": [
-    {
-      "id": 101,
-      "stat": 16,
-      "value": 15
-    }
+    {"stat": 16, "value": 15}
   ],
   "spell_data": [
     {
-      "id": 201,
-      "event": 1,
+      "event": 14,
       "spells": [
         {
-          "id": 301,
-          "target": 1,
-          "tick_count": null,
-          "tick_interval": null,
-          "spell_id": 12345,
-          "spell_format": "Increase {stat} by {value}",
-          "spell_params": {
-            "stat": 96,
-            "value": 10
-          },
+          "target": 2,
+          "tick_count": 1,
+          "tick_interval": 0,
+          "spell_id": 53045,
+          "spell_format": "Modify {Stat} {Amount}",
+          "spell_params": {"Stat": 96, "Amount": 10, "SpellDescription": "Modify 96 10"},
           "criteria": []
         }
       ]
@@ -117,19 +122,41 @@ Get detailed information about a specific item by its Anarchy Online ID (AOID).
   "defense_stats": [],
   "actions": [
     {
-      "id": 401,
-      "action": 1,
-      "item_id": 1,
+      "action": 6,
       "criteria": [
-        {
-          "id": 501,
-          "value1": 16,
-          "value2": 100,
-          "operator": 1
-        }
+        {"value1": 16, "value2": 100, "operator": 2}
       ]
     }
-  ]
+  ],
+  "sources": []
+}
+```
+
+`id` is deprecated and equals `aoid`. The item's content (stats, effects, actions and their criteria) carries no ids. A source does: `sources[].source.id` is the id of the source, `source.source_type_id` and `source.source_type.id` that of its type, and `source.source_id` the AOID of the item or the id of the mob it stands for:
+
+```json
+{
+  "source": {
+    "id": 4370,
+    "source_type_id": 1,
+    "source_id": 29358,
+    "name": "Nano Crystal (Pistol Mastery)",
+    "extra_data": {"type": "nanocrystal"},
+    "source_type": {
+      "id": 1,
+      "name": "item",
+      "description": "Items that create/upload other items (e.g., nanocrystals)"
+    }
+  },
+  "drop_rate": null,
+  "min_ql": 24,
+  "max_ql": 24,
+  "conditions": null,
+  "extra_data": {
+    "nano_name": "Pistol Mastery",
+    "crystal_aoid": 29358,
+    "crystal_name": "Nano Crystal (Pistol Mastery)"
+  }
 }
 ```
 
@@ -138,38 +165,305 @@ Get detailed information about a specific item by its Anarchy Online ID (AOID).
 - `spell_data`: Spell effects with nested spells and their criteria  
 - `attack_stats`: Attack-related statistics for weapons
 - `defense_stats`: Defense-related statistics for weapons
-- `actions`: Item actions with criteria (equipping, using, etc.)
+- `actions`: Item actions with criteria (equipping, using, etc.), criteria in evaluation order
+- `sources`: Where the item comes from (crystals for nanos, mobs for symbiants)
 
-#### GET /api/v1/items/with-stats
-Get items that have specific stat requirements.
+### Interpolation
 
-**Query Parameters:**
-- `stat` (int, required): Stat ID to filter by
-- `min_value` (int): Minimum stat value
-- `max_value` (int): Maximum stat value
-- `limit` (int): Maximum results (default: 100)
+An item that exists at several quality levels is stored at a few of them; these routes compute it at a QL in between.
 
-### Spells
-
-#### GET /api/v1/spells
-Get a paginated list of spells.
+#### GET /api/v1/items/{aoid}/interpolate
+Interpolate an item to a quality level.
 
 **Query Parameters:**
-- `page` (int): Page number
-- `page_size` (int): Items per page
-- `target` (int): Filter by target type
+- `target_ql` (int, required): Target quality level, 1 to 500
 
-#### GET /api/v1/spells/{spell_id}
-Get detailed information about a specific spell including criteria.
+**Response:**
+```json
+{
+  "success": true,
+  "item": {
+    "id": 111751,
+    "aoid": 111751,
+    "name": "Right-Hand Implant: Martial Arts, Shiny",
+    "ql": 150,
+    "description": "...",
+    "item_class": 3,
+    "is_nano": false,
+    "interpolating": true,
+    "low_ql": 1,
+    "high_ql": 200,
+    "target_ql": 150,
+    "ql_delta": 149,
+    "ql_delta_full": 199,
+    "stats": [{"stat": 0, "value": 515}],
+    "spell_data": [...],
+    "actions": [...]
+  },
+  "error": null,
+  "interpolation_range": {"min_ql": 1, "max_ql": 200}
+}
+```
 
-#### GET /api/v1/spells/with-criteria
-Get spells that match specific criteria.
+`item` has the `stats`, `spell_data` and `actions` of an item detail, computed for `target_ql`, and no attack, defense or source lists. Its `aoid` is that of the stored variant the values are computed from, and `id` equals it. `interpolating` is false when the item has a single variant, which is then returned as it is with `ql` set to `target_ql`.
+
+An AOID the build does not have answers 200 with `"success": false` and the reason in `error`.
+
+#### POST /api/v1/items/batch/interpolate
+Interpolate up to 100 items in one request.
+
+**Request Body:**
+```json
+{"items": [{"aoid": 111752, "target_ql": 150}, {"aoid": 1, "target_ql": 5}]}
+```
+
+`target_ql` is 1 to 500 and defaults to 1.
+
+**Response:**
+```json
+{
+  "success": false,
+  "results": [
+    {"aoid": 111752, "target_ql": 150, "success": true, "item": {...}, "error": null},
+    {"aoid": 1, "target_ql": 5, "success": false, "item": null, "error": "Item with AOID 1 not found"}
+  ],
+  "errors": ["Item with AOID 1 not found"]
+}
+```
+
+`results` has one entry per requested item, in request order; `item` is as in the single route. The top-level `success` is true only when every item succeeded.
+
+#### GET /api/v1/items/{aoid}/interpolation-info
+The quality level ranges an item can be interpolated over.
+
+**Response:**
+```json
+{
+  "aoid": 111752,
+  "interpolatable": true,
+  "ranges": [
+    {"min_ql": 1, "max_ql": 200, "interpolatable": true, "base_aoid": 111751},
+    {"min_ql": 200, "max_ql": 200, "interpolatable": false, "base_aoid": 111752}
+  ],
+  "min_ql": 1,
+  "max_ql": 200,
+  "ql_range": 200
+}
+```
+
+An AOID the build does not have is a 404.
+
+### Nanos
+
+#### GET /api/v1/nanos
+Get a paginated list of nano programs.
 
 **Query Parameters:**
-- `value1` (int): Criterion value1
-- `value2` (int): Criterion value2
-- `operator` (int): Criterion operator
-- `limit` (int): Maximum results
+- `page` (int): Page number (default: 1)
+- `page_size` (int): Items per page (default: 50, max: 200)
+- `school` (string, repeatable): `Combat`, `Medical`, `Protection`, `Psi` or `Space`, or its NanoSchool value 1-5
+- `profession` (string, repeatable): Profession name or id; matches nanos castable by any of them, including those any profession can cast
+- `strain` (string, repeatable): NanoStrain id or name; matches any of them
+- `level_min`, `level_max` (int): Bounds on the lowest level that can cast the nano
+- `ql_min`, `ql_max` (int): Bounds on the quality level
+- `sort_by` (string): `name` (default), `ql` or `level`
+- `sort_desc` (bool): Sort descending (default: false)
+
+A value of `school`, `profession` or `strain` that names nothing is ignored; a filter with only such values matches nothing. Ties in the sort are ordered by AOID.
+
+**Response:** the paginated envelope of `GET /api/v1/items`, with items like:
+```json
+{
+  "id": 26465,
+  "aoid": 26465,
+  "name": "Minor Healing",
+  "ql": 1,
+  "description": "Heals the target of 5 to 10 points of damage.",
+  "school": "Medical",
+  "strain_id": null,
+  "strain": null,
+  "professions": [],
+  "level": 1,
+  "actions": [
+    {
+      "action": 3,
+      "criteria": [
+        {"value1": 128, "value2": 16, "operator": 2},
+        {"value1": 127, "value2": 18, "operator": 2},
+        {"value1": 0, "value2": 0, "operator": 4}
+      ]
+    }
+  ],
+  "casting_time": 151,
+  "recharge_time": 100,
+  "memory_usage": null,
+  "nano_point_cost": null,
+  "effects": [],
+  "duration": null,
+  "targeting": null,
+  "source_location": null,
+  "acquisition_method": null
+}
+```
+
+- `id` is deprecated and equals `aoid`
+- `professions`: Professions that can cast the nano; empty when its Use action does not restrict the profession
+- `level`: Lowest character level that can cast it; null when it has no Use action
+- `strain_id`, `strain`: The NanoStrain (stat 75) the build serves for the nano and its name; null when it has none
+- `actions`: The Use action's criteria are the requirements to cast the nano
+- `casting_time`, `recharge_time`: In centiseconds (stats 294 and 210); null when the nano does not have the stat
+
+#### GET /api/v1/nanos/search
+Search nano programs by name or description (substring, any case).
+
+**Query Parameters:**
+- `q` (string, required): Search text
+- Every parameter of `GET /api/v1/nanos`
+
+The response is that of `GET /api/v1/nanos`.
+
+#### GET /api/v1/nanos/strains
+The strains of the nanos matching a set of filters, with the number of nanos of each.
+
+**Query Parameters:** `q`, `school`, `profession`, `level_min`, `level_max`, `ql_min`, `ql_max`, as in the list and the search. There is no `strain` filter: the list offers every strain the other filters leave.
+
+**Response** (for `?school=Space&level_max=20`):
+```json
+{
+  "strains": [
+    {"id": 1015, "name": "Attack Pets", "count": 186},
+    {"id": 293, "name": "Beacon Warp", "count": 2}
+  ]
+}
+```
+
+Sorted by name, then id; strains without a name come last. Nanos without a strain are not counted.
+
+#### GET /api/v1/nanos/profession/{profession_id}
+The nano programs whose Use action names a profession, as full items. `profession_id` 0 lists them for every profession. Nanos without a real strain and test items are left out.
+
+**Query Parameters:**
+- `page` (int): Page number (default: 1)
+- `page_size` (int): Items per page (default: 1000, max: 1000)
+- `sort` (string): `ql` (default) or `name`
+- `sort_order` (string): `desc` (default) or `asc`
+
+**Response:** the paginated envelope; each item is an item detail (see `GET /api/v1/items/{aoid}`) with empty `attack_stats`, `defense_stats` and `sources`, plus the `school`, `professions`, `level`, `strain_id` and `strain` of the nano list.
+
+#### GET /api/v1/nanos/offensive/{profession_id}
+The nanos of `GET /api/v1/nanos/profession/{profession_id}` that lower a hostile target's health. Same parameters; each item is an item detail with empty `attack_stats`, `defense_stats` and `sources`.
+
+### Weapons
+
+#### POST /api/v1/weapons/analyze
+The weapons a character can use.
+
+**Request Body:**
+```json
+{
+  "level": 220,
+  "breed_id": 1,
+  "profession_id": 11,
+  "side": 2,
+  "expansion_bitflag": 127,
+  "top_weapon_skills": [{"skill_id": 116, "value": 2500}]
+}
+```
+
+- `level` (int, required): Character level, 1 to 220
+- `breed_id` (int, required): 1 to 4
+- `profession_id` (int, required): 0 (any) to 15
+- `side` (int, required): 0 neutral, 1 clan, 2 omni
+- `expansion_bitflag` (int): Expansions the account has, 0 to 511 (default: 127)
+- `top_weapon_skills` (required): 1 to 3 weapon skills, each a `skill_id` and a `value` of 0 or more
+
+**Response:** a JSON array, not paginated, of item details (see `GET /api/v1/items/{aoid}`): every QL variant of each matching weapon, ordered by AOID.
+
+### Implants
+
+#### POST /api/v1/implants/lookup
+Find the implant of a slot with an exact set of clusters, at a quality level.
+
+**Request Body:**
+```json
+{"slot": 1024, "ql": 200, "clusters": {"Shiny": 100, "Bright": 102, "Faded": 150}}
+```
+
+- `slot` (int, required): Implant slot bitflag, 1 to 16383
+- `ql` (int, required): Quality level, 1 to 300
+- `clusters` (required): Stat ids by cluster position; the positions are `Shiny`, `Bright` and `Faded`, and a position may be left out
+
+The implant has exactly the clusters given and no other.
+
+**Response:**
+```json
+{
+  "success": true,
+  "item": {"aoid": 111752, "name": "Right-Hand Implant: Martial Arts, Shiny", "ql": 200, "...": "..."},
+  "message": "Implant found successfully (interpolated from QL 1 to QL 200)",
+  "interpolated": true,
+  "base_ql": 1
+}
+```
+
+`item` is an item detail, interpolated to `ql` when the stored implant is of another QL. When no implant matches, the answer is 200 with `"success": false`, a null `item` and the reason in `message`.
+
+### Perks
+
+#### POST /api/v1/perks/batch/lookup
+Look up perks by AOID, up to 100 per request.
+
+**Request Body:**
+```json
+{"aoids": [210830, 1]}
+```
+
+**Response:**
+```json
+{
+  "success": false,
+  "results": [
+    {
+      "aoid": 210830,
+      "success": true,
+      "perk": {
+        "id": 210830,
+        "aoid": 210830,
+        "name": "Accumulator",
+        "ql": 1,
+        "item_class": 2,
+        "description": "...",
+        "is_nano": false,
+        "stats": [{"stat": 0, "value": 9, "stat_name": null}],
+        "spell_data": [...],
+        "attack_stats": [],
+        "defense_stats": [],
+        "actions": [
+          {"action": 6, "criteria": [{"value1": 60, "value2": 7, "operator": 0, "order_index": 0}]}
+        ],
+        "perk_name": "Accumulator",
+        "perk_counter": 1,
+        "perk_type": "SL",
+        "perk_series": "Accumulator",
+        "perk_professions": ["Trader"],
+        "perk_breeds": [],
+        "perk_level_required": 10,
+        "perk_ai_level_required": null,
+        "counter": 1,
+        "type": "SL",
+        "level": 10,
+        "ai_title": null,
+        "formatted_name": "Accumulator 1"
+      },
+      "error": null
+    },
+    {"aoid": 1, "success": false, "perk": null, "error": "Perk with AOID 1 not found"}
+  ],
+  "errors": ["Perk 1 not found"]
+}
+```
+
+`results` has one entry per requested AOID, in request order. A perk is its item with the perk's own fields; unlike an item detail its stats carry a null `stat_name`, its action criteria an `order_index`, its effects no `criteria`, and it has no `sources`. The top-level `success` is true only when every AOID is a perk. A build that does not serve perks finds none.
 
 ### Symbiants
 
@@ -178,47 +472,223 @@ Get a paginated list of symbiants.
 
 **Query Parameters:**
 - `page` (int): Page number
-- `page_size` (int): Items per page
+- `page_size` (int): Items per page (default 50, max 200)
+
+Ordered by family, QL, name and AOID. Filtering is done by the client.
+
+#### GET /api/v1/symbiants/{aoid}
+Get detailed information about a specific symbiant, addressed by its AOID.
+
+#### GET /api/v1/symbiants/{aoid}/dropped-by
+Get list of pocket bosses that drop a specific symbiant, addressed by its AOID.
+
+### Mobs
+
+#### GET /api/v1/mobs
+Get a paginated list of mobs, including pocket bosses.
+
+**Query Parameters:**
+- `page` (int): Page number (default 1)
+- `page_size` (int): Items per page (default 50, max 1000)
+- `is_pocket_boss` (bool): Filter pocket bosses
+- `min_level` (int): Minimum mob level
+- `max_level` (int): Maximum mob level
+- `playfield` (string): Filter by playfield (partial match)
+
+#### GET /api/v1/mobs/{mob_id}
+Get detailed information about a specific mob.
+
+#### GET /api/v1/mobs/{mob_id}/drops
+Get list of symbiants dropped by a specific mob.
+
+**Query Parameters:**
 - `family` (string): Filter by symbiant family
-- `slot` (string): Filter by equipment slot
-- `min_ql` (int): Minimum quality level
-- `max_ql` (int): Maximum quality level
 
-#### GET /api/v1/symbiants/{symbiant_id}
-Get detailed information about a specific symbiant including drop sources.
+### Changes between builds
 
-#### GET /api/v1/symbiants/{symbiant_id}/dropped-by
-Get list of pocket bosses that drop a specific symbiant.
+What changed on an item, in a build, or between any two builds. The version segment of the URL names the newer side of every comparison; `{base}` is a build slug or family alias. Stats, skills, actions, events and effect types are numeric ids; `kind`, `parts` and `relevance` are words:
 
-### Pocket Bosses
+- `kind`: `added`, `removed`, `changed`
+- `parts` (what differs): `text`, `stats`, `effects`, `actions`, `atkdef`, `misc`
+- `relevance` (what the change matters for): `gameplay`, `economy`, `cosmetic`, `text`. It follows from `backend/database/change_relevance.toml`; an added or removed item is `gameplay`. A stat that is added or removed with its housekeeping value (`[housekeeping]` in that file: Value 0, ItemClass 0, Team 15, ...) is `cosmetic`; any other value of the stat keeps the stat's class. Effects are compared as the events group them, whatever the events' numbers: an effect that moves from one event to another (a modifier that applied on Use and now applies on Wear) is a change of its effect type's class, an event that only takes another number is `cosmetic`.
 
-#### GET /api/v1/pocket-bosses
-Get a paginated list of pocket bosses.
+Diffs compare the client's raw data, build against build. A value that the item pages show from curated data instead (the strain of a nano, from the curated nano CSV) can therefore differ from what a diff shows for the same item: the diff shows what the client data of the two builds held.
 
-**Query Parameters:**
-- `page` (int): Page number
-- `page_size` (int): Items per page
-- `min_level` (int): Minimum boss level
-- `max_level` (int): Maximum boss level
-- `playfield` (string): Filter by playfield
+A build is named in responses as `{"slug", "display_name", "family", "client_build", "snapshot_date"}`.
 
-#### GET /api/v1/pocket-bosses/{boss_id}
-Get detailed information about a specific pocket boss including drops.
+Responses depend only on the builds named and change only with an import. They are cached by the server for an hour; a client or proxy may cache a response for a pair of explicit build slugs just as long (`Cache-Control: public, max-age=3600` is safe), but not one asked through a family alias (`ao`, `prk`) or without a version, which follows the newest build.
 
-#### GET /api/v1/pocket-bosses/{boss_id}/drops
-Get list of symbiants dropped by a specific pocket boss.
-
-### Stat Values
-
-#### GET /api/v1/stat-values
-Get list of stat values.
+#### GET /api/v1/changes
+The change list of the request's build: every item added, removed or changed relative to the build before it (for a branch's first build, relative to its parent build: PRK 0.7.1 against AO 17.10.5).
 
 **Query Parameters:**
-- `skip` (int): Number of items to skip
-- `limit` (int): Maximum results
+- `page` (int, default 1), `page_size` (int, default 50, max 200)
+- `sort` (`name` | `aoid` | `ql`, default `name`): ties by AOID
+- `kind`, `part`, `relevance` (repeatable): only changes of one of these kinds, touching one of these parts, relevant to one of these
+- `is_nano` (bool), `item_class` (int), `min_ql`, `max_ql` (int)
+- `profession` (int): only items and nanos whose Use requires this profession
+- `slot` (int): only items worn in this slot (bit position of stat 298, as in `GET /items`)
+- `search` (string): text the new or the old name contains
+- `notes` (`collapse` | `expand`, default `collapse`), `note_id` (int): see below
+- `transition`, `transition_old`, `transition_new`: only the items of one line of `GET /changes/transitions`. `transition` is the line's `path`; the other two are its `old` and `new` as JSON (`60`, `"added"`, `[124,1060,2]`, `null`) and may be left out to take every line of the path
+- `include_diff` (bool, default false): give each changed item of the page its field-level diff. A very large diff is left out: the row has `"diff": null, "diff_omitted": true`, and `GET /items/{aoid}/compare/{base}` returns it
 
-#### GET /api/v1/stat-values/{stat_value_id}
-Get a specific stat value by ID.
+**Response:** a `PaginatedResponse` of change rows, plus `build`, `base`, `summary` and `notes`:
+```json
+{
+  "items": [
+    {
+      "aoid": 88805, "kind": "changed",
+      "name": "Boosted-Graft: Assault Rifle Expertise", "old_name": null,
+      "ql": 12, "old_ql": null, "item_class": 2, "is_nano": false, "icon": 11647,
+      "parts": ["text", "stats", "effects"],
+      "relevance": ["gameplay", "cosmetic", "text"],
+      "note_id": null,
+      "diff": null,
+      "diff_omitted": false
+    }
+  ],
+  "total": 92, "page": 1, "page_size": 50, "pages": 2, "has_next": true, "has_prev": false,
+  "build": {"slug": "ao-14-6-0", "display_name": "AO 14.6.0", "family": "ao", "client_build": "14.6.0", "snapshot_date": null},
+  "base": {"slug": "ao-14-5-1", "display_name": "AO 14.5.1", "family": "ao", "client_build": "14.5.1", "snapshot_date": null},
+  "summary": {
+    "total": 8650,
+    "by_kind": {"added": 968, "removed": 0, "changed": 7682},
+    "by_part": {"text": 5211, "stats": 6220, "effects": 3070, "actions": 2525, "atkdef": 78, "misc": 3540},
+    "by_relevance": {"gameplay": 6425, "economy": 244, "cosmetic": 5857, "text": 5211},
+    "noted": 869
+  },
+  "notes": [
+    {"note_id": 4, "title": "Weapons given an explicit attack range",
+     "body": "Stat 287 (AttackRange) was written out on weapons that had none.",
+     "count": 869, "matching": 0}
+  ]
+}
+```
+- A row is listed by its newer revision (the older one for a removed item); `old_name` and `old_ql` are set only when they differ. `icon` is stat 79.
+- `summary` counts every change of the build, whatever the filters. `base` is null for a build with nothing before it.
+- `diff_omitted` is true only when the diff was asked for (`include_diff=true`) and is too much for a row of a page: the effects of the two revisions, with their criteria, number more than 1,000, or the diff is more than 64 KB of JSON. The change log of all 147 builds has 129,630 changed entries, which compare 127,374 distinct pairs of revisions; 11 of those pairs are left out (five vehicle nanos of 17.7.0 at 186 KB each, five shop inventories and one item with a great many effects). The row is otherwise complete; ask for the diff with `GET /items/{aoid}/compare/{base}`, using the `slug` of the response's `base`. Rows without a diff to give (`include_diff=false`, added and removed items) have `diff_omitted: false`.
+- **Build notes** are build-wide events that explain many changes at once (`backend/database/build_notes.toml`). A change carries a `note_id` only when the note explains all of it. By default such changes are collapsed: left out of `items` and `total`, and counted per note in `notes` (`count`: changes the note explains; `matching`: those that match the request's filters). `notes=expand` lists them with the rest; `note_id=N` lists only that note's.
+
+#### GET /api/v1/compare/{base}
+The net difference between build `base` and the request's build, computed from what each build holds, not by replaying the builds between them: an item that changed and changed back is not listed. Any two builds, in either order, across families (`/api/v1/prk-0-7-1/compare/ao-17-10-5`). Parameters (except `transition*`) and response are those of `GET /changes`, `diff_omitted` included; a comparison has no build notes, so `notes` is empty and every `note_id` null. The first request for a pair of builds classifies the whole comparison and keeps its `summary`; later pages and filters of the pair classify only their page, unless they filter on `part` or `relevance`. For the farthest pair (14.2.2 against live, 123,224 items) that is 0.5 to 0.9 s once, then under 300 ms per page.
+
+#### GET /api/v1/changes/transitions
+The field transitions that most changed items of the request's build share, most items first. They read as patch notes.
+
+**Query Parameters:**
+- `part` (repeatable): only transitions of these parts
+- `relevance` (repeatable: `gameplay` | `economy` | `cosmetic` | `text`; default `gameplay`, `economy` and `text`): only transitions of fields that matter for one of these. The class is that of the field itself (the stat, the effect type, the part), whatever else the items changed: an icon or `static_instance` line is `cosmetic` even on items that changed in gameplay too. One kind of line depends on its values: a stat added or removed with its housekeeping value is `cosmetic` (`stat:74` null -> 0) while the same stat with other values has its own class (`stat:74` 56 -> 1 is `economy`). A renumbering (`event`) and an empty event added or removed (`event:<id>`) are `cosmetic`; an event that comes or goes with effects has no line of its own, its effects have theirs. Unlike on `GET /changes`, leaving the parameter out does filter: name all four classes to list cosmetic lines as well.
+- `notes` (`collapse` | `expand`, default `collapse`): with `collapse` the patch notes leave out what a build note already says. `items` and `occurrences` count only the changes no build note explains, and a transition is left out when the build's notes account for it: when fewer than `min_items` of those changes have it outside the event of a note. A note accounts for the transitions its rule names, in the items its event happened to (`backend/database/build_notes.toml`), so the implants of 14.8.0 that were renamed and rebalanced are listed with their rebalancing and not with the rename. A note marked `partial = false` in that file accounts only for the changes it explains entirely: the line of its transition stays, counting the changes that have it and something else besides. With `expand` every transition is listed and counted over every change.
+- `min_items` (int, default 2): only transitions shared by at least this many items
+- `limit` (int, default 50, max 500), `offset` (int, default 0): the lines from position `offset` on, at most `limit` of them. The order is fixed (most items first, then most occurrences, then part, path and values), so pages neither repeat nor skip a line and lines beyond the 500 of one request are reached with `offset`
+
+**Response:**
+```json
+{
+  "build": {"slug": "ao-14-6-0", "...": "..."},
+  "base": {"slug": "ao-14-5-1", "...": "..."},
+  "transitions": [
+    {"part": "effects", "path": "effect:53089:spell_params.Chance", "old": 60, "new": 100,
+     "relevance": "gameplay", "items": 760, "occurrences": 760,
+     "stat": null, "bit": null, "spell_id": 53089, "action": null, "field": "spell_params.Chance"}
+  ],
+  "total": 212
+}
+```
+`total` is the number of lines under the request's `part`, `relevance`, `notes` and `min_items`, whatever its `limit` and `offset`. Only transitions shared by at least two items are kept. `relevance` is the class of the line's field. A listed line's `items` is the `total` of `GET /changes` narrowed to it (`transition`, `transition_old`, `transition_new`) with the same `notes` value. `stat`, `bit`, `spell_id`, `action` and `field` repeat the ids in `path`. Paths, with what `old` and `new` hold (null: absent, or particular to each item):
+
+| part | path | old, new |
+|---|---|---|
+| text | `name`, `description` | the words only the old and only the new text have |
+| stats | `stat:<id>` | the values |
+| stats | `stat:<id>:bit:<value>` (flag stats) | 0 and 1 |
+| atkdef | `attack:<id>`, `defense:<id>` | the values |
+| actions | `action:<id>` | `"removed"` as old or `"added"` as new |
+| actions | `action:<id>:criterion` | `[value1, value2, operator]` |
+| effects | `event` | the event ids of a renumbering |
+| effects | `event:<id>` | `"removed"` / `"added"`, for an event without effects |
+| effects | `effect:<spell_id>` | the subject (stat, skill, nano id; `"none"`) of a removed (old) or added (new) effect |
+| effects | `effect:<spell_id>:<field>` | the values of `target`, `tick_count`, `tick_interval` or `spell_params.<name>` |
+| effects | `effect:<spell_id>:criterion` | `[value1, value2, operator]` |
+| misc | `static_instance`, `animation_mesh`, `shop` | null |
+
+#### GET /api/v1/items/{aoid}/timeline
+Every build in which the item was added, changed or removed, newest first, along the lineage of the request's version: every build of its family, and for a fork (PRK) the parent family's builds up to the fork. The answer is the same from any build of a family. An item the lineage never had gets `"entries": []`.
+
+**Query Parameters:** `include_diff` (bool, default true)
+
+**Response:**
+```json
+{
+  "aoid": 88393,
+  "family": "ao",
+  "entries": [
+    {
+      "build": {"slug": "ao-14-6-0", "...": "..."},
+      "base": {"slug": "ao-14-5-1", "...": "..."},
+      "kind": "changed",
+      "name": "Hacked Charged Nano Critter - 1H Blunt Weapon Incompetence", "ql": 13,
+      "parts": ["stats", "effects", "actions", "misc"],
+      "relevance": ["gameplay", "cosmetic"],
+      "note": null,
+      "diff": {"text": [], "stats": ["..."], "effects": ["..."], "actions": ["..."], "attack": [], "defense": [], "misc": ["..."]}
+    }
+  ]
+}
+```
+`note` is `{"note_id", "title", "body"}` when a build note explains the entry.
+
+#### POST /api/v1/items/revisions/batch
+The "changed in" badge of list rows, for up to 500 items in one request.
+
+**Request Body:** `{"aoids": [271072, 121141]}`
+
+**Response:**
+```json
+{
+  "items": {
+    "271072": {"aoid": 271072, "revision_count": 2, "change_count": 1,
+               "latest_change_slug": "ao-18-8-62-ep1", "present_in_current": true}
+  }
+}
+```
+- `revision_count`: the number of `entries` that `GET /items/{aoid}/timeline` returns for the same version: the builds of the version's lineage in which the item was added, changed or removed. Builds of another family after the fork are not counted. 0 for an item the lineage never had.
+- `change_count`: of those entries, the ones of kind `changed` (default 0). An item that was only ever added has `revision_count` 1 and `change_count` 0.
+- `latest_change_slug`: the enabled build that the definition served for the request's version comes from. For an item the version no longer has (`present_in_current: false`) it is the build that introduced the last definition the item had on the way to the version; it is null only when no build up to the version ever had the item. A build that changed only the shop data or the static instance id is not one, though the timeline lists it.
+- `present_in_current`: whether the request's version has the item.
+
+#### GET /api/v1/items/{aoid}/compare/{base}
+One item in build `base` and in the request's build.
+
+**Response:** `{"aoid", "build", "base", "kind", "old", "new", "parts", "relevance", "diff"}`. `kind` is `added`, `removed`, `changed` or `unchanged`; `old` and `new` are `{"name", "ql", "item_class", "is_nano", "icon"}` or null where the build lacks the item; `diff` is given when both have it, whatever its size. 404 when neither build has the item or `base` is unknown.
+
+#### The field-level diff
+`diff` has one list per part, empty when the part is the same: `text`, `stats`, `effects`, `actions`, `attack`, `defense`, `misc`. Every entry has a `relevance`, and the `relevance` of the change is the union of its entries' values.
+
+- `text`, `misc`: `{"field", "old", "new", "relevance"}`; fields `name`, `description`, `static_instance`, `animation_mesh`, `shop`.
+- `stats`, `attack`, `defense`: `{"stat", "change", "old", "new", "housekeeping", "bits_set", "bits_cleared", "relevance"}`. For the flag stats (0, 30, 182, 298, 355, 389) `bits_set` and `bits_cleared` list the flag values (1, 2, 4, ...) that were set and cleared; they are null for other stats. `housekeeping` (bool, default false; stats only) is true when `old` or `new` is the stat's housekeeping value. With `relevance: "cosmetic"` that is all the entry is (Value added as 0). With another `relevance` the stat went from that value to a real one or back (Value 0 -> 3): the entry then adds its own class and `cosmetic` to the relevance of the change, the one case in which an entry adds two.
+- `actions`: `{"action", "change", "criteria", "relevance"}`. `criteria` is the whole requirement list as a sequence diff: `{"op": "same" | "added" | "removed" | "changed", "old", "new"}` with criteria as `{"value1", "value2", "operator"}`. `changed` pairs two criteria that are the same thing at the same place: a requirement on the same stat, a logical operator (AND to OR), or a condition (on target to on fighting target). An operator is never paired with a requirement; that is one `removed` and one `added`.
+- `effects`: one entry per event that differs: `{"event", "change", "old_event", "relevance", "added", "removed", "changed"}`.
+  - `change` is `added`, `removed`, `changed` or `renumbered` (the same effects under another event id, `old_event`).
+  - `added` and `removed` hold effects shaped as the `spells` of an item's `spell_data`, each with a `relevance`.
+  - `changed` pairs an old with a new effect: `{"old", "new", "fields", "criteria", "relevance"}`, `fields` listing what differs as `{"field", "old", "new"}` (`target`, `tick_count`, `tick_interval`, `spell_params.<name>`) and `criteria` the sequence diff of their criteria, or null.
+  - Two effects are only paired when they have the same effect type and act on the same subject (the `Stat`, `Skill`, `NanoID`, `NanoStrain`, `Item` and `PerkID` parameters); a modifier replaced by a modifier of another stat is one removal and one addition.
+  - An effect entry has the class of its effect type when the events of the two revisions do not hold the same effects of that class: an effect added, removed, changed, or moved from one event to another. Where they do, only the numbering of events differs: the entry, like that of a renumbered event, is `cosmetic` when that is so for every class, and has a null `relevance` when another class differs.
+
+### Legacy Item IDs
+
+#### POST /api/v1/legacy-item-ids/resolve
+Resolve internal item row ids, as the database before the content-addressed store issued them, to AOIDs. Up to 1000 ids per request. Only the frontend's one-time migration of stored favorites, farm lists and comparison links calls it.
+
+**Request Body:**
+- `item_ids` (int[]): Internal item row ids
+
+**Response:** `{"aoids": {"<item_id>": <aoid>}, "available": true}`.
+
+- The version segment of the path says whose ids are meant (`POST /api/v1/prk/legacy-item-ids/resolve`); without it the default build is asked. 404 for an unknown version, 422 for more than 1000 ids or an id that is not an integer.
+- An id is looked up among the ids issued for the family of the requested version (`ao`, `prk`), whichever build of the family is asked about, and is answered only when its item is present in that build. Ids that name no such item are omitted.
+- `available` is false when the server holds no ids for the family at all (the map was not loaded: `IMPORT_README.md`, "Legacy item ids"). `aoids` is then empty, which says nothing about the ids asked for: a client keeps them and asks again later.
 
 ## Error Responses
 
@@ -274,6 +744,6 @@ Currently, no rate limiting is implemented as the API serves cached game referen
 
 ### Version 1.0.0
 - Initial release with basic CRUD endpoints
-- Support for items, spells, symbiants, pocket bosses, and stat values
+- Support for items, symbiants, and pocket bosses
 - Pagination and search functionality
 - Error handling and validation

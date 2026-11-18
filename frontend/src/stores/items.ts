@@ -10,14 +10,12 @@ import { ref, computed, readonly } from 'vue';
 import type {
   Item,
   ItemSearchQuery,
-  ItemFilterRequest,
   PaginatedResponse,
   UserFriendlyError,
+  PaginationInfo,
 } from '../types/api';
 import { apiClient } from '../services/api-client';
-import { itemValidation } from '../utils/item-validation';
-import { gameUtils } from '../services/game-utils';
-import { flagOperations } from '../utils/flag-operations';
+import { toUserFriendlyError } from '../services/error-message';
 
 interface ItemsState {
   // Data
@@ -25,7 +23,7 @@ interface ItemsState {
   searchResults: {
     query: ItemSearchQuery | null;
     results: Item[];
-    pagination: any;
+    pagination: PaginationInfo;
     timestamp: number;
   } | null;
 
@@ -55,10 +53,6 @@ export const useItemsStore = defineStore('items', () => {
   // ============================================================================
 
   const allItems = computed(() => Array.from(items.value.values()));
-
-  const itemsById = computed(
-    () => (ids: number[]) => ids.map((id) => items.value.get(id)).filter(Boolean) as Item[]
-  );
 
   const nanoItems = computed(() => allItems.value.filter((item) => item.is_nano));
 
@@ -103,7 +97,7 @@ export const useItemsStore = defineStore('items', () => {
       if (response.items) {
         // Store individual items in cache
         response.items.forEach((item) => {
-          items.value.set(item.id, item);
+          items.value.set(item.aoid, item);
         });
 
         // Store search results
@@ -126,8 +120,8 @@ export const useItemsStore = defineStore('items', () => {
       } else {
         throw new Error('Search failed');
       }
-    } catch (err: any) {
-      error.value = err;
+    } catch (err) {
+      error.value = toUserFriendlyError(err);
       throw err;
     } finally {
       loading.value = false;
@@ -156,8 +150,8 @@ export const useItemsStore = defineStore('items', () => {
       } else {
         throw new Error(response.error?.message || 'Item not found');
       }
-    } catch (err: any) {
-      error.value = err;
+    } catch (err) {
+      error.value = toUserFriendlyError(err);
       return null;
     } finally {
       loading.value = false;
@@ -169,85 +163,6 @@ export const useItemsStore = defineStore('items', () => {
    */
   function getItemFromCache(aoid: number): Item | null {
     return items.value.get(aoid) || null;
-  }
-
-  /**
-   * Get multiple items by IDs (uses batching)
-   */
-  async function getItems(ids: number[], forceRefresh = false): Promise<Item[]> {
-    const results: Item[] = [];
-    const missingIds: number[] = [];
-
-    // Check cache for existing items
-    if (!forceRefresh) {
-      for (const id of ids) {
-        const cachedItem = items.value.get(id);
-        if (cachedItem) {
-          results.push(cachedItem);
-        } else {
-          missingIds.push(id);
-        }
-      }
-    } else {
-      missingIds.push(...ids);
-    }
-
-    // Fetch missing items
-    if (missingIds.length > 0) {
-      loading.value = true;
-      error.value = null;
-
-      try {
-        const response = await apiClient.getItems(missingIds);
-
-        if (response.success && response.data) {
-          response.data.forEach((item) => {
-            items.value.set(item.aoid!, item); // Cache by AOID
-            results.push(item);
-          });
-          lastFetch.value = Date.now();
-        } else {
-          throw new Error(response.error?.message || 'Items fetch failed');
-        }
-      } catch (err: any) {
-        error.value = err;
-        throw err;
-      } finally {
-        loading.value = false;
-      }
-    }
-
-    // Return items in original order
-    return ids.map((id) => items.value.get(id)!).filter(Boolean);
-  }
-
-  /**
-   * Filter items with advanced criteria
-   */
-  async function filterItems(filter: ItemFilterRequest): Promise<Item[]> {
-    loading.value = true;
-    error.value = null;
-
-    try {
-      const response: PaginatedResponse<Item> = await apiClient.filterItems(filter);
-
-      if (response.items) {
-        // Store individual items in cache
-        response.items.forEach((item) => {
-          items.value.set(item.id, item);
-        });
-
-        lastFetch.value = Date.now();
-        return response.items;
-      } else {
-        throw new Error('Filter failed');
-      }
-    } catch (err: any) {
-      error.value = err;
-      throw err;
-    } finally {
-      loading.value = false;
-    }
   }
 
   /**
@@ -322,49 +237,6 @@ export const useItemsStore = defineStore('items', () => {
   }
 
   /**
-   * Analyze item for specific character (using profile store)
-   */
-  function analyzeItemForCharacter(item: Item, character: any) {
-    if (!character) return null;
-
-    return itemValidation.analyzeItemUsability(item, character);
-  }
-
-  /**
-   * Get item flag information
-   */
-  function getItemFlags(item: Item) {
-    if (!item.flags) return null;
-
-    return {
-      flags: item.flags,
-      decoded: flagOperations.decodeItemFlags(item.flags),
-      canFlags: item.can_flags ? flagOperations.decodeCanFlags(item.can_flags) : [],
-      factionRestriction: flagOperations.checkFactionRestriction(item.flags, 0), // Neutral check
-      canDrop: flagOperations.canDropItem(item.flags),
-    };
-  }
-
-  /**
-   * Format item requirements for display
-   */
-  function formatItemRequirements(item: Item): string[] {
-    if (!item.requirements) return [];
-
-    return item.requirements.map((req) => {
-      const statName = gameUtils.getStatName(req.stat) || `Stat ${req.stat}`;
-      return `${statName}: ${req.value}`;
-    });
-  }
-
-  /**
-   * Calculate item DPS (for weapons)
-   */
-  function calculateItemDPS(item: Item): number {
-    return itemValidation.calculateItemDPS(item);
-  }
-
-  /**
    * Get item statistics
    */
   const getStats = computed(() => ({
@@ -388,7 +260,6 @@ export const useItemsStore = defineStore('items', () => {
 
     // Getters
     allItems,
-    itemsById,
     nanoItems,
     regularItems,
     itemsByClass,
@@ -403,18 +274,10 @@ export const useItemsStore = defineStore('items', () => {
     searchItems,
     getItem,
     getItemFromCache,
-    getItems,
-    filterItems,
     getItemsWithStats,
     clearSearch,
     clearError,
     clearCache,
     preloadCommonItems,
-
-    // Enhanced analysis methods
-    analyzeItemForCharacter,
-    getItemFlags,
-    formatItemRequirements,
-    calculateItemDPS,
   };
 });

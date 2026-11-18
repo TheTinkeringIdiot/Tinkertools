@@ -6,7 +6,7 @@
  * reactive interpolation state, caching, and error handling.
  */
 
-import { ref, computed, watch, onUnmounted, readonly } from 'vue';
+import { ref, computed, watch, onUnmounted, readonly, unref } from 'vue';
 import type { Ref } from 'vue';
 import type { Item, InterpolatedItem, InterpolationInfo } from '../types/api';
 import interpolationService from '../services/interpolation-service';
@@ -17,14 +17,22 @@ import interpolationService from '../services/interpolation-service';
 
 interface UseInterpolationOptions {
   autoLoad?: boolean;
-  cacheResults?: boolean;
   debounceMs?: number;
+  /**
+   * Game version to interpolate against. Defaults to the browsing version;
+   * pass the peeked snapshot's slug when showing an item "as of" that version.
+   */
+  gameVersion?: Ref<string | null | undefined> | string | null;
 }
 
 interface InterpolationError {
   message: string;
   code?: string;
   retryable: boolean;
+}
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : '';
 }
 
 // ============================================================================
@@ -35,7 +43,13 @@ export function useInterpolation(
   aoid: Ref<number | null> = ref(null),
   options: UseInterpolationOptions = {}
 ) {
-  const { autoLoad = true, cacheResults = true, debounceMs = 300 } = options;
+  const { autoLoad = true, debounceMs = 300 } = options;
+
+  /** Resolved at call time so a peek that starts later is still honoured. */
+  function requestOptions(): { gameVersion?: string } | undefined {
+    const slug = unref(options.gameVersion);
+    return slug ? { gameVersion: slug } : undefined;
+  }
 
   // ============================================================================
   // Reactive State
@@ -48,8 +62,12 @@ export function useInterpolation(
   const isLoading = ref(false);
   const error = ref<InterpolationError | null>(null);
 
-  // Debounced loading state
-  let debounceTimeout: number | null = null;
+  // Debounced loading state; callers superseded by a newer request share its result
+  let debounceTimeout: ReturnType<typeof setTimeout> | null = null;
+  let pendingResolvers: Array<(item: InterpolatedItem | null) => void> = [];
+
+  // Re-runs whichever operation failed last, for retry()
+  let lastFailedOperation: (() => Promise<unknown>) | null = null;
 
   // ============================================================================
   // Computed Properties
@@ -113,14 +131,18 @@ export function useInterpolation(
     error.value = null;
 
     try {
-      const info = await interpolationService.getInterpolationInfo(currentAoid.value);
+      const request = requestOptions();
+      const info = request
+        ? await interpolationService.getInterpolationInfo(currentAoid.value, request)
+        : await interpolationService.getInterpolationInfo(currentAoid.value);
       interpolationInfo.value = info;
       return info !== null;
-    } catch (err: any) {
+    } catch (err) {
       error.value = {
-        message: err.message || 'Failed to load interpolation info',
+        message: errorMessage(err) || 'Failed to load interpolation info',
         retryable: true,
       };
+      lastFailedOperation = loadInterpolationInfo;
       return false;
     } finally {
       isLoading.value = false;
@@ -145,26 +167,41 @@ export function useInterpolation(
     }
 
     return new Promise((resolve) => {
-      debounceTimeout = setTimeout(async () => {
-        isLoading.value = true;
-        error.value = null;
-
-        try {
-          const item = await interpolationService.interpolateItem(currentAoid.value!, ql);
-          interpolatedItem.value = item;
-          targetQl.value = ql;
-          resolve(item);
-        } catch (err: any) {
-          error.value = {
-            message: err.message || 'Failed to interpolate item',
-            retryable: true,
-          };
-          resolve(null);
-        } finally {
-          isLoading.value = false;
-        }
+      pendingResolvers.push(resolve);
+      debounceTimeout = setTimeout(() => {
+        debounceTimeout = null;
+        const resolvers = pendingResolvers;
+        pendingResolvers = [];
+        void runInterpolation(ql).then((item) => resolvers.forEach((settle) => settle(item)));
       }, debounceMs);
     });
+  }
+
+  /** Performs the interpolation request; never rejects. */
+  async function runInterpolation(ql: number): Promise<InterpolatedItem | null> {
+    if (!currentAoid.value) return null;
+
+    isLoading.value = true;
+    error.value = null;
+
+    try {
+      const request = requestOptions();
+      const item = request
+        ? await interpolationService.interpolateItem(currentAoid.value, ql, request)
+        : await interpolationService.interpolateItem(currentAoid.value, ql);
+      interpolatedItem.value = item;
+      targetQl.value = ql;
+      return item;
+    } catch (err) {
+      error.value = {
+        message: errorMessage(err) || 'Failed to interpolate item',
+        retryable: true,
+      };
+      lastFailedOperation = () => interpolateToQl(ql);
+      return null;
+    } finally {
+      isLoading.value = false;
+    }
   }
 
   /**
@@ -175,6 +212,7 @@ export function useInterpolation(
     interpolatedItem.value = null;
     targetQl.value = null;
     error.value = null;
+    lastFailedOperation = null;
 
     if (autoLoadInfo) {
       await loadInterpolationInfo();
@@ -221,21 +259,19 @@ export function useInterpolation(
     interpolationInfo.value = null;
     error.value = null;
     isLoading.value = false;
+    lastFailedOperation = null;
   }
 
   /**
    * Retry last failed operation
    */
   async function retry(): Promise<void> {
-    if (!error.value?.retryable) return;
+    if (!error.value?.retryable || !lastFailedOperation) return;
 
+    const operation = lastFailedOperation;
+    lastFailedOperation = null;
     error.value = null;
-
-    if (currentAoid.value && !interpolationInfo.value) {
-      await loadInterpolationInfo();
-    } else if (currentAoid.value && targetQl.value) {
-      await interpolateToQl(targetQl.value);
-    }
+    await operation();
   }
 
   /**
@@ -276,8 +312,12 @@ export function useInterpolation(
 
   // Watch for AOID changes
   watch(aoid, (newAoid) => {
-    if (newAoid !== currentAoid.value) {
-      setItem(newAoid);
+    if (newAoid === currentAoid.value) return;
+    if (newAoid === null) {
+      clear();
+    } else {
+      // setItem records load failures in `error`
+      void setItem(newAoid);
     }
   });
 
@@ -289,6 +329,8 @@ export function useInterpolation(
     if (debounceTimeout) {
       clearTimeout(debounceTimeout);
     }
+    pendingResolvers.forEach((settle) => settle(null));
+    pendingResolvers = [];
   });
 
   // ============================================================================
@@ -296,7 +338,8 @@ export function useInterpolation(
   // ============================================================================
 
   if (autoLoad && currentAoid.value) {
-    loadInterpolationInfo();
+    // loadInterpolationInfo records failures in `error`
+    void loadInterpolationInfo();
   }
 
   // ============================================================================
@@ -389,8 +432,8 @@ export function useInterpolationBatch() {
       } else {
         errors.value.set(key, 'Failed to interpolate item');
       }
-    } catch (error: any) {
-      errors.value.set(key, error.message || 'Unknown error');
+    } catch (error) {
+      errors.value.set(key, errorMessage(error) || 'Unknown error');
     } finally {
       isLoading.value = false;
     }

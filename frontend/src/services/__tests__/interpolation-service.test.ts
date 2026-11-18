@@ -5,7 +5,7 @@
  * for the client-side interpolation functionality.
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi, type Mock } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type {
   Item,
   InterpolatedItem,
@@ -14,6 +14,7 @@ import type {
 } from '../../types/api';
 import interpolationService from '../interpolation-service';
 import { apiClient } from '../api-client';
+import { currentVersion } from '../../composables/useGameVersion';
 
 // Mock the API client
 vi.mock('../api-client', () => ({
@@ -31,15 +32,9 @@ vi.mock('../game-data', () => ({
 }));
 
 describe('InterpolationService', () => {
-  const mockApiClient = apiClient as {
-    interpolateItem: Mock;
-    getInterpolationInfo: Mock;
-    checkItemInterpolatable: Mock;
-    getInterpolationRange: Mock;
-  };
+  const mockApiClient = vi.mocked(apiClient);
 
   const sampleItem: Item = {
-    id: 1,
     aoid: 12345,
     name: 'Test Weapon',
     ql: 100,
@@ -47,17 +42,18 @@ describe('InterpolationService', () => {
     item_class: 1,
     is_nano: false,
     stats: [
-      { id: 1, stat: 1, value: 100 },
-      { id: 2, stat: 2, value: 50 },
+      { stat: 1, value: 100 },
+      { stat: 2, value: 50 },
     ],
     spell_data: [],
     actions: [],
     attack_defense: undefined,
     animation_mesh: undefined,
+    attack_stats: [],
+    defense_stats: [],
   };
 
   const sampleInterpolatedItem: InterpolatedItem = {
-    id: 1,
     aoid: 12345,
     name: 'Test Weapon',
     ql: 150,
@@ -71,8 +67,8 @@ describe('InterpolationService', () => {
     ql_delta: 50,
     ql_delta_full: 100,
     stats: [
-      { id: 1, stat: 1, value: 150 },
-      { id: 2, stat: 2, value: 75 },
+      { stat: 1, value: 150 },
+      { stat: 2, value: 75 },
     ],
     spell_data: [],
     actions: [],
@@ -81,6 +77,7 @@ describe('InterpolationService', () => {
   const sampleInterpolationInfo: InterpolationInfo = {
     aoid: 12345,
     interpolatable: true,
+    ranges: [{ min_ql: 100, max_ql: 200, interpolatable: true, base_aoid: 12345 }],
     min_ql: 100,
     max_ql: 200,
     ql_range: 101,
@@ -304,7 +301,7 @@ describe('InterpolationService', () => {
     it('should handle interpolation info failure', async () => {
       const mockResponse = {
         success: false,
-        data: null,
+        data: undefined,
       };
 
       mockApiClient.getInterpolationInfo.mockResolvedValue(mockResponse);
@@ -395,8 +392,8 @@ describe('InterpolationService', () => {
     });
 
     it('should use cached info when available', () => {
-      // Manually set cached info
-      interpolationService['infoCache'].set(12345, {
+      // Manually set cached info. Info is cached per game version.
+      interpolationService['infoCache'].set(`${currentVersion.value}:12345`, {
         ...sampleInterpolationInfo,
         interpolatable: false,
       });
@@ -411,7 +408,7 @@ describe('InterpolationService', () => {
     it('should convert Item to InterpolatedItem', () => {
       const result = interpolationService.itemToInterpolatedItem(sampleItem);
 
-      expect(result.id).toBe(sampleItem.id);
+      expect(result.aoid).toBe(sampleItem.aoid);
       expect(result.aoid).toBe(sampleItem.aoid);
       expect(result.name).toBe(sampleItem.name);
       expect(result.interpolating).toBe(false);
@@ -424,17 +421,19 @@ describe('InterpolationService', () => {
 
     it('should handle items without optional properties', () => {
       const minimalItem: Item = {
-        id: 1,
+        aoid: 1,
         name: 'Minimal Item',
         is_nano: false,
         stats: [],
         spell_data: [],
         actions: [],
+        attack_stats: [],
+        defense_stats: [],
       };
 
       const result = interpolationService.itemToInterpolatedItem(minimalItem);
 
-      expect(result.aoid).toBeUndefined();
+      expect(result.aoid).toBe(1);
       expect(result.ql).toBeUndefined();
       expect(result.description).toBeUndefined();
       expect(result.interpolating).toBe(false);
@@ -445,15 +444,14 @@ describe('InterpolationService', () => {
         ...sampleItem,
         spell_data: [
           {
-            id: 1,
             event: 1,
             spells: [
               {
-                id: 1,
                 target: 1,
                 tick_count: 5,
                 spell_id: 12345,
                 spell_params: { test: 'value' },
+                criteria: [],
               },
             ],
           },
@@ -523,7 +521,7 @@ describe('InterpolationService', () => {
     it('should handle malformed API responses', async () => {
       mockApiClient.interpolateItem.mockResolvedValue({
         success: true,
-        item: null, // Malformed response
+        item: undefined, // Malformed response: success without an item
       });
 
       const result = await interpolationService.interpolateItem(12345, 150);

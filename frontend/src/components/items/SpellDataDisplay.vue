@@ -19,15 +19,19 @@ Shows item spell effects in a compact, scannable table format following WeaponSt
 
         <!-- Compact Mode (for simple effects) -->
         <div v-if="useCompactMode" class="compact-effects">
-          <div v-for="spellData in formattedSpellData" :key="spellData.id" class="effect-group">
+          <div
+            v-for="(effectGroup, groupIndex) in formattedSpellData"
+            :key="groupIndex"
+            class="effect-group"
+          >
             <div class="effect-header">
-              <span class="event-icon">{{ getEventIcon(spellData.event || 0) }}</span>
-              <span class="event-name">{{ spellData.eventName || 'Effect' }}</span>
+              <span class="event-icon">{{ getEventIcon(effectGroup.event || 0) }}</span>
+              <span class="event-name">{{ effectGroup.eventName || 'Effect' }}</span>
             </div>
             <div class="spells-list">
               <div
-                v-for="spell in visibleSpells(spellData.spells)"
-                :key="spell.id"
+                v-for="(spell, spellIndex) in visibleSpells(effectGroup.spells)"
+                :key="spellIndex"
                 class="spell-compact"
               >
                 <span class="spell-text">{{ spell.formattedText }}</span>
@@ -61,17 +65,17 @@ Shows item spell effects in a compact, scannable table format following WeaponSt
 
             <!-- Data Rows -->
             <tbody>
-              <template v-for="spellData in formattedSpellData" :key="spellData.id">
+              <template v-for="(effectGroup, groupIndex) in formattedSpellData" :key="groupIndex">
                 <tr
-                  v-for="(spell, index) in visibleSpells(spellData.spells)"
-                  :key="spell.id"
+                  v-for="(spell, index) in visibleSpells(effectGroup.spells)"
+                  :key="index"
                   class="data-row"
                 >
                   <!-- Event Column (only show for first spell in group) -->
                   <td class="table-cell event-cell">
                     <div v-if="index === 0" class="event-display">
-                      <span class="event-icon">{{ getEventIcon(spellData.event || 0) }}</span>
-                      <span class="event-name">{{ spellData.eventName || 'Effect' }}</span>
+                      <span class="event-icon">{{ getEventIcon(effectGroup.event || 0) }}</span>
+                      <span class="event-name">{{ effectGroup.eventName || 'Effect' }}</span>
                     </div>
                   </td>
 
@@ -142,17 +146,16 @@ Shows item spell effects in a compact, scannable table format following WeaponSt
 <script setup lang="ts">
 import { computed } from 'vue';
 import Card from 'primevue/card';
-import type { SpellData, TinkerProfile } from '@/types/api';
+import type { SpellData } from '@/types/api';
+import type { ReadonlyTinkerProfile } from '@/lib/tinkerprofiles/types';
 import {
   formatSpellDataList,
   shouldUseCompactMode,
   getSpellDataSummary,
   getEventIcon,
-  type FormattedSpellData,
   type FormattedSpell,
 } from '@/services/spell-data-utils';
 import CriteriaDisplay from '@/components/CriteriaDisplay.vue';
-import SpellParameters from './SpellParameters.vue';
 import SpellText from './SpellText.vue';
 
 // ============================================================================
@@ -161,7 +164,7 @@ import SpellText from './SpellText.vue';
 
 interface Props {
   spellData: SpellData[];
-  profile?: TinkerProfile | null;
+  profile?: ReadonlyTinkerProfile | null;
   showHidden?: boolean;
   advancedView?: boolean;
 }
@@ -208,7 +211,7 @@ const spellDataSummary = computed(() => {
   return getSpellDataSummary(formattedSpellData.value);
 });
 
-const characterStats = computed(() => {
+const characterStats = computed((): Record<number, number> => {
   if (!props.profile?.skills) return {};
 
   // Convert TinkerProfile to character stats format expected by CriteriaDisplay
@@ -239,20 +242,6 @@ function visibleSpells(spells: FormattedSpell[]): FormattedSpell[] {
 function formatTickInterval(tickInterval: number): string {
   // Convert tick interval to seconds (assuming 100 ticks per second)
   return (tickInterval / 100).toFixed(1);
-}
-
-function getStatIdFromSkillName(skillName: string): number | null {
-  // Simplified mapping - in a real implementation this would be comprehensive
-  const skillMap: Record<string, number> = {
-    Strength: 16,
-    Agility: 17,
-    Stamina: 18,
-    Intelligence: 19,
-    Sense: 20,
-    Psychic: 21,
-    // Add more mappings as needed
-  };
-  return skillMap[skillName] || null;
 }
 </script>
 

@@ -1,37 +1,64 @@
+import threading
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
+from starlette.concurrency import run_in_threadpool
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.core.config import settings
+from app.core.version_middleware import GameVersionMiddleware
 from app.api.routes.health import router as health_router
+from app.api.routes.versions import router as versions_router
+from app.api.routes.item_revisions import router as item_revisions_router
+from app.api.routes.changes import router as changes_router
 from app.api.routes.items import router as items_router
+from app.api.routes.legacy_item_ids import router as legacy_item_ids_router
 from app.api.routes.implants import router as implants_router
 from app.api.routes.nanos import router as nanos_router
-from app.api.routes.spells import router as spells_router
 from app.api.routes.symbiants import router as symbiants_router
 from app.api.routes.mobs import router as mobs_router
-from app.api.routes.stat_values import router as stat_values_router
 from app.api.routes.cache import router as cache_router
-from app.api.routes.performance import router as performance_router
 from app.api.routes.aosetups import router as aosetups_router
-from app.api.routes.equipment_bonuses import router as equipment_bonuses_router
 from app.api.routes.perks import router as perks_router
 from app.api.routes.weapons import router as weapons_router
+from app.store import comparison
+
+_preloaded = threading.Event()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Has what build comparisons read of every revision in memory before
+    the first request is taken: 0.4 s of loading that the first comparison
+    would otherwise wait for. Once per process."""
+    if not _preloaded.is_set():
+        _preloaded.set()
+        await run_in_threadpool(comparison.preload)
+    yield
+
 
 app = FastAPI(
     title="TinkerTools API",
     description="API for TinkerTools - Anarchy Online game data utilities",
     version="1.0.0",
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
 # CORS - Environment-based origin configuration
 # Development: Allow all origins for flexibility
 # Production: Restrict to configured origins
-origins = ["*"] if settings.APP_ENV == "development" else settings.CORS_ORIGINS.split(",")
+origins = (
+    ["*"] if settings.APP_ENV == "development" else settings.CORS_ORIGINS.split(",")
+)
+
+# Resolves /api/v1/<version>/... to the build the version names.
+# Added before CORS so CORS is the outermost layer.
+app.add_middleware(GameVersionMiddleware, api_prefix="/api/v1")
 
 app.add_middleware(
     CORSMiddleware,
@@ -41,16 +68,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 # Exception handlers
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):
     return JSONResponse(
         status_code=exc.status_code,
-        content={
-            "error": exc.detail,
-            "code": f"HTTP_{exc.status_code}"
-        }
+        content={"error": exc.detail, "code": f"HTTP_{exc.status_code}"},
     )
+
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
@@ -61,7 +87,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
             "type": error.get("type"),
             "loc": error.get("loc"),
             "msg": error.get("msg"),
-            "input": error.get("input")
+            "input": error.get("input"),
         }
         # Convert ctx ValueError to string if present
         if "ctx" in error and "error" in error["ctx"]:
@@ -73,35 +99,38 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         content={
             "error": "Validation error",
             "code": "VALIDATION_ERROR",
-            "details": errors
-        }
+            "details": errors,
+        },
     )
+
 
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
     return JSONResponse(
         status_code=500,
-        content={
-            "error": "Internal server error",
-            "code": "INTERNAL_ERROR"
-        }
+        content={"error": "Internal server error", "code": "INTERNAL_ERROR"},
     )
+
 
 # Include routers
 app.include_router(health_router, prefix="")
+# Cross-version routers first: item_revisions owns /items/revisions/batch,
+# and changes owns /items/{aoid}/timeline and /items/{aoid}/compare/{base},
+# which must not be captured by the /items/{aoid} patterns in items_router.
+app.include_router(versions_router, prefix="/api/v1")
+app.include_router(item_revisions_router, prefix="/api/v1")
+app.include_router(changes_router, prefix="/api/v1")
 app.include_router(items_router, prefix="/api/v1")
+app.include_router(legacy_item_ids_router, prefix="/api/v1")
 app.include_router(implants_router, prefix="/api/v1")
 app.include_router(nanos_router, prefix="/api/v1")
-app.include_router(spells_router, prefix="/api/v1")
 app.include_router(symbiants_router, prefix="/api/v1")
 app.include_router(mobs_router, prefix="/api/v1")
-app.include_router(stat_values_router, prefix="/api/v1")
 app.include_router(cache_router, prefix="/api/v1")
-app.include_router(performance_router, prefix="/api/v1")
 app.include_router(aosetups_router, prefix="/api/v1")
-app.include_router(equipment_bonuses_router, prefix="/api/v1")
 app.include_router(perks_router, prefix="/api/v1")
 app.include_router(weapons_router, prefix="/api/v1")
+
 
 @app.get("/")
 async def root():
@@ -110,5 +139,5 @@ async def root():
         "name": "TinkerTools API",
         "version": "1.0.0",
         "documentation": "/docs",
-        "health": "/health"
+        "health": "/health",
     }

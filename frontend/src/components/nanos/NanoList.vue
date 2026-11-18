@@ -48,14 +48,12 @@ Displays nano programs in a scrollable list with compatibility indicators
         <div class="grid gap-4" :class="compactView ? 'grid-cols-1' : 'grid-cols-1'">
           <NanoCard
             v-for="nano in paginatedNanos"
-            :key="nano.id"
+            :key="nano.aoid"
             :nano="nano"
             :compact="compactView"
             :show-compatibility="showCompatibility"
-            :active-profile="activeProfile"
             :compatibility-info="getCompatibilityInfo(nano)"
             @select="handleNanoSelect"
-            @favorite="handleFavorite"
           />
         </div>
       </div>
@@ -96,12 +94,15 @@ Displays nano programs in a scrollable list with compatibility indicators
 import { ref, computed, watch, onMounted } from 'vue';
 import Badge from 'primevue/badge';
 import Dropdown from 'primevue/dropdown';
-import Paginator from 'primevue/paginator';
+import Paginator, { type PageState } from 'primevue/paginator';
 import ProgressSpinner from 'primevue/progressspinner';
 import ToggleButton from 'primevue/togglebutton';
 
 import NanoCard from './NanoCard.vue';
-import type { NanoProgram, TinkerProfile, NanoCompatibilityInfo } from '@/types/nano';
+import { getNanoCompatibility } from './nano-compatibility';
+import { mapProfileToStats } from '@/utils/profile-stats-mapper';
+import type { ReadonlyTinkerProfile } from '@/lib/tinkerprofiles/types';
+import type { NanoProgram, NanoCompatibilityInfo } from '@/types/nano';
 
 // Props
 const props = withDefaults(
@@ -109,20 +110,32 @@ const props = withDefaults(
     nanos: NanoProgram[];
     loading?: boolean;
     showCompatibility?: boolean;
-    activeProfile?: TinkerProfile | null;
+    activeProfile?: ReadonlyTinkerProfile | null;
+    /**
+     * Set when the server pages the results: nanos is then the current page,
+     * this the size of the whole result set, and page changes are emitted
+     * for the parent to load
+     */
+    totalRecords?: number | null;
+    /** The server page shown (1-based), with totalRecords */
+    page?: number;
+    /** The server page size, with totalRecords */
+    rows?: number;
   }>(),
   {
     loading: false,
     showCompatibility: false,
     activeProfile: null,
+    totalRecords: null,
+    page: 1,
+    rows: 25,
   }
 );
 
 // Emits
 const emit = defineEmits<{
   'nano-select': [nano: NanoProgram];
-  'page-change': [page: number];
-  favorite: [nanoId: number, isFavorite: boolean];
+  'page-change': [page: number, rows: number];
 }>();
 
 // Reactive state
@@ -134,110 +147,40 @@ const first = ref(0);
 const itemsPerPageOptions = [10, 25, 50, 100];
 
 // Computed
-const totalNanos = computed(() => props.nanos.length);
+const serverPaged = computed(() => props.totalRecords !== null);
+const totalNanos = computed(() => props.totalRecords ?? props.nanos.length);
 
 const totalPages = computed(() => Math.ceil(totalNanos.value / itemsPerPage.value));
 
+// The profile as a stat-ID map, built once for every card
+const characterStats = computed(() =>
+  props.showCompatibility && props.activeProfile ? mapProfileToStats(props.activeProfile) : null
+);
+
 const paginatedNanos = computed(() => {
+  if (serverPaged.value) return props.nanos;
   const start = currentPage.value * itemsPerPage.value;
   const end = start + itemsPerPage.value;
   return props.nanos.slice(start, end);
 });
 
 // Methods
-const getCompatibilityInfo = (nano: NanoProgram): NanoCompatibilityInfo | null => {
-  if (!props.showCompatibility || !props.activeProfile) {
-    return null;
-  }
-
-  const profile = props.activeProfile;
-  const requirements = nano.castingRequirements || [];
-
-  let canCast = true;
-  let skillDeficits: { skill: string; current: number; required: number; deficit: number }[] = [];
-  let statDeficits: { stat: string; current: number; required: number; deficit: number }[] = [];
-  let levelDeficit = 0;
-
-  // Check each requirement
-  for (const req of requirements) {
-    switch (req.type) {
-      case 'skill':
-        const skill = req.requirement as string;
-        const currentSkill = profile.skills[skill] || 0;
-        if (currentSkill < req.value) {
-          canCast = false;
-          skillDeficits.push({
-            skill,
-            current: currentSkill,
-            required: req.value,
-            deficit: req.value - currentSkill,
-          });
-        }
-        break;
-
-      case 'stat':
-        const stat = req.requirement as string;
-        const currentStat = profile.stats[stat] || 0;
-        if (currentStat < req.value) {
-          canCast = false;
-          statDeficits.push({
-            stat,
-            current: currentStat,
-            required: req.value,
-            deficit: req.value - currentStat,
-          });
-        }
-        break;
-
-      case 'level':
-        if (profile.level < req.value) {
-          canCast = false;
-          levelDeficit = req.value - profile.level;
-        }
-        break;
-    }
-  }
-
-  // Calculate compatibility score (0-100)
-  const totalRequirements = requirements.length;
-  const metRequirements =
-    totalRequirements - skillDeficits.length - statDeficits.length - (levelDeficit > 0 ? 1 : 0);
-  const compatibilityScore =
-    totalRequirements > 0 ? Math.round((metRequirements / totalRequirements) * 100) : 100;
-
-  // Calculate skill gap (average deficit across all skill requirements)
-  const allSkillReqs = requirements.filter((req) => req.type === 'skill');
-  let averageSkillGap = 0;
-
-  if (allSkillReqs.length > 0) {
-    const totalGap = skillDeficits.reduce((sum, deficit) => sum + deficit.deficit, 0);
-    averageSkillGap = Math.round(totalGap / allSkillReqs.length);
-  }
-
-  return {
-    canCast,
-    compatibilityScore,
-    averageSkillGap,
-    skillDeficits,
-    statDeficits,
-    levelDeficit,
-    memoryUsage: nano.memoryUsage || 0,
-    nanoPointCost: nano.nanoPointCost || 0,
-  };
-};
+const getCompatibilityInfo = (nano: NanoProgram): NanoCompatibilityInfo | null =>
+  characterStats.value ? getNanoCompatibility(nano, characterStats.value) : null;
 
 const handleNanoSelect = (nano: NanoProgram) => {
   emit('nano-select', nano);
 };
 
-const handleFavorite = (nanoId: number, isFavorite: boolean) => {
-  emit('favorite', nanoId, isFavorite);
-};
-
-const handlePageChange = (event: any) => {
-  currentPage.value = Math.floor(event.first / itemsPerPage.value);
-  first.value = event.first;
-  emit('page-change', currentPage.value + 1);
+const handlePageChange = (event: PageState) => {
+  if (serverPaged.value) {
+    itemsPerPage.value = event.rows;
+    emit('page-change', event.page + 1, event.rows);
+  } else {
+    currentPage.value = Math.floor(event.first / itemsPerPage.value);
+    first.value = event.first;
+    emit('page-change', currentPage.value + 1, itemsPerPage.value);
+  }
 
   // Scroll to top of list
   const listElement = document.querySelector('.nano-list .overflow-auto');
@@ -250,6 +193,7 @@ const handleItemsPerPageChange = () => {
   // Reset to first page when changing items per page
   currentPage.value = 0;
   first.value = 0;
+  if (serverPaged.value) emit('page-change', 1, itemsPerPage.value);
 };
 
 // Load preferences
@@ -260,6 +204,9 @@ const loadPreferences = () => {
       const parsed = JSON.parse(preferences);
       compactView.value = parsed.compactView || false;
       itemsPerPage.value = parsed.itemsPerPage || 25;
+      if (serverPaged.value && itemsPerPage.value !== props.rows) {
+        emit('page-change', 1, itemsPerPage.value);
+      }
     }
   } catch (error) {
     console.warn('Failed to load nano list preferences:', error);
@@ -283,14 +230,26 @@ watch([compactView, itemsPerPage], () => {
   savePreferences();
 });
 
-// Reset pagination when nanos change
+// Reset pagination when nanos change (the parent pages server results itself)
 watch(
   () => props.nanos,
   () => {
+    if (serverPaged.value) return;
     currentPage.value = 0;
     first.value = 0;
   },
   { flush: 'post' }
+);
+
+// Server paging: the paginator follows the page the parent loaded
+watch(
+  () => [serverPaged.value, props.page, props.rows] as const,
+  ([server, page, rows]) => {
+    if (!server) return;
+    itemsPerPage.value = rows;
+    first.value = (page - 1) * rows;
+  },
+  { immediate: true }
 );
 
 // Lifecycle

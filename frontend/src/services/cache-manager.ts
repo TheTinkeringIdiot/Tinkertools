@@ -5,6 +5,7 @@
  */
 
 import type { CacheEntry, CacheConfig } from '../types/api';
+import { versionKey, trailingVersionOf, activeVersionSlug } from './version-keys';
 
 // ============================================================================
 // Cache Configuration
@@ -130,12 +131,12 @@ class LocalStorageAdapter implements StorageAdapter {
         try {
           const cached = this.getItem(key);
           if (cached) {
-            const entry = JSON.parse(cached) as CacheEntry<any>;
+            const entry = JSON.parse(cached) as CacheEntry<unknown>;
             if (entry.expiry < Date.now()) {
               keysToRemove.push(key);
             }
           }
-        } catch (err) {
+        } catch {
           // Invalid cache entry, remove it
           keysToRemove.push(key);
         }
@@ -255,6 +256,31 @@ export class CacheManager {
     }
   }
 
+  /**
+   * Drop every cached entry that belongs to a game version other than `slug`
+   * (default: the active one). Called on version switch so the other snapshot's
+   * responses do not sit in the quota until their TTL expires.
+   */
+  async purgeOtherVersions(slug?: string): Promise<number> {
+    const keep = slug ?? activeVersionSlug();
+    const doomed: string[] = [];
+
+    try {
+      for (let i = 0; i < this.storage.length; i++) {
+        const key = this.storage.key(i);
+        if (!key?.startsWith(this.keyPrefix)) continue;
+        const owner = trailingVersionOf(key);
+        if (owner !== null && owner !== keep) doomed.push(key);
+      }
+    } catch (err) {
+      console.warn('Cache version purge failed:', err);
+      return 0;
+    }
+
+    doomed.forEach((key) => this.storage.removeItem(key));
+    return doomed.length;
+  }
+
   // ============================================================================
   // Specialized Cache Operations
   // ============================================================================
@@ -264,7 +290,7 @@ export class CacheManager {
    */
   async cacheApiResponse<T>(
     endpoint: string,
-    params: Record<string, any>,
+    params: Record<string, unknown>,
     data: T,
     ttl?: number
   ): Promise<void> {
@@ -275,7 +301,10 @@ export class CacheManager {
   /**
    * Get cached API response
    */
-  async getCachedApiResponse<T>(endpoint: string, params: Record<string, any>): Promise<T | null> {
+  async getCachedApiResponse<T>(
+    endpoint: string,
+    params: Record<string, unknown>
+  ): Promise<T | null> {
     const key = this.generateApiKey(endpoint, params);
     return await this.get<T>(key);
   }
@@ -283,7 +312,7 @@ export class CacheManager {
   /**
    * Cache search results with pagination info
    */
-  async cacheSearchResults<T>(query: any, results: T[], pagination: any): Promise<void> {
+  async cacheSearchResults<T>(query: unknown, results: T[], pagination: unknown): Promise<void> {
     const key = this.generateSearchKey(query);
     const cacheData = {
       results,
@@ -298,8 +327,8 @@ export class CacheManager {
    * Get cached search results
    */
   async getCachedSearchResults<T>(
-    query: any
-  ): Promise<{ results: T[]; pagination: any; query: any } | null> {
+    query: unknown
+  ): Promise<{ results: T[]; pagination: unknown; query: unknown } | null> {
     const key = this.generateSearchKey(query);
     return await this.get(key);
   }
@@ -307,7 +336,7 @@ export class CacheManager {
   /**
    * Cache computed/calculated data
    */
-  async cacheCalculation<T>(calculationId: string, params: any, result: T): Promise<void> {
+  async cacheCalculation<T>(calculationId: string, params: unknown, result: T): Promise<void> {
     const key = `calc_${calculationId}_${this.hashParams(params)}`;
     await this.set(key, result, this.config.dynamicData.ttl);
   }
@@ -315,7 +344,7 @@ export class CacheManager {
   /**
    * Get cached calculation result
    */
-  async getCachedCalculation<T>(calculationId: string, params: any): Promise<T | null> {
+  async getCachedCalculation<T>(calculationId: string, params: unknown): Promise<T | null> {
     const key = `calc_${calculationId}_${this.hashParams(params)}`;
     return await this.get(key);
   }
@@ -368,12 +397,12 @@ export class CacheManager {
           try {
             const cached = this.storage.getItem(key);
             if (cached) {
-              const entry = JSON.parse(cached) as CacheEntry<any>;
+              const entry = JSON.parse(cached) as CacheEntry<unknown>;
               if (entry.expiry < Date.now()) {
                 keysToRemove.push(key);
               }
             }
-          } catch (err) {
+          } catch {
             // Invalid cache entry, remove it
             keysToRemove.push(key);
           }
@@ -408,7 +437,7 @@ export class CacheManager {
           const cached = this.storage.getItem(key);
           if (cached) {
             try {
-              const entry = JSON.parse(cached) as CacheEntry<any>;
+              const entry = JSON.parse(cached) as CacheEntry<unknown>;
               const size = new Blob([cached]).size;
               const expired = entry.expiry < Date.now();
 
@@ -421,7 +450,7 @@ export class CacheManager {
 
               totalSize += size;
               if (expired) expiredCount++;
-            } catch (err) {
+            } catch {
               // Invalid entry
             }
           }
@@ -461,22 +490,30 @@ export class CacheManager {
     return this.config.dynamicData.ttl;
   }
 
-  private generateApiKey(endpoint: string, params: Record<string, any>): string {
+  /**
+   * The game version slug is appended, never prefixed: getTTLForKey matches on
+   * substrings such as 'items' or 'search-results', and a leading slug would
+   * not break that, but a trailing one keeps the endpoint at the front of the
+   * key where it stays readable in DevTools.
+   */
+  private generateApiKey(endpoint: string, params: Record<string, unknown>): string {
     const normalizedEndpoint = endpoint.replace(/^\/+|\/+$/g, '').replace(/\/+/g, '_');
     const paramsHash = this.hashParams(params);
-    return `api_${normalizedEndpoint}_${paramsHash}`;
+    return versionKey(`api_${normalizedEndpoint}_${paramsHash}`);
   }
 
-  private generateSearchKey(query: any): string {
+  private generateSearchKey(query: unknown): string {
     const queryHash = this.hashParams(query);
-    return `search_${queryHash}`;
+    return versionKey(`search_${queryHash}`);
   }
 
-  private hashParams(params: any): string {
+  private hashParams(params: unknown): string {
     try {
-      const normalized = JSON.stringify(params, Object.keys(params).sort());
+      const keys =
+        typeof params === 'object' && params !== null ? Object.keys(params).sort() : undefined;
+      const normalized = JSON.stringify(params, keys);
       return this.simpleHash(normalized);
-    } catch (err) {
+    } catch {
       return this.simpleHash(String(params));
     }
   }
@@ -502,14 +539,15 @@ export const cacheManager = new CacheManager();
 if (typeof window !== 'undefined') {
   setInterval(
     () => {
-      cacheManager.cleanup();
+      // cleanup() catches and logs its own errors
+      void cacheManager.cleanup();
     },
     15 * 60 * 1000
   );
 
   // Cleanup on page unload
   window.addEventListener('beforeunload', () => {
-    cacheManager.cleanup();
+    void cacheManager.cleanup();
   });
 }
 

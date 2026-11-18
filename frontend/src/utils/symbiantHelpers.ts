@@ -4,30 +4,37 @@ import type { Symbiant } from '@/types/api';
 export function getSymbiantDisplayName(symbiant: Symbiant): string {
   if (symbiant.name) return symbiant.name;
   if (symbiant.family) return `${symbiant.family} Symbiant`;
-  return `Symbiant ${symbiant.aoid || symbiant.id}`;
+  return `Symbiant ${symbiant.aoid}`;
 }
 
 export function getSymbiantSlotId(symbiant: Symbiant): number {
   if (symbiant.slot_id !== undefined) return symbiant.slot_id;
 
-  // Generate placeholder slot_id based on id
-  return (symbiant.id || 0) % 10;
+  // Generate placeholder slot_id based on AOID
+  return (symbiant.aoid || 0) % 10;
 }
 
 export function getSymbiantQL(symbiant: Symbiant): number {
   if (symbiant.ql) return symbiant.ql;
 
   // Generate placeholder QL between 50-300
-  return 50 + ((symbiant.id || 0) % 251);
+  return 50 + ((symbiant.aoid || 0) % 251);
 }
 
-export function getSymbiantFamily(symbiant: Symbiant): 'Artillery' | 'Control' | 'Extermination' | 'Infantry' | 'Support' {
+export function getSymbiantFamily(
+  symbiant: Symbiant
+): 'Artillery' | 'Control' | 'Extermination' | 'Infantry' | 'Support' {
   if (symbiant.family) return symbiant.family;
 
   // Generate placeholder families
-  const families: Array<'Artillery' | 'Control' | 'Extermination' | 'Infantry' | 'Support'> =
-    ['Artillery', 'Control', 'Extermination', 'Infantry', 'Support'];
-  const index = (symbiant.id || 0) % families.length;
+  const families: Array<'Artillery' | 'Control' | 'Extermination' | 'Infantry' | 'Support'> = [
+    'Artillery',
+    'Control',
+    'Extermination',
+    'Infantry',
+    'Support',
+  ];
+  const index = (symbiant.aoid || 0) % families.length;
   return families[index];
 }
 

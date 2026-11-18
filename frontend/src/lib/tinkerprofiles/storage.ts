@@ -6,9 +6,11 @@
  */
 
 import type { TinkerProfile, ProfileStorageOptions, ProfileMetadata } from './types';
-import { STORAGE_KEYS, CURRENT_VERSION } from './constants';
+import { STORAGE_KEYS } from './constants';
 import { toRaw } from 'vue';
 import { getProfessionName, getBreedName } from '../../services/game-utils';
+import { currentGameVersion, stampGameVersion } from './game-version';
+import { legacyDataVersion } from '@/composables/useGameVersion';
 
 export class ProfileStorage {
   private options: ProfileStorageOptions;
@@ -62,6 +64,11 @@ export class ProfileStorage {
           `Invalid profile version: ${profile.version}. Only v4.0.0 profiles are supported.`
         );
       }
+
+      // Never persist an untagged profile: everything saved from here on knows
+      // which game database it was built against. New profiles are tagged when
+      // created, so an untagged one here predates multi-version support.
+      stampGameVersion(profile, legacyDataVersion());
 
       // Prepare profile for v4.0.0 serialization (stores computed totals)
       const profileToSave = this.prepareProfileForSerialization(profile);
@@ -142,6 +149,18 @@ export class ProfileStorage {
         console.log(`[ProfileStorage] Auto-migrated profile ${profileId} Character IDs`);
       }
 
+      // Tag profiles written before multi-version support with the version whose
+      // database they were built against (the hostname's default, not whatever
+      // version this visit happens to open on), and persist it so this happens once.
+      if (!migrated.gameVersion) {
+        const slug = legacyDataVersion();
+        stampGameVersion(migrated, slug);
+        await this.saveProfile(migrated);
+        console.log(
+          `[ProfileStorage] Tagged profile ${profileId} with game version '${slug}' (pre-version-support profile)`
+        );
+      }
+
       return migrated;
     } catch (error) {
       console.error('Failed to load profile:', error);
@@ -217,6 +236,7 @@ export class ProfileStorage {
             created: profile.created,
             updated: profile.updated,
             version: profile.version,
+            gameVersion: profile.gameVersion,
           });
         }
       }
@@ -229,18 +249,58 @@ export class ProfileStorage {
   }
 
   // ============================================================================
-  // Active Profile Management
+  // Active Profile Management (per game version)
   // ============================================================================
 
   /**
-   * Set the active profile ID
+   * localStorage key holding the active profile for one game version.
+   *
+   * The active profile is per version so that equip checks, TinkerFite and
+   * TinkerNukes never read a profile built against a different database.
    */
-  async setActiveProfile(profileId: string | null): Promise<void> {
+  private activeProfileKey(versionSlug: string): string {
+    return `${STORAGE_KEYS.ACTIVE_PROFILE_PREFIX}${versionSlug}`;
+  }
+
+  /**
+   * Move the old global active-profile key under the legacy data version, once.
+   *
+   * Before multi-version support there was a single `tinkertools_active_profile`.
+   * The profile it points at is stamped with legacyDataVersion() on load, so the
+   * pointer belongs under that same version, whichever version is being browsed.
+   */
+  private migrateLegacyActiveProfile(): void {
     try {
+      const versionSlug = legacyDataVersion();
+      const legacy = localStorage.getItem(STORAGE_KEYS.ACTIVE_PROFILE);
+      if (!legacy) return;
+
+      const key = this.activeProfileKey(versionSlug);
+      if (!localStorage.getItem(key)) {
+        localStorage.setItem(key, legacy);
+        console.log(
+          `[ProfileStorage] Migrated active profile '${legacy}' to game version '${versionSlug}'`
+        );
+      }
+      localStorage.removeItem(STORAGE_KEYS.ACTIVE_PROFILE);
+    } catch (error) {
+      console.warn('[ProfileStorage] Failed to migrate legacy active profile:', error);
+    }
+  }
+
+  /**
+   * Set the active profile ID for a game version (defaults to the current one)
+   */
+  async setActiveProfile(profileId: string | null, versionSlug?: string): Promise<void> {
+    try {
+      const slug = versionSlug ?? currentGameVersion();
+      this.migrateLegacyActiveProfile();
+
+      const key = this.activeProfileKey(slug);
       if (profileId) {
-        localStorage.setItem(STORAGE_KEYS.ACTIVE_PROFILE, profileId);
+        localStorage.setItem(key, profileId);
       } else {
-        localStorage.removeItem(STORAGE_KEYS.ACTIVE_PROFILE);
+        localStorage.removeItem(key);
       }
     } catch (error) {
       throw new Error(
@@ -250,11 +310,13 @@ export class ProfileStorage {
   }
 
   /**
-   * Get the active profile ID
+   * Get the active profile ID for a game version (defaults to the current one)
    */
-  getActiveProfileId(): string | null {
+  getActiveProfileId(versionSlug?: string): string | null {
     try {
-      return localStorage.getItem(STORAGE_KEYS.ACTIVE_PROFILE);
+      const slug = versionSlug ?? currentGameVersion();
+      this.migrateLegacyActiveProfile();
+      return localStorage.getItem(this.activeProfileKey(slug));
     } catch (error) {
       console.error('Failed to get active profile ID:', error);
       return null;
@@ -262,26 +324,44 @@ export class ProfileStorage {
   }
 
   /**
-   * Load the active profile
+   * Load the active profile for a game version (defaults to the current one).
+   *
+   * A pointer to a profile that has since been deleted, or that belongs to a
+   * different version, is cleared rather than returned.
    */
-  async loadActiveProfile(): Promise<TinkerProfile | null> {
-    const activeId = this.getActiveProfileId();
+  async loadActiveProfile(versionSlug?: string): Promise<TinkerProfile | null> {
+    const slug = versionSlug ?? currentGameVersion();
+    const activeId = this.getActiveProfileId(versionSlug);
     if (!activeId) return null;
 
-    return await this.loadProfile(activeId);
+    const profile = await this.loadProfile(activeId);
+    if (!profile) {
+      await this.setActiveProfile(null, slug);
+      return null;
+    }
+
+    if (profile.gameVersion && profile.gameVersion !== slug) {
+      console.warn(
+        `[ProfileStorage] Active profile ${activeId} belongs to '${profile.gameVersion}', not '${slug}'; clearing`
+      );
+      await this.setActiveProfile(null, slug);
+      return null;
+    }
+
+    return profile;
   }
 
   // ============================================================================
   // Compression (Future Enhancement)
   // ============================================================================
 
-  private async compress(data: any): Promise<string> {
+  private async compress(data: TinkerProfile): Promise<string> {
     // For now, just return JSON string
     // In future, could implement actual compression
     return JSON.stringify(data);
   }
 
-  private async decompress(data: string): Promise<any> {
+  private async decompress(data: string): Promise<TinkerProfile> {
     // For now, just parse JSON
     // In future, could implement actual decompression
     return JSON.parse(data);
@@ -334,22 +414,6 @@ export class ProfileStorage {
     }
   }
 
-  /**
-   * Save all profiles to storage (DEPRECATED - kept for backward compatibility)
-   */
-  private async saveAllProfiles(profiles: Map<string, TinkerProfile>): Promise<void> {
-    // This method is no longer used but kept to avoid breaking changes
-    // Individual profiles are now saved separately
-    console.warn(
-      '[ProfileStorage] saveAllProfiles is deprecated - profiles are now saved individually'
-    );
-
-    // Save each profile individually
-    for (const [id, profile] of Array.from(profiles.entries())) {
-      await this.saveProfile(profile);
-    }
-  }
-
   // ============================================================================
   // Legacy Data Cleanup
   // ============================================================================
@@ -389,8 +453,11 @@ export class ProfileStorage {
       // Remove the index
       localStorage.removeItem(STORAGE_KEYS.PROFILE_INDEX);
 
-      // Remove other storage keys
+      // Remove other storage keys, including every per-version active pointer
       localStorage.removeItem(STORAGE_KEYS.ACTIVE_PROFILE);
+      for (const key of this.listActiveProfileKeys()) {
+        localStorage.removeItem(key);
+      }
       localStorage.removeItem(STORAGE_KEYS.PROFILE_METADATA);
       localStorage.removeItem(STORAGE_KEYS.PROFILE_PREFERENCES);
       localStorage.removeItem(STORAGE_KEYS.VERSION);
@@ -434,6 +501,7 @@ export class ProfileStorage {
         STORAGE_KEYS.PROFILE_METADATA,
         STORAGE_KEYS.PROFILE_PREFERENCES,
         STORAGE_KEYS.VERSION,
+        ...this.listActiveProfileKeys(),
       ];
 
       for (const key of otherKeys) {
@@ -450,9 +518,27 @@ export class ProfileStorage {
         total: 5 * 1024 * 1024, // 5MB typical localStorage limit
         profiles: profiles,
       };
-    } catch (error) {
+    } catch {
       return { used: 0, total: 0, profiles: 0 };
     }
+  }
+
+  /**
+   * Every `tinkertools_active_profile:<slug>` key currently in localStorage.
+   */
+  private listActiveProfileKeys(): string[] {
+    const keys: string[] = [];
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith(STORAGE_KEYS.ACTIVE_PROFILE_PREFIX)) {
+          keys.push(key);
+        }
+      }
+    } catch (error) {
+      console.warn('[ProfileStorage] Failed to enumerate active profile keys:', error);
+    }
+    return keys;
   }
 
   /**
@@ -467,7 +553,7 @@ export class ProfileStorage {
 
       const index = JSON.parse(indexData);
       return index.length;
-    } catch (error) {
+    } catch {
       return 0;
     }
   }

@@ -2,8 +2,21 @@
  * Backend Availability Helper
  *
  * Utility for checking if the backend is available for integration tests.
- * Tests that require a real backend should skip if it's not available.
+ * Tests that require a real backend should skip if it's not available:
+ *
+ *   const BACKEND_AVAILABLE = await isBackendAvailable();
+ *   describe.skipIf(!BACKEND_AVAILABLE)('...', () => { ... });
+ *
+ * The check must be awaited at the top level of the test file: skipIf is
+ * evaluated while tests are collected, before any beforeAll hook runs.
+ *
+ * Inside that describe, call browseLiveBackendVersion(): every test starts on
+ * the seeded TEST_VERSION, which no real backend serves.
  */
+
+import { beforeEach } from 'vitest';
+import { setCurrentVersion } from '@/composables/useGameVersion';
+import { LIVE_BACKEND_VERSION } from './version-fixtures';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
 
@@ -19,16 +32,21 @@ export async function isBackendAvailable(): Promise<boolean> {
   }
 
   try {
-    const response = await fetch(`${BACKEND_URL}/api/v1/health`, {
+    const response = await fetch(`${BACKEND_URL}/health`, {
       method: 'GET',
       signal: AbortSignal.timeout(2000), // 2 second timeout
     });
     backendAvailable = response.ok;
-  } catch (error) {
+  } catch {
     backendAvailable = false;
   }
 
   return backendAvailable;
+}
+
+/** Make the tests of the enclosing describe browse a version the real backend serves. */
+export function browseLiveBackendVersion(): void {
+  beforeEach(() => setCurrentVersion(LIVE_BACKEND_VERSION));
 }
 
 /**

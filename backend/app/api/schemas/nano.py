@@ -2,108 +2,143 @@
 Nano program response schemas with rich spell data.
 """
 
-from typing import List, Optional, Dict, Any
+from typing import List, Optional
 from pydantic import BaseModel, Field
-from app.api.schemas.spell import SpellResponse
-
-
-class CastingRequirement(BaseModel):
-    """Represents a casting requirement for a nano program."""
-    type: str = Field(..., description="Type of requirement (skill, stat, level)")
-    requirement: str = Field(..., description="Name of the skill, stat, or 'level'")
-    value: int = Field(..., description="Required value")
-    critical: bool = Field(default=True, description="Whether this is a critical requirement")
+from app.api.schemas.action import ActionResponse
+from app.api.schemas.item import ItemDetail
 
 
 class NanoEffect(BaseModel):
     """Represents an effect that a nano program produces."""
-    type: str = Field(..., description="Type of effect (heal, damage, protection, etc.)")
+
+    type: str = Field(
+        ..., description="Type of effect (heal, damage, protection, etc.)"
+    )
     value: int = Field(..., description="Numeric value of the effect")
-    modifier: str = Field(..., description="How the effect is applied (add, multiply, set)")
+    modifier: str = Field(
+        ..., description="How the effect is applied (add, multiply, set)"
+    )
     stackable: bool = Field(default=False, description="Whether this effect can stack")
-    conditions: List[str] = Field(default_factory=list, description="Conditions for the effect")
+    conditions: List[str] = Field(
+        default_factory=list, description="Conditions for the effect"
+    )
     stat_id: Optional[str] = Field(None, description="Stat affected by this effect")
 
 
 class NanoDuration(BaseModel):
     """Represents the duration of a nano program."""
+
     type: str = Field(..., description="Duration type (instant, duration, permanent)")
     value: Optional[int] = Field(None, description="Duration in seconds if applicable")
 
 
 class NanoTargeting(BaseModel):
     """Represents the targeting information for a nano program."""
+
     type: str = Field(..., description="Target type (self, team, hostile, area)")
     range: Optional[int] = Field(None, description="Range in meters if applicable")
 
 
 class NanoProgram(BaseModel):
     """Complete nano program with item and spell data."""
+
     # Basic item info
-    id: int = Field(..., description="Unique identifier")
+    # Deprecated: an internal row id that differs between game versions. Use
+    # ``aoid``; this field is removed with the content-addressed store.
+    id: int = Field(..., description="Deprecated internal row ID; do not rely on it")
     aoid: int = Field(..., description="Anarchy Online item ID")
     name: str = Field(..., description="Nano program name")
     ql: int = Field(..., description="Quality level")
     description: Optional[str] = Field(None, description="Nano description")
-    
-    # Nano-specific properties (derived from spell data)
-    school: Optional[str] = Field(None, description="Nano school (Matter Creation, etc.)")
-    strain: Optional[str] = Field(None, description="Nano strain for conflict detection")
-    profession: Optional[str] = Field(None, description="Required profession")
-    level: Optional[int] = Field(None, description="Required level")
-    
-    # Casting information
-    casting_requirements: List[CastingRequirement] = Field(
-        default_factory=list, 
-        description="Requirements to cast this nano"
+
+    # Nano-specific properties (app/core/nano_properties.py)
+    school: Optional[str] = Field(
+        None,
+        description="Nano school from the NanoSchool stat: Combat, Medical, "
+        "Protection, Psi or Space",
     )
-    casting_time: Optional[int] = Field(None, description="Time to cast in seconds")
-    recharge_time: Optional[int] = Field(None, description="Recharge time in seconds")
+    strain_id: Optional[int] = Field(
+        None, description="NanoStrain stat (75); nanos of one strain don't stack"
+    )
+    strain: Optional[str] = Field(
+        None, description="Name of strain_id; null when it has none"
+    )
+    professions: List[str] = Field(
+        default_factory=list,
+        description="Professions that can cast it; empty when the Use action "
+        "does not restrict the profession",
+    )
+    level: Optional[int] = Field(
+        None,
+        description="Lowest character level that can cast it (1 when the Use "
+        "action asks for no level); null when it has no Use action",
+    )
+
+    # Casting information
+    actions: List[ActionResponse] = Field(
+        default_factory=list,
+        description="Actions with criteria; the Use action's criteria are the "
+        "requirements to cast this nano",
+    )
+    casting_time: Optional[int] = Field(
+        None,
+        description="Time to cast, in centiseconds: the AttackDelay stat (294); "
+        "null when the nano does not have it",
+    )
+    recharge_time: Optional[int] = Field(
+        None,
+        description="Time to recharge, in centiseconds: the RechargeDelay stat "
+        "(210); null when the nano does not have it",
+    )
     memory_usage: Optional[int] = Field(None, description="Memory usage in MB")
     nano_point_cost: Optional[int] = Field(None, description="Nano point cost")
-    
+
     # Effects and targeting
     effects: List[NanoEffect] = Field(default_factory=list, description="Nano effects")
     duration: Optional[NanoDuration] = Field(None, description="Duration information")
-    targeting: Optional[NanoTargeting] = Field(None, description="Targeting information")
-    
+    targeting: Optional[NanoTargeting] = Field(
+        None, description="Targeting information"
+    )
+
     # Acquisition info (derived from item data)
-    source_location: Optional[str] = Field(None, description="Where to obtain this nano")
-    acquisition_method: Optional[str] = Field(None, description="How to acquire (shop, mission, etc.)")
-    
+    source_location: Optional[str] = Field(
+        None, description="Where to obtain this nano"
+    )
+    acquisition_method: Optional[str] = Field(
+        None, description="How to acquire (shop, mission, etc.)"
+    )
+
     class Config:
         from_attributes = True
 
 
-class NanoProgramWithSpells(NanoProgram):
-    """Nano program with detailed spell information."""
-    spells: List[SpellResponse] = Field(default_factory=list, description="Associated spells")
-    raw_criteria: List[Dict[str, Any]] = Field(default_factory=list, description="Raw spell criteria data")
+class NanoStrainCount(BaseModel):
+    """A strain and how many nanos in the filtered set have it."""
+
+    id: int = Field(..., description="NanoStrain (stat 75) id")
+    name: Optional[str] = Field(None, description="Strain name; null if unknown")
+    count: int = Field(..., description="Number of matching nanos with this strain")
 
 
-class NanoSearchRequest(BaseModel):
-    """Request model for nano search."""
-    query: Optional[str] = Field(None, description="Search query")
-    schools: Optional[List[str]] = Field(None, description="Filter by nano schools")
-    strains: Optional[List[str]] = Field(None, description="Filter by strains")
-    professions: Optional[List[str]] = Field(None, description="Filter by professions")
-    quality_levels: Optional[List[int]] = Field(None, description="Filter by quality levels")
-    level_range: Optional[List[int]] = Field(None, description="Level range [min, max]")
-    
-    # Compatibility filtering (requires profile data)
-    skill_compatible: Optional[bool] = Field(False, description="Filter by skill compatibility")
-    castable: Optional[bool] = Field(False, description="Filter by castable with current stats")
-    
-    # Sorting
-    sort_by: str = Field("name", description="Sort field (name, level, school, ql)")
-    sort_descending: bool = Field(False, description="Sort in descending order")
+class NanoStrainsResponse(BaseModel):
+    """Distinct strains of the nanos matching a set of filters."""
+
+    strains: List[NanoStrainCount] = Field(
+        default_factory=list, description="Strains, sorted by name then id"
+    )
 
 
-class NanoStatsResponse(BaseModel):
-    """Statistics about nano programs in the database."""
-    total_nanos: int = Field(..., description="Total number of nano programs")
-    schools: List[str] = Field(..., description="Available nano schools")
-    strains: List[str] = Field(..., description="Available strains")
-    professions: List[str] = Field(..., description="Available professions")
-    level_range: List[int] = Field(..., description="Min and max levels [min, max]")
-    quality_level_range: List[int] = Field(..., description="Min and max QLs [min, max]")
+class NanoItemDetail(ItemDetail):
+    """ItemDetail of a nano, with the same school, professions and level as
+    NanoProgram."""
+
+    school: Optional[str] = Field(None, description="Nano school (NanoSchool stat)")
+    professions: List[str] = Field(
+        default_factory=list,
+        description="Professions that can cast it; empty when unrestricted",
+    )
+    level: Optional[int] = Field(
+        None, description="Lowest character level that can cast it"
+    )
+    strain_id: Optional[int] = Field(None, description="NanoStrain stat (75)")
+    strain: Optional[str] = Field(None, description="Name of strain_id")

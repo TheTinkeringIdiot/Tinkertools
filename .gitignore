@@ -48,7 +48,6 @@ backend/*nano*analyzer*.py
 backend/*strain*matcher*.py
 
 # Database artifacts
-database/migrations/versions/*.py
 database/dumps/
 
 # ConPort local data
@@ -76,3 +75,5 @@ frontend/test-results/
 frontend/playwright-report/
 frontend/e2e/screenshots/
 frontend/.playwright/
+# Golden API reference captures (backend/tools/golden.py)
+.golden/

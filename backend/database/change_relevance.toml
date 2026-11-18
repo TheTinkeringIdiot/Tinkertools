@@ -1,0 +1,249 @@
+# Relevance of changes between builds.
+#
+# Read by backend/app/core/change_rules.py, whose docstring states how the
+# relevance of a change follows from this file. The importer classifies the
+# change log with it (item_change.relevance) and reclassifies the whole log
+# when the file changes: edit, then run `python import_cli.py import-cas`.
+#
+# Every stat and effect type (spell_id) is listed as `id = "name"` under the
+# class it belongs to. The name is for the reader only.
+#
+#   gameplay   what an item does and who can use it
+#   economy    what it is worth
+#   cosmetic   how it looks and sounds, and client housekeeping
+#
+# An id under `unclassified` is known to occur in changes and has not been
+# judged yet; it takes `default`, as does an id that is not listed at all.
+# `python -m pytest app/tests/test_change_rules_store.py` fails when a stat or
+# effect type occurs in the store's changes and is not in this file.
+
+default = "gameplay"
+
+# Changes classified as a whole.
+[changes]
+added = "gameplay"            # an item that appears in a build
+removed = "gameplay"          # an item that disappears
+actions = "gameplay"          # any action or requirement
+attack_defense = "gameplay"   # attack and defense skills
+event = "cosmetic"            # an event renumbered, an empty event added or removed
+static_instance = "cosmetic"  # stat 23, the client's row id
+animation_mesh = "cosmetic"
+shop = "economy"              # shop inventory data
+
+# Housekeeping values, as `stat = value`: the constant with which the client
+# data writes a stat out, or drops it, on items of every kind at once without
+# anything changing for a player. A stat that is added or removed with that
+# value is a cosmetic change; any other value of the stat, and a change from
+# or to another value (ItemClass 2 -> 4, Value 0 -> 1), keeps the class the
+# stat has below. A stat qualifies when the store shows it added or removed
+# with that one constant on hundreds of unrelated items and (nearly) never
+# with another value.
+[housekeeping]
+3 = 15     # AttackSpeed
+4 = 15     # Breed
+5 = 15     # Organization
+6 = 15     # Team
+7 = 15     # State
+8 = 15     # Duration
+9 = 15     # MapFlags
+30 = 0     # Can: no flags set
+74 = 0     # Value
+76 = 0     # ItemClass
+101 = 0    # MultiMelee
+134 = 0    # MultiRanged
+298 = 0    # Slot: no flags set
+
+[stats.gameplay]
+0 = "None"
+1 = "MaxHealth"
+3 = "AttackSpeed"
+4 = "Breed"
+8 = "Duration"
+24 = "MaxMass"
+26 = "Energy"
+30 = "Can"
+33 = "Faction"
+54 = "Level"
+72 = "ItemType"
+75 = "NanoStrain"
+76 = "ItemClass"
+100 = "MartialArts"
+101 = "MultiMelee"
+134 = "MultiRanged"
+210 = "RechargeDelay"
+211 = "EquipDelay"
+212 = "MaxEnergy"
+284 = "CriticalBonus"
+285 = "MaxDamage"
+286 = "MinDamage"
+287 = "AttackRange"
+289 = "TrapDifficulty"
+294 = "AttackDelay"
+298 = "Slot"
+341 = "XPBonus"
+352 = "SISCap"
+371 = "SkillTimeOnSelectedTarget"
+373 = "ExtendedTime"
+374 = "BurstRecharge"
+375 = "FullAutoRecharge"
+385 = "ChanceOfBreakOnSpellAttack"
+386 = "ChanceOfBreakOnDebuff"
+388 = "TowerType"
+405 = "NanoSchool"
+407 = "NanoPoints"
+420 = "AmmoType"
+422 = "ChanceOfBreakOnAttack"
+436 = "DamageType2"
+440 = "InitiativeType"
+523 = "AttackDelayCap"
+524 = "RechargeDelayCap"
+538 = "MaxBeneficialSkill"
+546 = "StackingLine2"
+547 = "StackingLine3"
+548 = "StackingLine4"
+549 = "StackingLine5"
+550 = "StackingLine6"
+551 = "StackingOrder"
+584 = "ApartmentAccessCard"
+620 = "HouseTemplate"
+642 = "CityTerminalRechargePercent"
+643 = "CooldownTime1"
+644 = "CooldownTime2"
+658 = "IsVehicle"
+
+[stats.economy]
+61 = "Credits"
+74 = "Value"
+426 = "BuyModifier"
+427 = "SellModifier"
+
+[stats.cosmetic]
+2 = "Mass"
+12 = "Mesh"
+41 = "FabricType"
+79 = "Icon"
+88 = "DefaultSlot"
+183 = "EffectIcon"
+209 = "WeaponMesh"
+250 = "SoundVolume"
+269 = "GatherSound"
+270 = "CastSound"
+272 = "HitSound"
+336 = "OverrideTexture"
+353 = "AnimSet"
+360 = "Scale"
+361 = "HitEffectType"
+366 = "GatherEffectType"
+413 = "EffectType"
+419 = "TracerEffectType"
+428 = "CastEffectType"
+501 = "AnimPlay"
+688 = "ItemRarity"
+
+[stats.unclassified]
+5 = "Organization"
+6 = "Team"
+7 = "State"
+9 = "MapFlags"
+10 = "ProfessionLevel"
+15 = "Info"
+177 = "MoreFlags"
+254 = "MonsterLevelsKilled"
+356 = "NPCHash"
+357 = "CollisionRadius"
+358 = "OuterRadius"
+450 = "StateMachine"
+490 = "OriginatorType"
+588 = "ActionCategory"
+651 = "AdvantageHash1"
+
+[effects.gameplay]
+53002 = "Hit {Stat} for {MinValue} to {MaxValue}"
+53012 = "Modify {Stat} {|right|}{Amount}{|/right|}"
+53014 = "Modify {Stat} for {Duration} {|right|}{Amount}{|/right|}"
+53016 = "Teleport to {Playfield} at {X}x{Z} elevation: {Y}"
+53019 = "Upload {NanoID}."
+53026 = "Set {Skill} {|right|}{Amount}{|/right|}"
+53033 = "Lock skill {Skill} for {Duration}."
+53045 = "Modify {Stat} {|right|}{Amount}{|/right|}"
+53051 = "Cast {NanoID}."
+53066 = "Cast {NanoID} on team."
+53073 = "Area hit {Stat}"
+53082 = "Teleport to {Playfield}, subgroup {SG}."
+53083 = "Teleport to {Playfield}."
+53087 = "Cast {NanoID} in a {Radius} radius."
+53089 = "{Chance} chance to cast {NanoID}; no defense checks."
+53100 = "Equip monster weapon {Item}."
+53105 = "Remove {NanoStrain} nanos <= {NCU} NCU {Times} times."
+53109 = "Enter apartment."
+53110 = "Temporarily change {Stat} to {Value}"
+53118 = "Pacify"
+53121 = "Fear."
+53122 = "Stun."
+53126 = "Wipe hate list."
+53127 = "Charm."
+53130 = "Destroy item."
+53137 = "Create apartment in {Playfield}."
+53138 = "Enable flight."
+53139 = "Set flag {Stat} &{BitNum}"
+53140 = "Clear flag {Stat} &{BitNum}"
+53153 = "Mezz."
+53162 = "Resist {NanoStrain} {|right|}{Resistance}{|/right|}"
+53175 = "At level 200: Modify {Stat} {|right|}{Amount}{|/right|}"
+53177 = "Reduce {NanoStrain} by {Duration}."
+53182 = "Add action: {UseItem}."
+53184 = "Modify base {Stat} {|right|}{Percent}{|/right|}"
+53185 = "Drain hit {Stat}"
+53187 = "Lock perk {PerkID} for {Duration}."
+53196 = "Hit {Stat} for {MinValue} to {MaxValue} (special attack)"
+53206 = "Cast {NanoID} if possible."
+53220 = "Spawn QL {Quality} NPC {Spawnee}."
+53222 = "Enqueue for battlestation."
+53224 = "Add defensive proc {Proc}, {Chance} trigger chance."
+53226 = "Spawn quest {Quest}."
+53227 = "Add offensive proc {Proc},  {Chance} trigger chance."
+53228 = "Cast {NanoID} on playfield."
+53229 = "Solve quest {Quest}."
+53230 = "Knockback a radius of {Radius} with {Power} force."
+53231 = "Enable RaidLock for current playfield."
+53236 = "Remove strain {NanoStrain}."
+53237 = "Modify buffed {Stat} {|right|}{Percent}{|/right|}"
+53240 = "Cast {NanoID} on all pets."
+53250 = "Delete quest {QuestId}."
+
+[effects.economy]
+
+[effects.cosmetic]
+53030 = "Visual effect (Gfx parameters)"
+53039 = "Apply texture {Texture} to {Location}."
+53044 = "System text: {Text}"
+53054 = "Change body texture set"
+53057 = "Float text: {Text}"
+53060 = "Temporarily change shape to {Shape}"
+53104 = "NPC Say {MessageName}"
+53115 = "Display GUI element."
+53132 = "Generate name."
+53134 = "Text: {Text}"
+53210 = "Say {Message}"
+
+[effects.unclassified]
+53003 = "(no format template)"
+53028 = "(no format template)"
+53035 = "(no format template)"
+53037 = "(no format template)"
+53038 = "(no format template)"
+53055 = "(no format template)"
+53063 = "(no format template)"
+53064 = "(no format template)"
+53065 = "(no format template)"
+53067 = "(no format template)"
+53068 = "(no format template)"
+53075 = "(no format template)"
+53076 = "(no format template)"
+53079 = "(no format template)"
+53117 = "(no format template)"
+53167 = "(no format template)"
+53193 = "(no format template)"
+53204 = "(no format template)"
+53248 = "(no format template)"
+53253 = "(no format template)"
