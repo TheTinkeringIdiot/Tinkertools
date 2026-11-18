@@ -10,7 +10,7 @@ import os
 
 import pytest
 
-from app.models.interpolated_item import InterpolatedItem
+from app.models.interpolated_item import InterpolatedItem, blend
 from app.services.interpolation import InterpolationService
 from app.tests.fixtures.store_fixtures import criterion, item, modify, nano
 
@@ -388,6 +388,31 @@ def test_values_scale_linearly_with_ql(
 def test_a_value_is_rounded_to_the_nearest_whole_number():
     assert between(0, 3, 1).interpolate_value(10, 11) == 10
     assert between(0, 3, 2).interpolate_value(10, 11) == 11
+
+
+@pytest.mark.parametrize(
+    "lo_val,hi_val,ql_delta,ql_delta_full,expected",
+    [
+        (2, 3, 10, 20, 3),  # 2.5
+        (1, 2, 10, 20, 2),  # 1.5
+        (3, 2, 10, 20, 3),  # 2.5, falling
+        (674, 806, 7, 24, 713),  # 712.5
+        (0, 1, 1, 2, 1),  # 0.5
+        (-3, -2, 10, 20, -2),  # -2.5
+        (-50, -25, 1, 50, -49),  # -49.5
+        (-1, 0, 1, 2, 0),  # -0.5
+        (2, 3, 9, 20, 2),  # 2.45
+        (-3, -2, 11, 20, -2),  # -2.45
+        (-3, -2, 9, 20, -3),  # -2.55
+        (35, 130, 49, 98, 83),  # 82.5, where a float product falls short
+    ],
+)
+def test_an_exact_half_is_rounded_up(lo_val, hi_val, ql_delta, ql_delta_full, expected):
+    assert blend(lo_val, hi_val, ql_delta, ql_delta_full) == expected
+    assert (
+        between(0, ql_delta_full, ql_delta).interpolate_value(lo_val, hi_val)
+        == expected
+    )
 
 
 def test_without_interpolation_a_value_is_the_low_value():
