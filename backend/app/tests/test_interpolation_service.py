@@ -320,6 +320,181 @@ def test_two_variants_of_the_same_ql_leave_no_closing_range(store):
 
 
 # ---------------------------------------------------------------------------
+# Chains (backend/database/item_chains.toml)
+# ---------------------------------------------------------------------------
+
+BELT_SLOTS = 45
+TI_100X, TI_200X, B_300X, B_4IX = 36783, 36782, 36777, 36785
+
+
+def belt(aoid, ql, name, slots, icon, effect=None):
+    """A rung of the belt chain: a name, description and icon of its own."""
+    return item(
+        aoid,
+        name=name,
+        ql=ql,
+        Description=f"About {name}",
+        stats=[(ICON, icon), (STAMINA, ql)],
+        SpellData=[{"Event": 14, "Items": [effect or modify(BELT_SLOTS, slots)]}],
+    )
+
+
+def shown(interpolated):
+    (event,) = interpolated.spell_data
+    (slots,) = [s.spell_params["Amount"] for s in event.spells]
+    return (
+        interpolated.name,
+        interpolated.description,
+        stats_of(interpolated)[ICON],
+        slots,
+    )
+
+
+def test_a_build_with_some_rungs_serves_the_chain_they_make(store):
+    build = store.add_build(
+        "b1",
+        1,
+        items=[
+            belt(TI_200X, 20, "Ti-200X", 2, 502),
+            belt(B_4IX, 80, "4IX", 4, 504),
+            belt(900, 50, "Ti-200X", 9, 599),
+        ],
+    )
+    service = InterpolationService(store.db, build)
+
+    assert service.get_interpolation_ranges(B_4IX) == [
+        {"min_ql": 20, "max_ql": 80, "interpolatable": True, "base_aoid": TI_200X},
+        {"min_ql": 80, "max_ql": 80, "interpolatable": False, "base_aoid": B_4IX},
+    ]
+    # 2 + 2 * 14 / 60 = 2.47, 2 + 2 * 15 / 60 = 2.5, 2 + 2 * 45 / 60 = 3.5
+    assert shown(service.interpolate_item(B_4IX, 34)) == (
+        "Ti-200X",
+        "About Ti-200X",
+        502,
+        2,
+    )
+    # 3 slots, and no rung of this build has 3: still the Ti-200X
+    assert shown(service.interpolate_item(B_4IX, 35)) == (
+        "Ti-200X",
+        "About Ti-200X",
+        502,
+        3,
+    )
+    assert shown(service.interpolate_item(TI_200X, 65)) == ("4IX", "About 4IX", 504, 4)
+    at_65 = service.interpolate_item(TI_200X, 65)
+    assert (at_65.aoid, at_65.interpolating) == (TI_200X, True)
+    assert (at_65.low_ql, at_65.high_ql, at_65.ql) == (20, 80, 65)
+    assert stats_of(at_65)[STAMINA] == 65
+
+
+def test_outside_the_span_of_a_chain_the_item_is_its_first_or_last_rung(store):
+    build = store.add_build(
+        "b1",
+        1,
+        items=[belt(TI_200X, 20, "Ti-200X", 2, 502), belt(B_300X, 40, "300X", 3, 503)],
+    )
+    service = InterpolationService(store.db, build)
+
+    below = service.interpolate_item(B_300X, 5)
+    above = service.interpolate_item(TI_200X, 90)
+
+    assert shown(below) == ("Ti-200X", "About Ti-200X", 502, 2)
+    assert (below.aoid, below.ql, below.interpolating) == (TI_200X, 5, False)
+    assert shown(above) == ("300X", "About 300X", 503, 3)
+    assert (above.aoid, above.ql, above.interpolating) == (B_300X, 90, False)
+
+
+def test_a_single_rung_is_an_ordinary_item(store):
+    build = store.add_build(
+        "b1",
+        1,
+        items=[
+            belt(TI_200X, 20, "Ti-200X", 2, 502),
+            belt(901, 60, "Ti-200X", 4, 599),
+            belt(902, 40, "300X", 3, 503),
+        ],
+    )
+    service = InterpolationService(store.db, build)
+
+    at_40 = service.interpolate_item(TI_200X, 40)
+
+    assert service.get_interpolation_range(TI_200X) == (20, 60)
+    assert shown(at_40) == ("Ti-200X", "About Ti-200X", 502, 3)
+    assert (at_40.low_ql, at_40.high_ql) == (20, 60)
+
+
+def test_a_rung_without_the_key_effect_is_not_part_of_the_chain(store):
+    build = store.add_build(
+        "b1",
+        1,
+        items=[
+            belt(TI_100X, 1, "Ti-100X", 1, 501),
+            belt(TI_200X, 20, "Ti-200X", 0, 502, effect=modify(STAMINA, 7)),
+            belt(B_300X, 41, "300X", 3, 503),
+        ],
+    )
+    service = InterpolationService(store.db, build)
+
+    assert service.get_interpolation_range(TI_100X) == (1, 41)
+    # 1 + 2 * 29 / 40 = 2.45, 1 + 2 * 30 / 40 = 2.5
+    assert shown(service.interpolate_item(TI_100X, 30))[::3] == ("Ti-100X", 2)
+    assert shown(service.interpolate_item(TI_100X, 31))[::3] == ("300X", 3)
+    assert service.get_interpolation_ranges(TI_200X) == [
+        {"min_ql": 20, "max_ql": 20, "interpolatable": False, "base_aoid": TI_200X}
+    ]
+
+
+def test_an_item_that_shares_the_text_of_a_rung_keeps_its_variants(store):
+    build = store.add_build(
+        "b1",
+        1,
+        items=[
+            belt(B_300X, 40, "300X", 3, 503),
+            belt(B_4IX, 80, "4IX", 4, 504),
+            belt(903, 60, "4IX", 4, 599),
+        ],
+    )
+    service = InterpolationService(store.db, build)
+    service.preload([B_4IX, 903])
+
+    assert service.get_interpolation_ranges(903) == [
+        {"min_ql": 60, "max_ql": 80, "interpolatable": True, "base_aoid": 903},
+        {"min_ql": 80, "max_ql": 80, "interpolatable": False, "base_aoid": B_4IX},
+    ]
+    assert shown(service.interpolate_item(903, 70)) == ("4IX", "About 4IX", 599, 4)
+    assert service.get_interpolation_range(B_4IX) == (40, 80)
+    assert service.interpolate_item(B_4IX, 70).low_ql == 40
+
+
+def test_a_chain_costs_one_query_more_whatever_the_number_of_rungs_asked(store):
+    build = store.add_build(
+        "b1",
+        1,
+        items=[
+            belt(TI_100X, 1, "Ti-100X", 1, 501),
+            belt(TI_200X, 20, "Ti-200X", 2, 502),
+            belt(B_300X, 40, "300X", 3, 503),
+            armor(201, ql=1, bonus=5, requirement=50),
+            armor(202, ql=100, bonus=104, requirement=248),
+        ],
+    )
+
+    with store.counting_queries() as ordinary:
+        service = InterpolationService(store.db, build)
+        service.preload([201])
+        service.interpolate_item(201, 50)
+    with store.counting_queries() as mixed:
+        service = InterpolationService(store.db, build)
+        service.preload([201, TI_100X, B_300X])
+        service.interpolate_item(201, 50)
+        service.interpolate_item(TI_100X, 30)
+        service.interpolate_item(B_300X, 10)
+        service.interpolate_item(TI_200X, 10)
+
+    assert len(mixed) == len(ordinary) + 1
+
+
+# ---------------------------------------------------------------------------
 # Loading
 # ---------------------------------------------------------------------------
 
