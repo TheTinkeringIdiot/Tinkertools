@@ -215,6 +215,8 @@ interface PaginatedResponse<T> extends ApiResponse<T[]> {
 - Stat interpolation for INTERP_STATS (183 supported stats)
 - Spell parameter interpolation for specific spell IDs
 - Action criteria interpolation
+- Values rounded to the nearest integer, an exact half up as in the game
+- Item chains (`backend/database/item_chains.toml`): differently named items that interpolate into one another (NCU belts, NCU memory chips) and take the name, description and icon of the rung they have reached
 - Range calculation and boundary validation
 
 **Frontend Integration** (`frontend/src/services/interpolation-service.ts`):

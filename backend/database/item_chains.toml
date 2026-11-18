@@ -1,0 +1,39 @@
+# Item chains: ladders of differently named items that interpolate into one
+# another.
+#
+# Read by backend/app/core/item_chains.py, once per API process. Nothing is
+# imported into the store: an edit takes effect when the API restarts.
+#
+# The QL variants of an item are normally the items that share its name and
+# description. The rungs of a chain are variants of one another although each
+# has a name of its own: between two adjacent rungs every value is blended by
+# QL as between ordinary variants, and the result takes the name, description
+# and icon of the highest rung whose own key value is not above the blended
+# key value. The key value is the amount of the effect of type `effect`
+# (spell_id) that modifies stat `stat`.
+#
+# `rungs` are AOIDs, in any order: a build serves the chain made of the rungs
+# it holds, by QL, and interpolates the rungs as ordinary items when it holds
+# fewer than two. An AOID belongs to one chain at most. An item that is not
+# listed is never part of a chain, whatever its name.
+
+# Belt Component Platform Ti-100X (QL 1, 1 slot), Ti-200X (20, 2), 300X
+# (40, 3), 4IX (80, 4), 5000 (120, 5), 6K-X (200, 6). Confirmed in game:
+# between Ti-200X and 300X, QL 29 is a Ti-200X with 2 slots and QL 30 a 300X
+# with 3 (2.5 rounds up).
+[[chain]]
+name = "NCU belts"
+effect = 53045
+stat = 45  # BeltSlots
+rungs = [36783, 36782, 36777, 36785, 36784, 36787]
+
+# "2 - 3 NCU Memory" (QL 1, 2 NCU), "4 - 7" (20, 4), "8 - 15" (40, 8),
+# "16 - 31" (50, 16), "32 - 63" (120, 32), "64 NCU Memory" (200, 64). Not
+# confirmed in game: the chain rests on the names being ranges of the key
+# value, each rung named for the values it shows until the next one takes
+# over.
+[[chain]]
+name = "NCU memory"
+effect = 53045
+stat = 181  # NCU
+rungs = [36779, 36778, 36786, 36780, 36781, 95520]

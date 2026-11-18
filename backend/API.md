@@ -172,6 +172,10 @@ Get detailed information about a specific item by its Anarchy Online ID (AOID).
 
 An item that exists at several quality levels is stored at a few of them; these routes compute it at a QL in between.
 
+The stored variants of an item are the items of the build that share its name and description. Between two consecutive variants, stats, effect amounts and requirement values are blended linearly by QL and rounded to the nearest integer, an exact half up as the game does (2.5 is 3, -2.5 is -2).
+
+**Item chains.** The NCU belts (`Belt Component Platform Ti-100X` ... `6K-X`) and the NCU memory chips (`2 - 3 NCU Memory` ... `64 NCU Memory`) are ladders of differently named items that interpolate into one another. The rungs of a chain are variants of one another: any rung's AOID answers for every QL of the chain, the values are blended between the two adjacent rungs like those of any item, and the result has the `name`, `description` and icon (stat 79) of the highest rung whose own key value (belt slots, NCU) is not above the blended one. Between the Ti-200X (QL 20, 2 slots) and the 300X (QL 40, 3 slots), QL 29 is a Ti-200X with 2 slots and QL 30 a 300X with 3. The `aoid` stays that of the low rung of the pair, as for any item, so along a chain the name can be that of another AOID. The chains are listed in `backend/database/item_chains.toml`; a build serves the chain made of the rungs it holds, and items that are not listed are never part of one.
+
 #### GET /api/v1/items/{aoid}/interpolate
 Interpolate an item to a quality level.
 
@@ -205,7 +209,7 @@ Interpolate an item to a quality level.
 }
 ```
 
-`item` has the `stats`, `spell_data` and `actions` of an item detail, computed for `target_ql`, and no attack, defense or source lists. Its `aoid` is that of the stored variant the values are computed from, and `id` equals it. `interpolating` is false when the item has a single variant, which is then returned as it is with `ql` set to `target_ql`.
+`item` has the `stats`, `spell_data` and `actions` of an item detail, computed for `target_ql`, and no attack, defense or source lists. Its `aoid` is that of the stored variant the values are computed from, and `id` equals it. `interpolating` is false when the item has a single variant, which is then returned as it is with `ql` set to `target_ql`; so is the lowest variant below its QL, and the highest at or above its own.
 
 An AOID the build does not have answers 200 with `"success": false` and the reason in `error`.
 

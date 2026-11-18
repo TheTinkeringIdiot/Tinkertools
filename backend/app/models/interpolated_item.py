@@ -10,6 +10,20 @@ from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 
 
+def blend(lo_val: int, hi_val: int, ql_delta: int, ql_delta_full: int) -> int:
+    """
+    The value ``ql_delta`` quality levels above ``lo_val`` on the line that
+    reaches ``hi_val`` after ``ql_delta_full`` levels, rounded as the game
+    rounds: to the nearest integer, an exact half up (2.5 is 3, -2.5 is -2).
+
+    Computed in integers, so that a half is a half whatever the operands:
+    Python's ``round`` sends halves to the even number, and a float product
+    can land on either side of one.
+    """
+    doubled = 2 * (lo_val * ql_delta_full + (hi_val - lo_val) * ql_delta)
+    return (doubled + ql_delta_full) // (2 * ql_delta_full)
+
+
 class InterpolatedSpell(BaseModel):
     """
     Represents a spell with interpolated parameters.
@@ -114,14 +128,10 @@ class InterpolatedItem(BaseModel):
     def interpolate_value(self, lo_val: int, hi_val: int) -> int:
         """
         Interpolate a single value between low and high based on QL delta.
-        This is the core interpolation function from the legacy system.
         """
         if not self.interpolating or self.ql_delta_full == 0:
             return lo_val
-
-        val_per_ql = (hi_val - lo_val) / self.ql_delta_full
-        newval = round(lo_val + (val_per_ql * self.ql_delta))
-        return newval
+        return blend(lo_val, hi_val, self.ql_delta, self.ql_delta_full)
 
     def set_interpolation_metadata(
         self, lo_item: Any, hi_item: Optional[Any], target_ql: int

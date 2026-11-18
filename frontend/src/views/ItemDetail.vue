@@ -239,7 +239,7 @@ Shows all item data with profile compatibility and comparison options
             <template #content>
               <div class="space-y-4">
                 <!-- Item Slots Display or Icon -->
-                <ItemSlotsDisplay :item="item" />
+                <ItemSlotsDisplay :item="displayedItem ?? item" />
               </div>
             </template>
           </Card>
@@ -258,9 +258,9 @@ Shows all item data with profile compatibility and comparison options
                   </div>
                 </div>
 
-                <div v-if="item.description">
+                <div v-if="(displayedItem ?? item).description">
                   <p class="text-sm text-surface-600 dark:text-surface-400 leading-relaxed">
-                    {{ item.description }}
+                    {{ (displayedItem ?? item).description }}
                   </p>
                 </div>
                 <div v-else class="text-sm text-surface-500 dark:text-surface-400 italic">
@@ -631,9 +631,13 @@ const absence = computed<{ title: string; text: string } | null>(() => {
   return { title: 'No such item', text: `No build on record has an item with id ${id}.` };
 });
 
-/** The item's name; for an item this version does not have, the name its history gives it. */
+/**
+ * The item's name at the QL shown, which along an item chain is not the name of
+ * the item the page was opened on; for an item this version does not have, the
+ * name its history gives it.
+ */
 const headingText = computed(() => {
-  if (item.value?.name) return item.value.name;
+  if (displayedItem.value?.name) return displayedItem.value.name;
   if (loading.value) return 'Loading Item...';
   return timelineEntries.value[0]?.name || `Item ${itemAoid.value}`;
 });
@@ -919,8 +923,8 @@ async function shareItem() {
   if (navigator.share) {
     try {
       await navigator.share({
-        title: item.value.name,
-        text: item.value.description,
+        title: (displayedItem.value ?? item.value).name,
+        text: (displayedItem.value ?? item.value).description,
         url,
       });
     } catch (err) {

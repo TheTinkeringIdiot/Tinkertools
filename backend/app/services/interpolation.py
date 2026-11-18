@@ -9,13 +9,20 @@ The QL variants of an item are the items of the build that share its name and
 description, which in the store is its text part. They are read through
 ``app.store``: one query finds the variants of any number of items, one loads
 them.
+
+The rungs of an item chain (``app.core.item_chains``) are variants of one
+another instead, whatever their names: the chain of a build is made of the
+rungs the build holds that carry the chain's key effect, and one more query
+loads the chains asked for. An item interpolated along a chain is shown as the
+highest rung whose key value is not above its own.
 """
 
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.item_chains import ItemChain, default_chains
 from app.models.interpolated_item import (
     InterpolatedAction,
     InterpolatedItem,
@@ -46,6 +53,26 @@ _SPELL_PARAMS: Dict[int, Tuple[str, str]] = {
     53184: ("Stat", "Percent"),
     53237: ("Stat", "Percent"),
 }
+
+ICON_STAT = 79
+
+
+def _effects(item: ItemRecord) -> Iterator[Tuple[int, Dict[str, Any]]]:
+    """The effect type and parameters of every effect of an item."""
+    for event in item.effects:
+        for effect in event["effects"]:
+            yield effect["spell_id"], effect["params"]
+
+
+def _key_value(
+    chain: ItemChain, effects: Iterable[Tuple[Optional[int], Dict[str, Any]]]
+) -> Optional[int]:
+    """The key value of a chain among these effects, None when none of them
+    is the chain's key effect."""
+    for spell_id, params in effects:
+        if spell_id == chain.effect and params.get("Stat") == chain.stat:
+            return params.get("Amount")
+    return None
 
 
 class InterpolationService:
@@ -81,12 +108,15 @@ class InterpolationService:
         self.db = db
         self.build = build
         self._variants: Dict[int, List[ItemRecord]] = {}
+        self._chains: Dict[int, ItemChain] = {}
         self._formats: Optional[Dict[int, str]] = None
 
     def preload(self, aoids: Iterable[int]) -> None:
         """Load the variants of several items at once, ahead of the calls that
         use them."""
         missing = [aoid for aoid in dict.fromkeys(aoids) if aoid not in self._variants]
+        self._load_chains(missing)
+        missing = [aoid for aoid in missing if aoid not in self._variants]
         if not missing:
             return
         base = t.item_presence.alias("base")
@@ -119,6 +149,35 @@ class InterpolationService:
             text_of[row.aoid] = row.text_id
         for aoid in missing:
             self._variants[aoid] = by_text[text_of[aoid]] if aoid in text_of else []
+
+    def _load_chains(self, aoids: Sequence[int]) -> None:
+        """Make the rungs of the chains these items belong to variants of one
+        another. A chain the build holds fewer than two rungs of is left
+        alone: its rungs are then ordinary items."""
+        known = default_chains()
+        chains = {chain.name: chain for aoid in aoids if (chain := known.get(aoid))}
+        if not chains:
+            return
+        records = load_records(
+            self.db,
+            self.build,
+            aoids=sorted(aoid for chain in chains.values() for aoid in chain.rungs),
+        )
+        for chain in chains.values():
+            rungs = sorted(
+                (
+                    record
+                    for record in records
+                    if record.aoid in chain.rungs
+                    and _key_value(chain, _effects(record)) is not None
+                ),
+                key=lambda record: (record.ql, record.aoid),
+            )
+            if len(rungs) < 2:
+                continue
+            for rung in rungs:
+                self._variants[rung.aoid] = rungs
+                self._chains[rung.aoid] = chain
 
     def _find_item_variants(self, aoid: int) -> List[ItemRecord]:
         """
@@ -162,7 +221,44 @@ class InterpolationService:
         lo_item, hi_item = self._find_interpolation_bounds(item_variants, target_ql)
 
         # Create the interpolated item
-        return self._create_interpolated_item(lo_item, hi_item, target_ql)
+        interpolated = self._create_interpolated_item(lo_item, hi_item, target_ql)
+        chain = self._chains.get(aoid)
+        if chain is not None:
+            self._show_rung(interpolated, chain, item_variants)
+        return interpolated
+
+    @staticmethod
+    def _show_rung(
+        interpolated: InterpolatedItem, chain: ItemChain, rungs: Sequence[ItemRecord]
+    ) -> None:
+        """
+        Give an item interpolated along a chain the name, description and icon
+        of the rung it is: the highest one whose key value is not above the
+        item's. Its AOID stays that of the low rung it is computed from.
+        """
+        value = _key_value(
+            chain,
+            (
+                (spell.spell_id, spell.spell_params)
+                for event in interpolated.spell_data
+                for spell in event.spells
+            ),
+        )
+        if value is None:
+            return
+        keys = ((_key_value(chain, _effects(rung)), rung) for rung in rungs)
+        reached = [(key, rung) for key, rung in keys if key <= value]
+        if not reached:
+            return
+        _, rung = max(reached, key=lambda entry: (entry[0], entry[1].ql))
+        interpolated.name = rung.name
+        interpolated.description = rung.description
+        icon = dict(rung.stats).get(ICON_STAT)
+        interpolated.stats = [
+            stat for stat in interpolated.stats if stat["stat"] != ICON_STAT
+        ]
+        if icon is not None:
+            interpolated.stats.append({"stat": ICON_STAT, "value": icon})
 
     def get_interpolation_ranges(self, aoid: int) -> Optional[List[Dict[str, Any]]]:
         """
