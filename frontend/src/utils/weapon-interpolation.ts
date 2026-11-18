@@ -73,17 +73,6 @@ export function interpolateWeapon(
   const loStats = extractWeaponStatsForInterpolation(loWeapon);
   const hiStats = extractWeaponStatsForInterpolation(hiWeapon);
 
-  // Calculate deltas per QL
-  const minDmgDelta = (hiStats.minDamage - loStats.minDamage) / qlDelta;
-  const maxDmgDelta = (hiStats.maxDamage - loStats.maxDamage) / qlDelta;
-  const critDmgDelta = (hiStats.critBonus - loStats.critBonus) / qlDelta;
-
-  // AR cap delta (only if both weapons have it)
-  let arCapDelta = 0;
-  if (loStats.arCap !== null && hiStats.arCap !== null) {
-    arCapDelta = (hiStats.arCap - loStats.arCap) / qlDelta;
-  }
-
   // Try each QL from high to low
   for (let i = qlDelta; i >= 0; i--) {
     const testQL = loQL + i;
@@ -97,15 +86,7 @@ export function interpolateWeapon(
     };
 
     // Interpolate stats
-    interpolated.stats = interpolateStats(
-      loWeapon.stats,
-      i,
-      minDmgDelta,
-      maxDmgDelta,
-      critDmgDelta,
-      arCapDelta,
-      loStats
-    );
+    interpolated.stats = interpolateStats(loWeapon.stats, i, qlDelta, loStats, hiStats);
 
     // Interpolate requirements
     interpolated.actions = interpolateRequirements(loWeapon.actions, hiWeapon.actions, i, qlDelta);
@@ -171,29 +152,12 @@ export function interpolateWeaponToQL(
   const loStats = extractWeaponStatsForInterpolation(loWeapon);
   const hiStats = extractWeaponStatsForInterpolation(hiWeapon);
 
-  const minDmgDelta = (hiStats.minDamage - loStats.minDamage) / qlDelta;
-  const maxDmgDelta = (hiStats.maxDamage - loStats.maxDamage) / qlDelta;
-  const critDmgDelta = (hiStats.critBonus - loStats.critBonus) / qlDelta;
-
-  let arCapDelta = 0;
-  if (loStats.arCap !== null && hiStats.arCap !== null) {
-    arCapDelta = (hiStats.arCap - loStats.arCap) / qlDelta;
-  }
-
   return {
     ...loWeapon,
     ql: clampedQL,
     interpolatedQL: clampedQL,
     equipable: true,
-    stats: interpolateStats(
-      loWeapon.stats,
-      offset,
-      minDmgDelta,
-      maxDmgDelta,
-      critDmgDelta,
-      arCapDelta,
-      loStats
-    ),
+    stats: interpolateStats(loWeapon.stats, offset, qlDelta, loStats, hiStats),
   };
 }
 
@@ -255,63 +219,64 @@ function findStatValue(
 }
 
 /**
+ * The value `qlOffset` quality levels above `loValue` on the line that reaches
+ * `hiValue` after `qlDelta` levels, rounded as the game rounds: to the nearest
+ * integer, an exact half up (2.5 is 3, -2.5 is -2).
+ *
+ * Computed in integers so that a half is a half: a per-QL delta multiplied
+ * back can land on either side of one. The backend's `blend`
+ * (app/models/interpolated_item.py) is the same arithmetic.
+ */
+export function interpolateValue(
+  loValue: number,
+  hiValue: number,
+  qlOffset: number,
+  qlDelta: number
+): number {
+  const doubled = 2 * (loValue * qlDelta + (hiValue - loValue) * qlOffset);
+  return Math.floor((doubled + qlDelta) / (2 * qlDelta));
+}
+
+/**
  * Interpolate weapon stats based on QL offset
  *
  * Port of legacy code lines 518-532
  *
  * @param loStats - Stats from low QL weapon
  * @param qlOffset - QL offset from low weapon (0 to qlDelta)
- * @param minDmgDelta - Min damage increase per QL
- * @param maxDmgDelta - Max damage increase per QL
- * @param critDmgDelta - Crit bonus increase per QL
- * @param arCapDelta - AR cap increase per QL
- * @param baseStats - Base stats for interpolation
+ * @param qlDelta - Total QL difference
+ * @param lo - Interpolated stats of the low QL weapon
+ * @param hi - Interpolated stats of the high QL weapon
  * @returns New stats array with interpolated values
  */
 function interpolateStats(
   loStats: StatValue[],
   qlOffset: number,
-  minDmgDelta: number,
-  maxDmgDelta: number,
-  critDmgDelta: number,
-  arCapDelta: number,
-  baseStats: WeaponStatsForInterpolation
+  qlDelta: number,
+  lo: WeaponStatsForInterpolation,
+  hi: WeaponStatsForInterpolation
 ): StatValue[] {
+  const interpolated = new Map<number, number>([
+    [WEAPON_STAT_IDS.MIN_DAMAGE, interpolateValue(lo.minDamage, hi.minDamage, qlOffset, qlDelta)],
+    [WEAPON_STAT_IDS.MAX_DAMAGE, interpolateValue(lo.maxDamage, hi.maxDamage, qlOffset, qlDelta)],
+    [
+      WEAPON_STAT_IDS.CRITICAL_BONUS,
+      interpolateValue(lo.critBonus, hi.critBonus, qlOffset, qlDelta),
+    ],
+  ]);
+  // AR cap is interpolated when the low weapon has one; a high weapon without
+  // one leaves it at the low value.
+  if (lo.arCap !== null) {
+    interpolated.set(
+      WEAPON_STAT_IDS.AR_CAP,
+      interpolateValue(lo.arCap, hi.arCap ?? lo.arCap, qlOffset, qlDelta)
+    );
+  }
+
+  // All other stats stay the same
   return loStats.map((stat) => {
-    // Min damage
-    if (stat.stat === WEAPON_STAT_IDS.MIN_DAMAGE) {
-      return {
-        ...stat,
-        value: Math.round(baseStats.minDamage + qlOffset * minDmgDelta),
-      };
-    }
-
-    // Max damage
-    else if (stat.stat === WEAPON_STAT_IDS.MAX_DAMAGE) {
-      return {
-        ...stat,
-        value: Math.round(baseStats.maxDamage + qlOffset * maxDmgDelta),
-      };
-    }
-
-    // Crit bonus
-    else if (stat.stat === WEAPON_STAT_IDS.CRITICAL_BONUS) {
-      return {
-        ...stat,
-        value: Math.round(baseStats.critBonus + qlOffset * critDmgDelta),
-      };
-    }
-
-    // AR cap
-    else if (stat.stat === WEAPON_STAT_IDS.AR_CAP && baseStats.arCap !== null) {
-      return {
-        ...stat,
-        value: Math.round(baseStats.arCap + qlOffset * arCapDelta),
-      };
-    }
-
-    // All other stats stay the same
-    return stat;
+    const value = interpolated.get(stat.stat);
+    return value === undefined ? stat : { ...stat, value };
   });
 }
 
@@ -364,13 +329,9 @@ function interpolateRequirements(
 
         // Interpolate skill requirements
         if (typeof criterion.value2 === 'number' && typeof hiCriterion.value2 === 'number') {
-          const loValue = criterion.value2;
-          const hiValue = hiCriterion.value2;
-          const delta = (hiValue - loValue) / qlDelta;
-
           return {
             ...criterion,
-            value2: Math.round(loValue + qlOffset * delta),
+            value2: interpolateValue(criterion.value2, hiCriterion.value2, qlOffset, qlDelta),
           };
         }
 

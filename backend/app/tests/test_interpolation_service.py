@@ -579,7 +579,7 @@ def test_a_value_is_rounded_to_the_nearest_whole_number():
         (2, 3, 9, 20, 2),  # 2.45
         (-3, -2, 11, 20, -2),  # -2.45
         (-3, -2, 9, 20, -3),  # -2.55
-        (35, 130, 49, 98, 83),  # 82.5, where a float product falls short
+        (0, 61, 7, 14, 31),  # 30.5, where 61 / 14 * 7 is 30.499999999999996
     ],
 )
 def test_an_exact_half_is_rounded_up(lo_val, hi_val, ql_delta, ql_delta_full, expected):
