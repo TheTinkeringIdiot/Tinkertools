@@ -221,7 +221,9 @@ def classify(builds: list, known: dict, taken: dict, force: bool) -> list:
     return to_parse
 
 
-def parser_command(parser_dll: Path, build: Build, staging: Path, errors_file: Path) -> list:
+def parser_command(
+    parser_dll: Path, build: Build, staging: Path, errors_file: Path
+) -> list:
     command = [
         "dotnet",
         str(parser_dll),
