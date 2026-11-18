@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import Optional
 
 # Every build must be parsed by the same extractor: content hashes cover parser-generated fields.
-TINKERPARSE_COMMIT = "eb179de3599a242308a9391d707e1c987ae8064b"
+TINKERPARSE_COMMIT = "56d596df9026e7fcf493e0926be4df1c682a5d07"
 
 DB_DIR = Path("cd_image/data/db")
 DAT_NAME = "ResourceDatabase.dat"
@@ -221,14 +221,7 @@ def classify(builds: list, known: dict, taken: dict, force: bool) -> list:
     return to_parse
 
 
-def run_parser(parser_dll: Path, build: Build, extracts: Path, commit: str) -> None:
-    """Parse one build into ``<extracts>/<slug>``; on failure mark the build failed."""
-    started = datetime.now()
-    target = extracts / build.slug
-    staging = extracts / f".{build.slug}.tmp"
-    shutil.rmtree(staging, ignore_errors=True)
-    staging.mkdir(parents=True)
-    errors_file = staging / "errors.json"
+def parser_command(parser_dll: Path, build: Build, staging: Path, errors_file: Path) -> list:
     command = [
         "dotnet",
         str(parser_dll),
@@ -243,6 +236,21 @@ def run_parser(parser_dll: Path, build: Build, extracts: Path, commit: str) -> N
     ]
     if build.family == "prk":
         command.append("--prk")
+    else:
+        # Older AO clients store records in older formats; PRK numbers its builds on its own scale.
+        command += ["--client-version", build.build]
+    return command
+
+
+def run_parser(parser_dll: Path, build: Build, extracts: Path, commit: str) -> None:
+    """Parse one build into ``<extracts>/<slug>``; on failure mark the build failed."""
+    started = datetime.now()
+    target = extracts / build.slug
+    staging = extracts / f".{build.slug}.tmp"
+    shutil.rmtree(staging, ignore_errors=True)
+    staging.mkdir(parents=True)
+    errors_file = staging / "errors.json"
+    command = parser_command(parser_dll, build, staging, errors_file)
     try:
         result = subprocess.run(
             command, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True
