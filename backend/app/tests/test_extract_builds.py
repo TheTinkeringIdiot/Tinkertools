@@ -70,6 +70,28 @@ def test_slug_follows_the_client_build(family, build, slug):
     assert make_slug(family, build) == slug
 
 
+def test_an_ao_build_tells_the_parser_its_client_version(tmp_path):
+    build = installed_build(make_client(tmp_path, "client", version="11.0"), "ao")
+    command = extract_builds.parser_command(
+        tmp_path / "p.dll", build, tmp_path / "out", tmp_path / "e.json"
+    )
+    assert command[command.index("--client-version") + 1] == "11.0"
+    assert "--prk" not in command
+
+
+def test_a_prk_build_is_not_read_as_an_old_ao_client(tmp_path):
+    client = tmp_path / "prk"
+    (client / "cd_image").mkdir(parents=True)
+    (client / "cd_image" / "rdb.db").write_bytes(b"db")
+    (client / "patch.version").write_text("0.7.1\n")
+    build = installed_build(client, "prk")
+    command = extract_builds.parser_command(
+        tmp_path / "p.dll", build, tmp_path / "out", tmp_path / "e.json"
+    )
+    assert "--prk" in command
+    assert "--client-version" not in command
+
+
 def test_builds_sort_in_patch_order_not_text_order():
     builds = ["14.7.10", "14.7.8", "14.7.2", "15.0.1", "14.9.0"]
     assert sorted(builds, key=build_key) == [
